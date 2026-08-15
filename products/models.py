@@ -1,4 +1,4 @@
-from django.conf import settings
+from django.contrib.auth.models import User
 from django.db import models
 
 
@@ -26,9 +26,9 @@ class Product(models.Model):
         FAIR = 'FAIR', 'Fair Condition'
 
     seller = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        related_name='products',
+        User,
         on_delete=models.CASCADE,
+        related_name='products',
     )
     category = models.ForeignKey(
         Category,

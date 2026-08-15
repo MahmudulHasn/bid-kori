@@ -2,7 +2,7 @@ from django.db import transaction
 from rest_framework import serializers
 
 from products.models import Product
-from .models import Auction
+from .models import Auction, Bid
 
 
 class ProductSerializer(serializers.ModelSerializer):
@@ -70,3 +70,19 @@ class AuctionSerializer(serializers.ModelSerializer):
             auction = Auction.objects.create(product=product, **validated_data)
 
         return auction
+
+
+class BidSerializer(serializers.ModelSerializer):
+    """Serializes a bid placed on an auction, including nested auction details."""
+
+    auction = AuctionSerializer(read_only=True)
+
+    class Meta:
+        model = Bid
+        fields = ['id', 'auction', 'bidder', 'amount', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'auction', 'bidder', 'created_at', 'updated_at']
+
+    def validate_amount(self, value):
+        if value <= 0:
+            raise serializers.ValidationError('Bid amount must be greater than 0.')
+        return value

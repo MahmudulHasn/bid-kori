@@ -4,8 +4,9 @@ from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnl
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import Auction
-from .serializers import AuctionSerializer
+from .models import Auction, Bid
+from .permissions import IsNotSeller
+from .serializers import AuctionSerializer, BidSerializer
 from .services import AuctionStateMachine
 
 
@@ -62,3 +63,37 @@ class TransitionAuctionStateView(APIView):
 
         serializer = AuctionSerializer(auction, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class PlaceBidView(generics.CreateAPIView):
+    """Place a bid on a live auction.
+
+    Sellers are blocked from bidding on their own auctions via IsNotSeller.
+    """
+
+    serializer_class = BidSerializer
+    permission_classes = [IsAuthenticated, IsNotSeller]
+
+    def perform_create(self, serializer):
+        auction = generics.get_object_or_404(
+            Auction.objects.select_related('product__seller'),
+            pk=self.kwargs['pk'],
+        )
+        bid = serializer.save(bidder=self.request.user, auction=auction)
+        if bid.amount > auction.current_highest_bid:
+            auction.current_highest_bid = bid.amount
+            auction.save(update_fields=['current_highest_bid'])
+
+
+class UserBidsView(generics.ListAPIView):
+    """Return all bids placed by the authenticated user, with auction details."""
+
+    serializer_class = BidSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Bid.objects.select_related(
+            'auction',
+            'auction__product',
+            'bidder',
+        ).filter(bidder=self.request.user)

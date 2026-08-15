@@ -1,3 +1,4 @@
+from django.contrib.auth.models import User
 from django.db import models
 from django.utils import timezone
 
@@ -73,3 +74,27 @@ class Auction(models.Model):
             return True
 
         return False
+
+
+class Bid(models.Model):
+    """A single bid placed by a registered user on an auction."""
+
+    auction = models.ForeignKey(
+        Auction,
+        related_name='bids',
+        on_delete=models.CASCADE,
+    )
+    bidder = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='bids',
+    )
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.bidder} bid {self.amount} on {self.auction}'
