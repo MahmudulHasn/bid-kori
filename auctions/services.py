@@ -12,29 +12,12 @@ class AuctionStateMachine:
     """
 
     ALLOWED_TRANSITIONS = {
-        Auction.Status.DRAFT: [
-            Auction.Status.SCHEDULED,
+        Auction.Status.ACTIVE: [
+            Auction.Status.CLOSED,
             Auction.Status.CANCELLED,
         ],
-        Auction.Status.SCHEDULED: [
-            Auction.Status.LIVE,
-            Auction.Status.CANCELLED,
-        ],
-        Auction.Status.LIVE: [
-            Auction.Status.ENDED,
-            Auction.Status.CANCELLED,
-        ],
-        Auction.Status.ENDED: [
-            Auction.Status.WINNER_VALIDATION,
-            Auction.Status.CANCELLED,
-        ],
-        Auction.Status.WINNER_VALIDATION: [
-            Auction.Status.READY_TO_SHIP,
-            Auction.Status.CANCELLED,
-        ],
-        Auction.Status.READY_TO_SHIP: [
-            Auction.Status.COMPLETED,
-        ],
+        Auction.Status.CLOSED: [],
+        Auction.Status.CANCELLED: [],
     }
 
     @classmethod

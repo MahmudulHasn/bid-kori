@@ -56,7 +56,7 @@ class Command(BaseCommand):
                 'auction': {
                     'starting_bid': Decimal('500.00'),
                     'min_increment': Decimal('50.00'),
-                    'status': Auction.Status.DRAFT,
+                    'status': Auction.Status.ACTIVE,
                     'start_time': now + timedelta(days=1),
                     'end_time': now + timedelta(days=2),
                 },
@@ -71,7 +71,7 @@ class Command(BaseCommand):
                 'auction': {
                     'starting_bid': Decimal('20000.00'),
                     'min_increment': Decimal('500.00'),
-                    'status': Auction.Status.LIVE,
+                    'status': Auction.Status.ACTIVE,
                     'start_time': now - timedelta(hours=1),
                     'end_time': now + timedelta(hours=2),
                 },
@@ -86,7 +86,7 @@ class Command(BaseCommand):
                 'auction': {
                     'starting_bid': Decimal('3000.00'),
                     'min_increment': Decimal('100.00'),
-                    'status': Auction.Status.ENDED,
+                    'status': Auction.Status.CLOSED,
                     'start_time': now - timedelta(hours=5),
                     'end_time': now - timedelta(hours=1),
                 },

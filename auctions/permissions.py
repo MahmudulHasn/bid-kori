@@ -21,7 +21,11 @@ class IsNotSeller(BasePermission):
         return request.user != auction.product.seller
 
     def _get_auction(self, view):
-        auction_id = view.kwargs.get('pk') or view.kwargs.get('auction_pk')
+        auction_id = (
+            view.kwargs.get('auction_id')
+            or view.kwargs.get('pk')
+            or view.kwargs.get('auction_pk')
+        )
         if auction_id is None:
             return None
         try:

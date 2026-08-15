@@ -7,13 +7,8 @@ class Auction(models.Model):
     """An auction listing for a single product, tracking its bidding lifecycle."""
 
     class Status(models.TextChoices):
-        DRAFT = 'DRAFT', 'Draft'
-        SCHEDULED = 'SCHEDULED', 'Scheduled'
-        LIVE = 'LIVE', 'Live'
-        ENDED = 'ENDED', 'Ended'
-        WINNER_VALIDATION = 'WINNER_VALIDATION', 'Winner Validation'
-        READY_TO_SHIP = 'READY_TO_SHIP', 'Ready to Ship'
-        COMPLETED = 'COMPLETED', 'Completed'
+        ACTIVE = 'ACTIVE', 'Active'
+        CLOSED = 'CLOSED', 'Closed'
         CANCELLED = 'CANCELLED', 'Cancelled'
 
     product = models.OneToOneField(
@@ -40,10 +35,17 @@ class Auction(models.Model):
     )
     start_time = models.DateTimeField()
     end_time = models.DateTimeField()
+    winning_bidder = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='won_auctions',
+    )
     status = models.CharField(
         max_length=20,
         choices=Status.choices,
-        default=Status.DRAFT,
+        default=Status.ACTIVE,
     )
     is_featured = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -54,22 +56,17 @@ class Auction(models.Model):
     def __str__(self):
         return f'Auction for {self.product} ({self.get_status_display()})'
 
-    def update_status_by_time(self):
-        """Advance the auction status based on the current time.
+    def is_active(self):
+        """Return True when the auction is ACTIVE and has not yet ended."""
+        return self.status == self.Status.ACTIVE and timezone.now() < self.end_time
 
-        Transitions a SCHEDULED auction to LIVE once its start time has
-        passed, and a LIVE auction to ENDED once its end time has passed.
+    def update_status_by_time(self):
+        """Close an ACTIVE auction once its end time has passed.
+
         Persists any change and returns True if the status was updated.
         """
-        now = timezone.now()
-
-        if self.status == self.Status.SCHEDULED and now >= self.start_time:
-            self.status = self.Status.LIVE
-            self.save(update_fields=['status'])
-            return True
-
-        if self.status == self.Status.LIVE and now >= self.end_time:
-            self.status = self.Status.ENDED
+        if self.status == self.Status.ACTIVE and timezone.now() >= self.end_time:
+            self.status = self.Status.CLOSED
             self.save(update_fields=['status'])
             return True
 
@@ -90,11 +87,11 @@ class Bid(models.Model):
         related_name='bids',
     )
     amount = models.DecimalField(max_digits=10, decimal_places=2)
-    created_at = models.DateTimeField(auto_now_add=True)
+    timestamp = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ['-created_at']
+        ordering = ['-amount']
 
     def __str__(self):
         return f'{self.bidder} bid {self.amount} on {self.auction}'

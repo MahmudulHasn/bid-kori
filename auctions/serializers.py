@@ -33,10 +33,11 @@ class AuctionSerializer(serializers.ModelSerializer):
             'reserve_price',
             'start_time',
             'end_time',
+            'winning_bidder',
             'status',
             'is_featured',
         ]
-        read_only_fields = ['current_highest_bid', 'status']
+        read_only_fields = ['current_highest_bid', 'winning_bidder', 'status']
 
     def validate_starting_bid(self, value):
         if value <= 0:
@@ -73,16 +74,53 @@ class AuctionSerializer(serializers.ModelSerializer):
 
 
 class BidSerializer(serializers.ModelSerializer):
-    """Serializes a bid placed on an auction, including nested auction details."""
+    """Serializes a bid for frontend display."""
 
-    auction = AuctionSerializer(read_only=True)
+    bidder_username = serializers.ReadOnlyField(source='bidder.username')
 
     class Meta:
         model = Bid
-        fields = ['id', 'auction', 'bidder', 'amount', 'created_at', 'updated_at']
-        read_only_fields = ['id', 'auction', 'bidder', 'created_at', 'updated_at']
+        fields = ['id', 'auction', 'bidder_username', 'amount', 'timestamp']
+        read_only_fields = ['id', 'auction', 'bidder_username', 'timestamp']
 
     def validate_amount(self, value):
         if value <= 0:
             raise serializers.ValidationError('Bid amount must be greater than 0.')
         return value
+
+
+class AuctionDetailSerializer(serializers.ModelSerializer):
+    """Detailed auction payload including product labels and recent bids."""
+
+    product_title = serializers.ReadOnlyField(source='product.title')
+    winning_bidder_username = serializers.CharField(
+        source='winning_bidder.username',
+        read_only=True,
+        allow_null=True,
+        default=None,
+    )
+    is_active = serializers.SerializerMethodField()
+    recent_bids = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Auction
+        fields = [
+            'id',
+            'product',
+            'product_title',
+            'start_time',
+            'end_time',
+            'current_highest_bid',
+            'winning_bidder_username',
+            'status',
+            'is_active',
+            'recent_bids',
+        ]
+        read_only_fields = fields
+
+    def get_is_active(self, obj):
+        return obj.is_active()
+
+    def get_recent_bids(self, obj):
+        bids = obj.bids.select_related('bidder').all()[:5]
+        return BidSerializer(bids, many=True, context=self.context).data
