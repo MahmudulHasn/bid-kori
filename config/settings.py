@@ -47,10 +47,12 @@ INSTALLED_APPS = [
     # Third-party packages
     'rest_framework',
     'corsheaders',
+    'rest_framework.authtoken',
 
     # Local apps
     'products',
     'auctions',
+    'users',
 
 
 
@@ -168,7 +170,14 @@ MAILERS = {
 # Django REST Framework
 # https://www.django-rest-framework.org/api-guide/settings/
 
+# Django REST Framework
+# https://www.django-rest-framework.org/api-guide/settings/
+
 REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.TokenAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+    ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticatedOrReadOnly',
     ],

@@ -61,7 +61,7 @@ class AuctionSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         product_data = validated_data.pop('product')
-        seller = self.context['request'].user
+        seller = validated_data.pop('seller', None) or self.context['request'].user
 
         validated_data['current_highest_bid'] = validated_data['starting_bid']
 

@@ -1,5 +1,6 @@
 from django.core.exceptions import ValidationError
-from rest_framework import generics, permissions, status
+from rest_framework import generics, status
+from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -16,7 +17,7 @@ class AuctionListCreateView(generics.ListCreateAPIView):
     """
 
     serializer_class = AuctionSerializer
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    permission_classes = [IsAuthenticatedOrReadOnly]
 
     def get_queryset(self):
         queryset = Auction.objects.select_related('product').all()
@@ -24,19 +25,22 @@ class AuctionListCreateView(generics.ListCreateAPIView):
             auction.update_status_by_time()
         return queryset
 
+    def perform_create(self, serializer):
+        serializer.save(seller=self.request.user)
+
 
 class AuctionDetailView(generics.RetrieveUpdateDestroyAPIView):
     """Retrieve, update, or delete a single auction by its primary key."""
 
     queryset = Auction.objects.select_related('product').all()
     serializer_class = AuctionSerializer
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    permission_classes = [IsAuthenticatedOrReadOnly]
 
 
 class TransitionAuctionStateView(APIView):
     """Transition an auction to a new status via the state machine."""
 
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def post(self, request, pk):
         auction = generics.get_object_or_404(Auction, pk=pk)

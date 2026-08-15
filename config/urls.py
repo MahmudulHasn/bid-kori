@@ -9,7 +9,10 @@ def api_root(request):
         "endpoints": {
             "admin": "/admin/",
             "products": "/api/products/",
-            "auctions": "/api/auctions/"
+            "auctions": "/api/auctions/",
+            "register": "/api/users/register/",
+            "login": "/api/users/login/",
+            "me": "/api/users/me/",
         }
     })
 
@@ -18,4 +21,5 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/products/', include('products.urls')),
     path('api/auctions/', include('auctions.urls')),
+    path('api/users/', include('users.urls')),
 ]
