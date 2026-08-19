@@ -1,22 +1,25 @@
+import datetime
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 from django.db import transaction
+from django.utils import timezone
 
+from auctions.models import Auction, Bid
 from products.models import Product
 
 
 class Command(BaseCommand):
-    """Seed the database with demo users and sample products.
+    """Seed the database with demo users, products, auctions, and bids.
 
-    This is the first half of the seed workflow: it creates a seller, two
-    buyers, and four products owned by the seller. Starting prices are carried
-    on each product's future auction (see the auctions seeder), since the
-    Product model itself has no price field.
+    Creates a seller, two buyers, and four products owned by the seller. Each
+    product gets a 7-day ACTIVE auction with two simulated bids, and the
+    auction's highest bid / winning bidder are updated accordingly. The command
+    is idempotent: re-running it will not create duplicates or crash.
     """
 
-    help = 'Seeds demo users (1 seller, 2 buyers) and 4 sample products.'
+    help = 'Seeds demo users, products, auctions, and simulated bids.'
 
     USERS = [
         {
@@ -100,8 +103,14 @@ class Command(BaseCommand):
             created_users[data['username']] = user
 
         seller = created_users['seller_demo']
+        buyer_one = created_users['buyer_one']
+        buyer_two = created_users['buyer_two']
+
+        now = timezone.now()
 
         for data in self.PRODUCTS:
+            starting_price = data['starting_price']
+
             product, created = Product.objects.get_or_create(
                 title=data['title'],
                 seller=seller,
@@ -114,7 +123,7 @@ class Command(BaseCommand):
                 self.stdout.write(
                     self.style.SUCCESS(
                         f"Created product '{product.title}' "
-                        f"(starting price: {data['starting_price']})."
+                        f"(starting price: {starting_price})."
                     )
                 )
             else:
@@ -124,4 +133,62 @@ class Command(BaseCommand):
                     )
                 )
 
-        self.stdout.write(self.style.SUCCESS('Seed data (users + products) complete.'))
+            auction, auction_created = Auction.objects.get_or_create(
+                product=product,
+                defaults={
+                    'starting_bid': starting_price,
+                    'current_highest_bid': starting_price,
+                    'start_time': now,
+                    'end_time': now + datetime.timedelta(days=7),
+                    'status': Auction.Status.ACTIVE,
+                },
+            )
+            if auction_created:
+                self.stdout.write(
+                    self.style.SUCCESS(
+                        f"  Created 7-day ACTIVE auction for '{product.title}'."
+                    )
+                )
+            else:
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"  Auction for '{product.title}' already exists, skipping."
+                    )
+                )
+
+            planned_bids = [
+                (buyer_one, starting_price + Decimal('10.00')),
+                (buyer_two, starting_price + Decimal('25.00')),
+            ]
+
+            for bidder, amount in planned_bids:
+                bid, bid_created = Bid.objects.get_or_create(
+                    auction=auction,
+                    bidder=bidder,
+                    amount=amount,
+                )
+                if bid_created:
+                    self.stdout.write(
+                        self.style.SUCCESS(
+                            f"    {bidder.username} bid {amount}."
+                        )
+                    )
+
+            highest_bid = auction.bids.order_by('-amount').first()
+            if highest_bid is not None and (
+                auction.current_highest_bid != highest_bid.amount
+                or auction.winning_bidder_id != highest_bid.bidder_id
+            ):
+                auction.current_highest_bid = highest_bid.amount
+                auction.winning_bidder = highest_bid.bidder
+                auction.save(update_fields=['current_highest_bid', 'winning_bidder'])
+                self.stdout.write(
+                    self.style.SUCCESS(
+                        f"  Highest bid: {highest_bid.amount} by "
+                        f"{highest_bid.bidder.username}."
+                    )
+                )
+
+        self.stdout.write(
+            self.style.SUCCESS('Seed data (users + products + auctions + bids) complete.')
+        )
