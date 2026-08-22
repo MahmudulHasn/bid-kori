@@ -1,0 +1,5 @@
+$kind: http-request
+description: List auctions that are currently ACTIVE and have not ended.
+url: "{{baseUrl}}/api/auctions/active/"
+method: GET
+order: 1000

@@ -1,0 +1,5 @@
+$kind: http-request
+description: Retrieve a single auction by ID.
+url: "{{baseUrl}}/api/auctions/{{auctionId}}/"
+method: GET
+order: 3000

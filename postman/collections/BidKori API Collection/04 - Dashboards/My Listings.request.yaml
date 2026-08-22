@@ -1,0 +1,7 @@
+$kind: http-request
+description: Return products listed by the authenticated user.
+url: "{{baseUrl}}/api/products/my-listings/"
+method: GET
+headers:
+  Authorization: Token {{authToken}}
+order: 1000

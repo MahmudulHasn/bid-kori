@@ -1,0 +1,16 @@
+$kind: http-request
+description: Register a new user. Returns an auth token and user details on success (201).
+url: "{{baseUrl}}/api/users/register/"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "username": "buyer_one",
+      "email": "buyer_one@example.com",
+      "password": "password123",
+      "confirm_password": "password123"
+    }
+order: 1000

@@ -1,0 +1,246 @@
+{
+  "info": {
+    "_postman_id": "b8e4c2a1-9f3d-4e6b-8c1a-7d2f5e0a9b3c",
+    "name": "BidKori API Collection",
+    "description": "Postman Collection v2.1 for BidKori API (Auth, Products, Auctions, Dashboards).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "01 - Auth",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"buyer_one\",\n  \"email\": \"buyer_one@example.com\",\n  \"password\": \"password123\",\n  \"confirm_password\": \"password123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/users/register/",
+            "description": "Register a new user. Returns an auth token and user details on success (201)."
+          },
+          "response": []
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var data = pm.response.json();",
+                  "    if (data.token) {",
+                  "        pm.collectionVariables.set('authToken', data.token);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"buyer_one\",\n  \"password\": \"password123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/users/login/",
+            "description": "Authenticate with username and password. Saves the returned token to {{authToken}}."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "02 - Products",
+      "item": [
+        {
+          "name": "List Products",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/products/",
+            "description": "List all products (public read)."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Product",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Token {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Vintage Mechanical Watch\",\n  \"description\": \"Classic stainless steel watch in excellent condition.\",\n  \"condition\": \"USED_LIKE_NEW\",\n  \"category\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/products/",
+            "description": "Create a product listing. Requires authentication. Seller is set from the token user."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Product Detail",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/products/{{productId}}/",
+            "description": "Retrieve a single product by ID."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "03 - Auctions",
+      "item": [
+        {
+          "name": "List Active Auctions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/auctions/active/",
+            "description": "List auctions that are currently ACTIVE and have not ended."
+          },
+          "response": []
+        },
+        {
+          "name": "Place Bid",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Token {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 600.00\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/auctions/{{auctionId}}/place-bid/",
+            "description": "Place a bid on an active auction. Requires authentication. Sellers cannot bid on their own listings."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Auction Detail",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/auctions/{{auctionId}}/",
+            "description": "Retrieve a single auction by ID."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "04 - Dashboards",
+      "item": [
+        {
+          "name": "My Listings",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/products/my-listings/",
+            "description": "Return products listed by the authenticated user."
+          },
+          "response": []
+        },
+        {
+          "name": "My Bids",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auctions/my-bids/",
+            "description": "Return all bids placed by the authenticated user."
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://127.0.0.1:8000"
+    },
+    {
+      "key": "authToken",
+      "value": ""
+    },
+    {
+      "key": "productId",
+      "value": "1"
+    },
+    {
+      "key": "auctionId",
+      "value": "1"
+    }
+  ]
+}

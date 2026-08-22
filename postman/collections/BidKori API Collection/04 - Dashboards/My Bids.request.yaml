@@ -1,0 +1,7 @@
+$kind: http-request
+description: Return all bids placed by the authenticated user.
+url: "{{baseUrl}}/api/auctions/my-bids/"
+method: GET
+headers:
+  Authorization: Token {{authToken}}
+order: 2000

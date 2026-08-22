@@ -1,0 +1,14 @@
+$kind: http-request
+description: Place a bid on an active auction. Requires authentication. Sellers cannot bid on their own listings.
+url: "{{baseUrl}}/api/auctions/{{auctionId}}/place-bid/"
+method: POST
+headers:
+  Content-Type: application/json
+  Authorization: Token {{authToken}}
+body:
+  type: json
+  content: |-
+    {
+      "amount": 600.00
+    }
+order: 2000

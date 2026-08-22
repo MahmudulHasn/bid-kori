@@ -1,0 +1,17 @@
+$kind: http-request
+description: Create a product listing. Requires authentication. Seller is set from the token user.
+url: "{{baseUrl}}/api/products/"
+method: POST
+headers:
+  Content-Type: application/json
+  Authorization: Token {{authToken}}
+body:
+  type: json
+  content: |-
+    {
+      "title": "Vintage Mechanical Watch",
+      "description": "Classic stainless steel watch in excellent condition.",
+      "condition": "USED_LIKE_NEW",
+      "category": 1
+    }
+order: 2000
