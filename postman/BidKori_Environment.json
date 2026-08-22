@@ -1,0 +1,19 @@
+{
+  "id": "c3d4e5f6-a7b8-4901-c2d3-e4f5a6b7c8d9",
+  "name": "BidKori Environment",
+  "values": [
+    {
+      "key": "baseUrl",
+      "value": "http://127.0.0.1:8000",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "authToken",
+      "value": "",
+      "type": "secret",
+      "enabled": true
+    }
+  ],
+  "_postman_variable_scope": "environment"
+}
