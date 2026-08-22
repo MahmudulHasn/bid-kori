@@ -111,10 +111,10 @@ class PlaceBidView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        raw_amount = request.data.get('bid_amount', request.data.get('amount'))
-        if raw_amount is None:
+        raw_amount = request.data.get('amount', request.data.get('bid_amount'))
+        if raw_amount is None or raw_amount == '':
             return Response(
-                {'detail': "Field 'bid_amount' is required."},
+                {'error': 'Bid amount must be a valid number.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -122,7 +122,13 @@ class PlaceBidView(APIView):
             bid_amount = Decimal(str(raw_amount))
         except (InvalidOperation, TypeError, ValueError):
             return Response(
-                {'detail': 'Invalid bid_amount.'},
+                {'error': 'Bid amount must be a valid number.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if bid_amount <= 0:
+            return Response(
+                {'error': 'Bid amount must be greater than zero.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
