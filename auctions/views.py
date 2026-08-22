@@ -99,11 +99,31 @@ class PlaceBidView(APIView):
 
     permission_classes = [IsAuthenticated, IsNotSeller]
 
+    def permission_denied(self, request, message=None, code=None):
+        from rest_framework.exceptions import PermissionDenied
+
+        raise PermissionDenied(
+            detail={
+                'error': message
+                or 'Action forbidden: Sellers cannot bid on their own listings.',
+            }
+        )
+
     def post(self, request, auction_id):
         auction = get_object_or_404(
             Auction.objects.select_related('product__seller'),
             pk=auction_id,
         )
+
+        if request.user == auction.product.seller:
+            return Response(
+                {
+                    'error': (
+                        'Action forbidden: Sellers cannot bid on their own listings.'
+                    ),
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
         if not auction.is_active():
             return Response(

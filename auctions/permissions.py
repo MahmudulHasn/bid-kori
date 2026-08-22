@@ -6,9 +6,12 @@ from .models import Auction
 class IsNotSeller(BasePermission):
     """Prevent the auction's product seller from placing a bid on their own listing."""
 
-    message = 'Sellers cannot bid on their own auctions.'
+    message = 'Action forbidden: Sellers cannot bid on their own listings.'
 
     def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+
         auction = self._get_auction(view)
         if auction is None:
             return True

@@ -49,11 +49,25 @@ ProductListView = ProductListCreateView
 
 
 class ProductDetailView(generics.RetrieveUpdateDestroyAPIView):
-    """Retrieve, update, or delete a single product by its primary key."""
+    """Retrieve, update, or delete a single product by its primary key.
+
+    PUT, PATCH, and DELETE are restricted to the product seller via
+    IsSellerOrReadOnly.
+    """
 
     queryset = Product.objects.select_related('category', 'seller').all()
     serializer_class = ProductSerializer
     permission_classes = [IsAuthenticatedOrReadOnly, IsSellerOrReadOnly]
+
+    def permission_denied(self, request, message=None, code=None):
+        from rest_framework.exceptions import PermissionDenied
+
+        raise PermissionDenied(
+            detail={
+                'error': message
+                or 'Action forbidden: Only the seller can modify this listing.',
+            }
+        )
 
 
 class UserListingsView(generics.ListAPIView):
