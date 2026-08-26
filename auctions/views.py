@@ -1,7 +1,6 @@
 from decimal import Decimal, InvalidOperation
 
 from django.core.exceptions import ValidationError
-from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import generics, status
@@ -12,7 +11,7 @@ from rest_framework.views import APIView
 from .models import Auction, Bid
 from .permissions import IsNotSeller
 from .serializers import AuctionDetailSerializer, AuctionSerializer, BidSerializer
-from .services import AuctionStateMachine
+from .services import AuctionStateMachine, BidService
 
 
 class AuctionListCreateView(generics.ListCreateAPIView):
@@ -94,7 +93,8 @@ class PlaceBidView(APIView):
     """Place a bid on an active auction.
 
     Validates active status and that the bid beats the current highest bid.
-    Sellers cannot bid on their own auctions.
+    Sellers cannot bid on their own auctions. Bid writes run atomically under
+    ``select_for_update`` to prevent concurrent race conditions.
     """
 
     permission_classes = [IsAuthenticated, IsNotSeller]
@@ -110,6 +110,7 @@ class PlaceBidView(APIView):
         )
 
     def post(self, request, auction_id):
+        # Pre-check seller ownership outside the lock (cheap fail-fast).
         auction = get_object_or_404(
             Auction.objects.select_related('product__seller'),
             pk=auction_id,
@@ -123,12 +124,6 @@ class PlaceBidView(APIView):
                     ),
                 },
                 status=status.HTTP_403_FORBIDDEN,
-            )
-
-        if not auction.is_active():
-            return Response(
-                {'detail': 'Auction is not active.'},
-                status=status.HTTP_400_BAD_REQUEST,
             )
 
         raw_amount = request.data.get('amount', request.data.get('bid_amount'))
@@ -152,37 +147,27 @@ class PlaceBidView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        if bid_amount <= auction.current_highest_bid:
-            return Response(
-                {
-                    'detail': (
-                        'Bid amount must be greater than the current highest bid.'
-                    ),
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        minimum_required = auction.current_highest_bid + auction.min_increment
-        if bid_amount < minimum_required:
-            return Response(
-                {
-                    'detail': (
-                        f'Bid amount must be at least {minimum_required} '
-                        f'(current highest bid plus minimum increment).'
-                    ),
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        with transaction.atomic():
-            bid = Bid.objects.create(
-                auction=auction,
+        try:
+            bid = BidService.place_bid(
+                auction_id=auction_id,
                 bidder=request.user,
                 amount=bid_amount,
             )
-            auction.current_highest_bid = bid_amount
-            auction.winning_bidder = request.user
-            auction.save(update_fields=['current_highest_bid', 'winning_bidder'])
+        except ValidationError as exc:
+            message = exc.messages[0] if getattr(exc, 'messages', None) else str(exc)
+            if 'higher than the current highest bid' in message:
+                return Response(
+                    {
+                        'error': (
+                            'Bid amount must be higher than the current highest bid.'
+                        ),
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            return Response(
+                {'error': message},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         serializer = BidSerializer(bid, context={'request': request})
         return Response(serializer.data, status=status.HTTP_201_CREATED)
