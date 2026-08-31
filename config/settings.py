@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'corsheaders',
     'rest_framework.authtoken',
+    'drf_spectacular',
 
     # Local apps
     'products',
@@ -186,7 +187,15 @@ REST_FRAMEWORK = {
     'DEFAULT_RENDERER_CLASSES': [
         'rest_framework.renderers.JSONRenderer',
     ],
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'EXCEPTION_HANDLER': 'config.exceptions.custom_exception_handler',
+}
+
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'BidKori API',
+    'DESCRIPTION': 'Real-time auction platform backend API documentation',
+    'VERSION': '3.0.0',
 }
 
 

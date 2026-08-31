@@ -3,6 +3,11 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.http import JsonResponse
 from django.urls import include, path
+from drf_spectacular.views import (
+    SpectacularAPIView,
+    SpectacularRedocView,
+    SpectacularSwaggerView,
+)
 
 
 def api_root(request):
@@ -16,6 +21,9 @@ def api_root(request):
             "register": "/api/users/register/",
             "login": "/api/users/login/",
             "me": "/api/users/me/",
+            "schema": "/api/schema/",
+            "swagger": "/api/schema/swagger-ui/",
+            "redoc": "/api/schema/redoc/",
         }
     })
 
@@ -25,6 +33,17 @@ urlpatterns = [
     path('api/products/', include('products.urls')),
     path('api/auctions/', include('auctions.urls')),
     path('api/users/', include('users.urls')),
+    path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
+    path(
+        'api/schema/swagger-ui/',
+        SpectacularSwaggerView.as_view(url_name='schema'),
+        name='swagger-ui',
+    ),
+    path(
+        'api/schema/redoc/',
+        SpectacularRedocView.as_view(url_name='schema'),
+        name='redoc',
+    ),
 ]
 
 if settings.DEBUG:
