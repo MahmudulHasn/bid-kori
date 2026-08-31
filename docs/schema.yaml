@@ -1,0 +1,1314 @@
+openapi: 3.0.3
+info:
+  title: BidKori API
+  version: 3.0.0
+  description: Real-time auction platform backend API documentation
+paths:
+  /api/auctions/:
+    get:
+      operationId: auctions_list
+      description: |-
+        List, create, retrieve, update, and delete auctions.
+
+        Accepts JSON and multipart/form-data so listing images can be uploaded
+        alongside auction creation (field name: ``images``).
+      summary: List auctions
+      parameters:
+      - in: query
+        name: category
+        schema:
+          type: string
+        description: Filter by product category name or slug.
+      - in: query
+        name: search
+        schema:
+          type: string
+        description: Search product title and description (case-insensitive).
+      - in: query
+        name: status
+        schema:
+          type: string
+          enum:
+          - ACTIVE
+          - CANCELLED
+          - CLOSED
+        description: Filter by auction status (ACTIVE, CLOSED, CANCELLED).
+      tags:
+      - Auctions
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Auction'
+          description: ''
+    post:
+      operationId: auctions_create
+      description: |-
+        List, create, retrieve, update, and delete auctions.
+
+        Accepts JSON and multipart/form-data so listing images can be uploaded
+        alongside auction creation (field name: ``images``).
+      summary: Create an auction (JSON or multipart with images)
+      tags:
+      - Auctions
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Auction'
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                product:
+                  type: object
+                starting_bid:
+                  type: string
+                  format: decimal
+                min_increment:
+                  type: string
+                  format: decimal
+                reserve_price:
+                  type: string
+                  format: decimal
+                start_time:
+                  type: string
+                  format: date-time
+                end_time:
+                  type: string
+                  format: date-time
+                is_featured:
+                  type: boolean
+                images:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: Optional auction images (multipart).
+              required:
+              - product
+              - starting_bid
+              - start_time
+              - end_time
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Auction'
+          description: ''
+  /api/auctions/{auction_id}/history/:
+    get:
+      operationId: auctions_history_list
+      description: Return all bids for an auction, ordered by highest amount first.
+      summary: List bid history for an auction
+      parameters:
+      - in: path
+        name: auction_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Bidding
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Bid'
+          description: ''
+  /api/auctions/{auction_id}/images/:
+    post:
+      operationId: auctions_images_create
+      description: Upload one or more binary image files via multipart/form-data.
+      summary: Upload auction images
+      parameters:
+      - in: path
+        name: auction_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Auctions
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                images:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: Image files to attach to the auction.
+              required:
+              - images
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AuctionImage'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorMessage'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorMessage'
+          description: ''
+  /api/auctions/{auction_id}/place-bid/:
+    post:
+      operationId: auctions_place_bid_create
+      description: |-
+        Place a bid on an active auction.
+
+        Validates active status and that the bid beats the current highest bid.
+        Sellers cannot bid on their own auctions. Bid writes run atomically under
+        ``select_for_update`` to prevent concurrent race conditions.
+      summary: Place a bid on an auction
+      parameters:
+      - in: path
+        name: auction_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Bidding
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlaceBidRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PlaceBidRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PlaceBidRequest'
+        required: true
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Bid'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorMessage'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorMessage'
+          description: ''
+  /api/auctions/{id}/:
+    get:
+      operationId: auctions_retrieve
+      description: |-
+        List, create, retrieve, update, and delete auctions.
+
+        Accepts JSON and multipart/form-data so listing images can be uploaded
+        alongside auction creation (field name: ``images``).
+      summary: Retrieve an auction
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Auctions
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Auction'
+          description: ''
+    put:
+      operationId: auctions_update
+      description: |-
+        List, create, retrieve, update, and delete auctions.
+
+        Accepts JSON and multipart/form-data so listing images can be uploaded
+        alongside auction creation (field name: ``images``).
+      summary: Update an auction
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Auctions
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Auction'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Auction'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Auction'
+        required: true
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Auction'
+          description: ''
+    patch:
+      operationId: auctions_partial_update
+      description: |-
+        List, create, retrieve, update, and delete auctions.
+
+        Accepts JSON and multipart/form-data so listing images can be uploaded
+        alongside auction creation (field name: ``images``).
+      summary: Partially update an auction
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Auctions
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedAuction'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedAuction'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedAuction'
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Auction'
+          description: ''
+    delete:
+      operationId: auctions_destroy
+      description: |-
+        List, create, retrieve, update, and delete auctions.
+
+        Accepts JSON and multipart/form-data so listing images can be uploaded
+        alongside auction creation (field name: ``images``).
+      summary: Delete an auction
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Auctions
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/auctions/{id}/transition/:
+    post:
+      operationId: auctions_transition_create
+      description: Transition an auction to a new status via the state machine.
+      summary: Transition auction status
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Auctions
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransitionStatus'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TransitionStatus'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TransitionStatus'
+        required: true
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Auction'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorMessage'
+          description: ''
+  /api/auctions/active/:
+    get:
+      operationId: auctions_active_list
+      description: Return auctions that are ACTIVE and have not yet reached end_time.
+      summary: List active auctions
+      parameters:
+      - in: query
+        name: category
+        schema:
+          type: string
+        description: Filter by product category name or slug.
+      - in: query
+        name: search
+        schema:
+          type: string
+        description: Search product title and description.
+      tags:
+      - Auctions
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AuctionDetail'
+          description: ''
+  /api/auctions/analytics/:
+    get:
+      operationId: auctions_analytics_retrieve
+      description: Aggregate auction and bidding metrics for dashboards and reporting.
+      summary: Auction analytics summary
+      tags:
+      - Analytics
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/auctions/my-bids/:
+    get:
+      operationId: auctions_my_bids_list
+      description: Return all bids placed by the authenticated user, with auction
+        details.
+      summary: List bids placed by the authenticated user
+      tags:
+      - Bidding
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Bid'
+          description: ''
+  /api/products/:
+    get:
+      operationId: products_list
+      description: List all products or create a new one for the authenticated user.
+      tags:
+      - products
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Product'
+          description: ''
+    post:
+      operationId: products_create
+      description: List all products or create a new one for the authenticated user.
+      tags:
+      - products
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Product'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Product'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Product'
+        required: true
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+          description: ''
+  /api/products/{id}/:
+    get:
+      operationId: products_retrieve
+      description: |-
+        Retrieve, update, or delete a single product by its primary key.
+
+        PUT, PATCH, and DELETE are restricted to the product seller via
+        IsSellerOrReadOnly.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - products
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+          description: ''
+    put:
+      operationId: products_update
+      description: |-
+        Retrieve, update, or delete a single product by its primary key.
+
+        PUT, PATCH, and DELETE are restricted to the product seller via
+        IsSellerOrReadOnly.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - products
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Product'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Product'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Product'
+        required: true
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+          description: ''
+    patch:
+      operationId: products_partial_update
+      description: |-
+        Retrieve, update, or delete a single product by its primary key.
+
+        PUT, PATCH, and DELETE are restricted to the product seller via
+        IsSellerOrReadOnly.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - products
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedProduct'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedProduct'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedProduct'
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+          description: ''
+    delete:
+      operationId: products_destroy
+      description: |-
+        Retrieve, update, or delete a single product by its primary key.
+
+        PUT, PATCH, and DELETE are restricted to the product seller via
+        IsSellerOrReadOnly.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - products
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/products/my-listings/:
+    get:
+      operationId: products_my_listings_list
+      description: Return all products listed by the authenticated user.
+      tags:
+      - products
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Product'
+          description: ''
+  /api/schema/:
+    get:
+      operationId: schema_retrieve
+      description: |-
+        OpenApi3 schema for this API. Format can be selected via content negotiation.
+
+        - YAML: application/vnd.oai.openapi
+        - JSON: application/vnd.oai.openapi+json
+      parameters:
+      - in: query
+        name: format
+        schema:
+          type: string
+          enum:
+          - json
+          - yaml
+      - in: query
+        name: lang
+        schema:
+          type: string
+          enum:
+          - af
+          - ar
+          - ar-dz
+          - ast
+          - az
+          - be
+          - bg
+          - bn
+          - br
+          - bs
+          - ca
+          - ckb
+          - cs
+          - cy
+          - da
+          - de
+          - dsb
+          - el
+          - en
+          - en-au
+          - en-gb
+          - eo
+          - es
+          - es-ar
+          - es-co
+          - es-mx
+          - es-ni
+          - es-ve
+          - et
+          - eu
+          - fa
+          - fi
+          - fr
+          - fy
+          - ga
+          - gd
+          - gl
+          - he
+          - hi
+          - hr
+          - hsb
+          - ht
+          - hu
+          - hy
+          - ia
+          - id
+          - ig
+          - io
+          - is
+          - it
+          - ja
+          - ka
+          - kab
+          - kk
+          - km
+          - kn
+          - ko
+          - ky
+          - lb
+          - lt
+          - lv
+          - mk
+          - ml
+          - mn
+          - mr
+          - ms
+          - my
+          - nb
+          - ne
+          - nl
+          - nn
+          - os
+          - pa
+          - pl
+          - pt
+          - pt-br
+          - ro
+          - ru
+          - sk
+          - sl
+          - sq
+          - sr
+          - sr-latn
+          - sv
+          - sw
+          - ta
+          - te
+          - tg
+          - th
+          - tk
+          - tr
+          - tt
+          - udm
+          - ug
+          - uk
+          - ur
+          - uz
+          - vi
+          - zh-hans
+          - zh-hant
+      tags:
+      - schema
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/vnd.oai.openapi:
+              schema:
+                type: object
+                additionalProperties: {}
+            application/yaml:
+              schema:
+                type: object
+                additionalProperties: {}
+            application/vnd.oai.openapi+json:
+              schema:
+                type: object
+                additionalProperties: {}
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/users/login/:
+    post:
+      operationId: users_login_create
+      description: Authenticate with username/password and return an auth token.
+      summary: Log in and obtain an auth token
+      tags:
+      - Users
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+        required: true
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokenResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                description: Username and password are required.
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                description: Invalid credentials.
+          description: ''
+  /api/users/me/:
+    get:
+      operationId: users_me_retrieve
+      description: Return the currently authenticated user's profile.
+      summary: Get the authenticated user profile
+      tags:
+      - Users
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+  /api/users/register/:
+    post:
+      operationId: users_register_create
+      description: Register a new user and return an auth token with user details.
+      summary: Register a new user
+      tags:
+      - Users
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRegistration'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UserRegistration'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UserRegistration'
+        required: true
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokenResponse'
+          description: ''
+components:
+  schemas:
+    Auction:
+      type: object
+      description: |-
+        Serializes an auction with its nested product and images.
+
+        Supports creating a product and its auction in a single request; the
+        seller is taken from the authenticated request user. Optional multipart
+        image uploads may be sent as ``images`` (one or more files).
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        product:
+          $ref: '#/components/schemas/Product'
+        starting_bid:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        current_highest_bid:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          readOnly: true
+        min_increment:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        reserve_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          nullable: true
+        start_time:
+          type: string
+          format: date-time
+        end_time:
+          type: string
+          format: date-time
+        winning_bidder:
+          type: integer
+          readOnly: true
+          nullable: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/StatusEnum'
+          readOnly: true
+        is_featured:
+          type: boolean
+        images:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuctionImage'
+          readOnly: true
+        uploaded_images:
+          type: array
+          items:
+            type: string
+            format: uri
+          writeOnly: true
+          description: 'One or more image files (multipart/form-data field name: images).'
+      required:
+      - current_highest_bid
+      - end_time
+      - id
+      - images
+      - product
+      - start_time
+      - starting_bid
+      - status
+      - winning_bidder
+    AuctionDetail:
+      type: object
+      description: Detailed auction payload including product labels and recent bids.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        product:
+          type: integer
+          readOnly: true
+        product_title:
+          type: string
+          readOnly: true
+        start_time:
+          type: string
+          format: date-time
+          readOnly: true
+        end_time:
+          type: string
+          format: date-time
+          readOnly: true
+        current_highest_bid:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          readOnly: true
+        winning_bidder_username:
+          type: string
+          readOnly: true
+          nullable: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/StatusEnum'
+          readOnly: true
+        is_active:
+          type: string
+          readOnly: true
+        recent_bids:
+          type: string
+          readOnly: true
+        images:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuctionImage'
+          readOnly: true
+      required:
+      - current_highest_bid
+      - end_time
+      - id
+      - images
+      - is_active
+      - product
+      - product_title
+      - recent_bids
+      - start_time
+      - status
+      - winning_bidder_username
+    AuctionImage:
+      type: object
+      description: Serializes an uploaded auction listing image.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        image:
+          type: string
+          format: uri
+        uploaded_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - id
+      - image
+      - uploaded_at
+    AuthTokenResponse:
+      type: object
+      description: Schema for login/register responses containing a token and user.
+      properties:
+        token:
+          type: string
+        user:
+          $ref: '#/components/schemas/User'
+      required:
+      - token
+      - user
+    Bid:
+      type: object
+      description: Serializes a bid for frontend display.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        auction:
+          type: integer
+          readOnly: true
+        bidder_username:
+          type: string
+          description: Required. 150 characters or fewer. Letters, digits and @/./+/-/_
+            only.
+          readOnly: true
+        amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        timestamp:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - amount
+      - auction
+      - bidder_username
+      - id
+      - timestamp
+    ConditionEnum:
+      enum:
+      - NEW
+      - USED_LIKE_NEW
+      - USED_GOOD
+      - FAIR
+      type: string
+      description: |-
+        * `NEW` - Brand New
+        * `USED_LIKE_NEW` - Used - Like New
+        * `USED_GOOD` - Used - Good
+        * `FAIR` - Fair Condition
+    ErrorMessage:
+      type: object
+      description: Generic error payload used by custom API views.
+      properties:
+        error:
+          type: string
+        detail:
+          type: string
+    LoginRequest:
+      type: object
+      description: Schema for username/password login requests.
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+          writeOnly: true
+      required:
+      - password
+      - username
+    PatchedAuction:
+      type: object
+      description: |-
+        Serializes an auction with its nested product and images.
+
+        Supports creating a product and its auction in a single request; the
+        seller is taken from the authenticated request user. Optional multipart
+        image uploads may be sent as ``images`` (one or more files).
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        product:
+          $ref: '#/components/schemas/Product'
+        starting_bid:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        current_highest_bid:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          readOnly: true
+        min_increment:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        reserve_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          nullable: true
+        start_time:
+          type: string
+          format: date-time
+        end_time:
+          type: string
+          format: date-time
+        winning_bidder:
+          type: integer
+          readOnly: true
+          nullable: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/StatusEnum'
+          readOnly: true
+        is_featured:
+          type: boolean
+        images:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuctionImage'
+          readOnly: true
+        uploaded_images:
+          type: array
+          items:
+            type: string
+            format: uri
+          writeOnly: true
+          description: 'One or more image files (multipart/form-data field name: images).'
+    PatchedProduct:
+      type: object
+      description: Serializes a product listing, attaching the seller from the request.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        seller:
+          type: integer
+          readOnly: true
+        category:
+          type: integer
+          nullable: true
+        title:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+        condition:
+          $ref: '#/components/schemas/ConditionEnum'
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+    PlaceBidRequest:
+      type: object
+      description: Request body for placing a bid on an auction.
+      properties:
+        amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+      required:
+      - amount
+    Product:
+      type: object
+      description: Serializes the core details of a product listing.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        title:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+        condition:
+          $ref: '#/components/schemas/ConditionEnum'
+        category:
+          type: integer
+          nullable: true
+      required:
+      - id
+      - title
+    StatusEnum:
+      enum:
+      - ACTIVE
+      - CLOSED
+      - CANCELLED
+      type: string
+      description: |-
+        * `ACTIVE` - Active
+        * `CLOSED` - Closed
+        * `CANCELLED` - Cancelled
+    TransitionStatus:
+      type: object
+      description: Request body for auction status transitions.
+      properties:
+        status:
+          $ref: '#/components/schemas/StatusEnum'
+      required:
+      - status
+    User:
+      type: object
+      description: Returns basic public user profile information.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        username:
+          type: string
+          description: Required. 150 characters or fewer. Letters, digits and @/./+/-/_
+            only.
+          pattern: ^[\w.@+-]+$
+          maxLength: 150
+        email:
+          title: Email address
+          oneOf:
+          - type: string
+            format: email
+            maxLength: 254
+          - type: string
+            maxLength: 0
+      required:
+      - id
+      - username
+    UserRegistration:
+      type: object
+      description: Handles new user registration with password confirmation.
+      properties:
+        username:
+          type: string
+          description: Required. 150 characters or fewer. Letters, digits and @/./+/-/_
+            only.
+          pattern: ^[\w.@+-]+$
+          maxLength: 150
+        email:
+          title: Email address
+          oneOf:
+          - type: string
+            format: email
+            maxLength: 254
+          - type: string
+            maxLength: 0
+        password:
+          type: string
+          writeOnly: true
+          minLength: 8
+        confirm_password:
+          type: string
+          writeOnly: true
+          minLength: 8
+      required:
+      - confirm_password
+      - password
+      - username
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: sessionid
+    tokenAuth:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: Token-based authentication with required prefix "Token"

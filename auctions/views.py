@@ -1,10 +1,11 @@
 from decimal import Decimal, InvalidOperation
 
 from django.core.exceptions import ValidationError
-from django.db.models import Avg, Count, F, Sum
+from django.db.models import Avg, Count, F, Q, Sum
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.views.generic import TemplateView
+from drf_spectacular.utils import OpenApiParameter, OpenApiTypes, extend_schema
 from rest_framework import generics, status, viewsets
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
@@ -16,10 +17,39 @@ from .permissions import IsNotSeller
 from .serializers import (
     AuctionDetailSerializer,
     AuctionImageSerializer,
+    AuctionImageUploadSerializer,
     AuctionSerializer,
     BidSerializer,
+    ErrorMessageSerializer,
+    PlaceBidRequestSerializer,
+    TransitionStatusSerializer,
 )
 from .services import AuctionStateMachine, BidService
+
+AUCTION_LIST_PARAMETERS = [
+    OpenApiParameter(
+        name='status',
+        type=OpenApiTypes.STR,
+        location=OpenApiParameter.QUERY,
+        required=False,
+        description='Filter by auction status (ACTIVE, CLOSED, CANCELLED).',
+        enum=['ACTIVE', 'CLOSED', 'CANCELLED'],
+    ),
+    OpenApiParameter(
+        name='category',
+        type=OpenApiTypes.STR,
+        location=OpenApiParameter.QUERY,
+        required=False,
+        description='Filter by product category name or slug.',
+    ),
+    OpenApiParameter(
+        name='search',
+        type=OpenApiTypes.STR,
+        location=OpenApiParameter.QUERY,
+        required=False,
+        description='Search product title and description (case-insensitive).',
+    ),
+]
 
 
 class AuctionViewSet(viewsets.ModelViewSet):
@@ -34,12 +64,37 @@ class AuctionViewSet(viewsets.ModelViewSet):
     parser_classes = (MultiPartParser, FormParser, JSONParser)
 
     def get_queryset(self):
-        return (
-            Auction.objects.select_related('product', 'winning_bidder')
+        queryset = (
+            Auction.objects.select_related('product', 'product__category', 'winning_bidder')
             .prefetch_related('images')
             .all()
         )
 
+        status_param = self.request.query_params.get('status')
+        category = self.request.query_params.get('category')
+        search = self.request.query_params.get('search')
+
+        if status_param:
+            queryset = queryset.filter(status__iexact=status_param)
+        if category:
+            queryset = queryset.filter(
+                Q(product__category__slug__iexact=category)
+                | Q(product__category__name__iexact=category)
+            )
+        if search:
+            queryset = queryset.filter(
+                Q(product__title__icontains=search)
+                | Q(product__description__icontains=search)
+            )
+
+        return queryset
+
+    @extend_schema(
+        tags=['Auctions'],
+        summary='List auctions',
+        parameters=AUCTION_LIST_PARAMETERS,
+        responses={200: AuctionSerializer(many=True)},
+    )
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         for auction in queryset:
@@ -51,11 +106,53 @@ class AuctionViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
+    @extend_schema(
+        tags=['Auctions'],
+        summary='Create an auction (JSON or multipart with images)',
+        request={
+            'application/json': AuctionSerializer,
+            'multipart/form-data': {
+                'type': 'object',
+                'properties': {
+                    'product': {'type': 'object'},
+                    'starting_bid': {'type': 'string', 'format': 'decimal'},
+                    'min_increment': {'type': 'string', 'format': 'decimal'},
+                    'reserve_price': {'type': 'string', 'format': 'decimal'},
+                    'start_time': {'type': 'string', 'format': 'date-time'},
+                    'end_time': {'type': 'string', 'format': 'date-time'},
+                    'is_featured': {'type': 'boolean'},
+                    'images': {
+                        'type': 'array',
+                        'items': {'type': 'string', 'format': 'binary'},
+                        'description': 'Optional auction images (multipart).',
+                    },
+                },
+                'required': ['product', 'starting_bid', 'start_time', 'end_time'],
+            },
+        },
+        responses={201: AuctionSerializer},
+    )
+    def create(self, request, *args, **kwargs):
+        return super().create(request, *args, **kwargs)
+
+    @extend_schema(tags=['Auctions'], summary='Retrieve an auction')
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
         instance.update_status_by_time()
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
+
+    @extend_schema(tags=['Auctions'], summary='Update an auction')
+    def update(self, request, *args, **kwargs):
+        return super().update(request, *args, **kwargs)
+
+    @extend_schema(tags=['Auctions'], summary='Partially update an auction')
+    def partial_update(self, request, *args, **kwargs):
+        return super().partial_update(request, *args, **kwargs)
+
+    @extend_schema(tags=['Auctions'], summary='Delete an auction')
+    def destroy(self, request, *args, **kwargs):
+        return super().destroy(request, *args, **kwargs)
 
     def perform_create(self, serializer):
         serializer.save(seller=self.request.user)
@@ -77,6 +174,29 @@ class AuctionImageUploadView(APIView):
     permission_classes = [IsAuthenticated]
     parser_classes = (MultiPartParser, FormParser)
 
+    @extend_schema(
+        tags=['Auctions'],
+        summary='Upload auction images',
+        description='Upload one or more binary image files via multipart/form-data.',
+        request={
+            'multipart/form-data': {
+                'type': 'object',
+                'properties': {
+                    'images': {
+                        'type': 'array',
+                        'items': {'type': 'string', 'format': 'binary'},
+                        'description': 'Image files to attach to the auction.',
+                    },
+                },
+                'required': ['images'],
+            }
+        },
+        responses={
+            201: AuctionImageSerializer(many=True),
+            400: ErrorMessageSerializer,
+            403: ErrorMessageSerializer,
+        },
+    )
     def post(self, request, auction_id):
         auction = get_object_or_404(
             Auction.objects.select_related('product__seller'),
@@ -96,9 +216,16 @@ class AuctionImageUploadView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        # Validate via schema serializer (keeps Swagger + runtime aligned).
+        upload_serializer = AuctionImageUploadSerializer(
+            data={'images': files},
+            context={'request': request},
+        )
+        upload_serializer.is_valid(raise_exception=True)
+
         created = [
             AuctionImage.objects.create(auction=auction, image=image_file)
-            for image_file in files
+            for image_file in upload_serializer.validated_data['images']
         ]
         serializer = AuctionImageSerializer(
             created,
@@ -113,6 +240,15 @@ class TransitionAuctionStateView(APIView):
 
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        tags=['Auctions'],
+        summary='Transition auction status',
+        request=TransitionStatusSerializer,
+        responses={
+            200: AuctionSerializer,
+            400: ErrorMessageSerializer,
+        },
+    )
     def post(self, request, pk):
         auction = get_object_or_404(Auction, pk=pk)
         new_status = request.data.get('status')
@@ -138,15 +274,50 @@ class TransitionAuctionStateView(APIView):
 class ActiveAuctionListView(APIView):
     """Return auctions that are ACTIVE and have not yet reached end_time."""
 
+    @extend_schema(
+        tags=['Auctions'],
+        summary='List active auctions',
+        parameters=[
+            OpenApiParameter(
+                name='category',
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.QUERY,
+                required=False,
+                description='Filter by product category name or slug.',
+            ),
+            OpenApiParameter(
+                name='search',
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.QUERY,
+                required=False,
+                description='Search product title and description.',
+            ),
+        ],
+        responses={200: AuctionDetailSerializer(many=True)},
+    )
     def get(self, request):
         auctions = (
             Auction.objects.filter(
                 status=Auction.Status.ACTIVE,
                 end_time__gt=timezone.now(),
             )
-            .select_related('product', 'winning_bidder')
+            .select_related('product', 'product__category', 'winning_bidder')
             .prefetch_related('bids__bidder', 'images')
         )
+
+        category = request.query_params.get('category')
+        search = request.query_params.get('search')
+        if category:
+            auctions = auctions.filter(
+                Q(product__category__slug__iexact=category)
+                | Q(product__category__name__iexact=category)
+            )
+        if search:
+            auctions = auctions.filter(
+                Q(product__title__icontains=search)
+                | Q(product__description__icontains=search)
+            )
+
         serializer = AuctionDetailSerializer(
             auctions,
             many=True,
@@ -175,6 +346,16 @@ class PlaceBidView(APIView):
             }
         )
 
+    @extend_schema(
+        tags=['Bidding'],
+        summary='Place a bid on an auction',
+        request=PlaceBidRequestSerializer,
+        responses={
+            201: BidSerializer,
+            400: ErrorMessageSerializer,
+            403: ErrorMessageSerializer,
+        },
+    )
     def post(self, request, auction_id):
         # Pre-check seller ownership outside the lock (cheap fail-fast).
         auction = get_object_or_404(
@@ -242,6 +423,11 @@ class PlaceBidView(APIView):
 class AuctionBidHistoryView(APIView):
     """Return all bids for an auction, ordered by highest amount first."""
 
+    @extend_schema(
+        tags=['Bidding'],
+        summary='List bid history for an auction',
+        responses={200: BidSerializer(many=True)},
+    )
     def get(self, request, auction_id):
         auction = get_object_or_404(Auction, pk=auction_id)
         bids = (
@@ -259,6 +445,14 @@ class UserBidsView(generics.ListAPIView):
     serializer_class = BidSerializer
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        tags=['Bidding'],
+        summary='List bids placed by the authenticated user',
+        responses={200: BidSerializer(many=True)},
+    )
+    def get(self, request, *args, **kwargs):
+        return self.list(request, *args, **kwargs)
+
     def get_queryset(self):
         return Bid.objects.select_related(
             'auction',
@@ -270,6 +464,11 @@ class UserBidsView(generics.ListAPIView):
 class AnalyticsSummaryView(APIView):
     """Aggregate auction and bidding metrics for dashboards and reporting."""
 
+    @extend_schema(
+        tags=['Analytics'],
+        summary='Auction analytics summary',
+        responses={200: OpenApiTypes.OBJECT},
+    )
     def get(self, request):
         now = timezone.now()
 

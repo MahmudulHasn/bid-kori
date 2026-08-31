@@ -123,6 +123,34 @@ class BidSerializer(serializers.ModelSerializer):
         return value
 
 
+class PlaceBidRequestSerializer(serializers.Serializer):
+    """Request body for placing a bid on an auction."""
+
+    amount = serializers.DecimalField(max_digits=10, decimal_places=2)
+
+
+class ErrorMessageSerializer(serializers.Serializer):
+    """Generic error payload used by custom API views."""
+
+    error = serializers.CharField(required=False)
+    detail = serializers.CharField(required=False)
+
+
+class AuctionImageUploadSerializer(serializers.Serializer):
+    """Multipart payload for uploading one or more auction images."""
+
+    images = serializers.ListField(
+        child=serializers.ImageField(),
+        help_text='One or more image files (multipart field name: images).',
+    )
+
+
+class TransitionStatusSerializer(serializers.Serializer):
+    """Request body for auction status transitions."""
+
+    status = serializers.ChoiceField(choices=Auction.Status.choices)
+
+
 class AuctionDetailSerializer(serializers.ModelSerializer):
     """Detailed auction payload including product labels and recent bids."""
 

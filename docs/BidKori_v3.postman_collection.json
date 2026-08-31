@@ -1,0 +1,865 @@
+{
+  "info": {
+    "_postman_id": "387d92eb-746e-4375-ad5f-72d6acc1b956",
+    "name": "BidKori API",
+    "description": "Real-time auction platform backend API documentation",
+    "version": "3.0.0",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://127.0.0.1:8000",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "{{bearer_token}}",
+      "type": "string"
+    }
+  ],
+  "auth": {
+    "type": "apikey",
+    "apikey": [
+      {
+        "key": "key",
+        "value": "Authorization",
+        "type": "string"
+      },
+      {
+        "key": "value",
+        "value": "Token {{token}}",
+        "type": "string"
+      },
+      {
+        "key": "in",
+        "value": "header",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Analytics",
+      "item": [
+        {
+          "name": "Auction analytics summary",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auctions/analytics/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auctions",
+                "analytics"
+              ]
+            },
+            "description": "Aggregate auction and bidding metrics for dashboards and reporting."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Auctions",
+      "item": [
+        {
+          "name": "List auctions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auctions/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auctions"
+              ],
+              "query": [
+                {
+                  "key": "category",
+                  "value": "",
+                  "description": "Filter by product category name or slug.",
+                  "disabled": true
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "description": "Search product title and description (case-insensitive).",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "",
+                  "description": "Filter by auction status (ACTIVE, CLOSED, CANCELLED).",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "List, create, retrieve, update, and delete auctions.\n\nAccepts JSON and multipart/form-data so listing images can be uploaded\nalongside auction creation (field name: ``images``)."
+          },
+          "response": []
+        },
+        {
+          "name": "Create an auction (JSON or multipart with images)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auctions/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auctions"
+              ]
+            },
+            "description": "List, create, retrieve, update, and delete auctions.\n\nAccepts JSON and multipart/form-data so listing images can be uploaded\nalongside auction creation (field name: ``images``).",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "images",
+                  "type": "file",
+                  "src": [],
+                  "description": "Binary image upload field(s)."
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Upload auction images",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auctions/:auction_id/images/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auctions",
+                ":auction_id",
+                "images"
+              ]
+            },
+            "description": "Upload one or more binary image files via multipart/form-data.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "images",
+                  "type": "file",
+                  "src": [],
+                  "description": "Binary image upload field(s)."
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Retrieve an auction",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auctions/:id/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auctions",
+                ":id"
+              ]
+            },
+            "description": "List, create, retrieve, update, and delete auctions.\n\nAccepts JSON and multipart/form-data so listing images can be uploaded\nalongside auction creation (field name: ``images``)."
+          },
+          "response": []
+        },
+        {
+          "name": "Update an auction",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auctions/:id/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auctions",
+                ":id"
+              ]
+            },
+            "description": "List, create, retrieve, update, and delete auctions.\n\nAccepts JSON and multipart/form-data so listing images can be uploaded\nalongside auction creation (field name: ``images``).",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "images",
+                  "type": "file",
+                  "src": [],
+                  "description": "Binary image upload field(s)."
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Partially update an auction",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auctions/:id/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auctions",
+                ":id"
+              ]
+            },
+            "description": "List, create, retrieve, update, and delete auctions.\n\nAccepts JSON and multipart/form-data so listing images can be uploaded\nalongside auction creation (field name: ``images``).",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "images",
+                  "type": "file",
+                  "src": [],
+                  "description": "Binary image upload field(s)."
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete an auction",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auctions/:id/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auctions",
+                ":id"
+              ]
+            },
+            "description": "List, create, retrieve, update, and delete auctions.\n\nAccepts JSON and multipart/form-data so listing images can be uploaded\nalongside auction creation (field name: ``images``)."
+          },
+          "response": []
+        },
+        {
+          "name": "Transition auction status",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auctions/:id/transition/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auctions",
+                ":id",
+                "transition"
+              ]
+            },
+            "description": "Transition an auction to a new status via the state machine.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "images",
+                  "type": "file",
+                  "src": [],
+                  "description": "Binary image upload field(s)."
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List active auctions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auctions/active/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auctions",
+                "active"
+              ],
+              "query": [
+                {
+                  "key": "category",
+                  "value": "",
+                  "description": "Filter by product category name or slug.",
+                  "disabled": true
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "description": "Search product title and description.",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Return auctions that are ACTIVE and have not yet reached end_time."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Bidding",
+      "item": [
+        {
+          "name": "List bid history for an auction",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auctions/:auction_id/history/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auctions",
+                ":auction_id",
+                "history"
+              ]
+            },
+            "description": "Return all bids for an auction, ordered by highest amount first."
+          },
+          "response": []
+        },
+        {
+          "name": "Place a bid on an auction",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auctions/:auction_id/place-bid/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auctions",
+                ":auction_id",
+                "place-bid"
+              ]
+            },
+            "description": "Place a bid on an active auction.\n\nValidates active status and that the bid beats the current highest bid.\nSellers cannot bid on their own auctions. Bid writes run atomically under\n``select_for_update`` to prevent concurrent race conditions.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "images",
+                  "type": "file",
+                  "src": [],
+                  "description": "Binary image upload field(s)."
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List bids placed by the authenticated user",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auctions/my-bids/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auctions",
+                "my-bids"
+              ]
+            },
+            "description": "Return all bids placed by the authenticated user, with auction details."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Log in and obtain an auth token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/login/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "login"
+              ]
+            },
+            "description": "Authenticate with username/password and return an auth token.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "images",
+                  "type": "file",
+                  "src": [],
+                  "description": "Binary image upload field(s)."
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get the authenticated user profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/me/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "me"
+              ]
+            },
+            "description": "Return the currently authenticated user's profile."
+          },
+          "response": []
+        },
+        {
+          "name": "Register a new user",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/register/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "register"
+              ]
+            },
+            "description": "Register a new user and return an auth token with user details.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "images",
+                  "type": "file",
+                  "src": [],
+                  "description": "Binary image upload field(s)."
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "products",
+      "item": [
+        {
+          "name": "products_list",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/products/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "products"
+              ]
+            },
+            "description": "List all products or create a new one for the authenticated user."
+          },
+          "response": []
+        },
+        {
+          "name": "products_create",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/products/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "products"
+              ]
+            },
+            "description": "List all products or create a new one for the authenticated user.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "images",
+                  "type": "file",
+                  "src": [],
+                  "description": "Binary image upload field(s)."
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "products_retrieve",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/products/:id/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "products",
+                ":id"
+              ]
+            },
+            "description": "Retrieve, update, or delete a single product by its primary key.\n\nPUT, PATCH, and DELETE are restricted to the product seller via\nIsSellerOrReadOnly."
+          },
+          "response": []
+        },
+        {
+          "name": "products_update",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/products/:id/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "products",
+                ":id"
+              ]
+            },
+            "description": "Retrieve, update, or delete a single product by its primary key.\n\nPUT, PATCH, and DELETE are restricted to the product seller via\nIsSellerOrReadOnly.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "images",
+                  "type": "file",
+                  "src": [],
+                  "description": "Binary image upload field(s)."
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "products_partial_update",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/products/:id/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "products",
+                ":id"
+              ]
+            },
+            "description": "Retrieve, update, or delete a single product by its primary key.\n\nPUT, PATCH, and DELETE are restricted to the product seller via\nIsSellerOrReadOnly.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "images",
+                  "type": "file",
+                  "src": [],
+                  "description": "Binary image upload field(s)."
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "products_destroy",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/products/:id/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "products",
+                ":id"
+              ]
+            },
+            "description": "Retrieve, update, or delete a single product by its primary key.\n\nPUT, PATCH, and DELETE are restricted to the product seller via\nIsSellerOrReadOnly."
+          },
+          "response": []
+        },
+        {
+          "name": "products_my_listings_list",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/products/my-listings/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "products",
+                "my-listings"
+              ]
+            },
+            "description": "Return all products listed by the authenticated user."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "schema",
+      "item": [
+        {
+          "name": "schema_retrieve",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/schema/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "schema"
+              ],
+              "query": [
+                {
+                  "key": "format",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "lang",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "OpenApi3 schema for this API. Format can be selected via content negotiation.\n\n- YAML: application/vnd.oai.openapi\n- JSON: application/vnd.oai.openapi+json"
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
