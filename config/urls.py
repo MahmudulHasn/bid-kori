@@ -1,4 +1,4 @@
-from django.contrib import admin
+from config.admin import bidkori_admin_site
 from django.urls import include, path
 from django.http import JsonResponse
 
@@ -18,7 +18,7 @@ def api_root(request):
 
 urlpatterns = [
     path('', api_root, name='api-root'),
-    path('admin/', admin.site.urls),
+    path('admin/', bidkori_admin_site.urls),
     path('api/products/', include('products.urls')),
     path('api/auctions/', include('auctions.urls')),
     path('api/users/', include('users.urls')),

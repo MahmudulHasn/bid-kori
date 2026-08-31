@@ -1,9 +1,11 @@
 from django.contrib import admin
 
+from config.admin import bidkori_admin_site
+
 from .models import Auction, Bid
 
 
-@admin.register(Auction)
+@admin.register(Auction, site=bidkori_admin_site)
 class AuctionAdmin(admin.ModelAdmin):
     list_display = (
         'id',
@@ -17,7 +19,7 @@ class AuctionAdmin(admin.ModelAdmin):
     search_fields = ('product__title',)
 
 
-@admin.register(Bid)
+@admin.register(Bid, site=bidkori_admin_site)
 class BidAdmin(admin.ModelAdmin):
     list_display = ('id', 'auction', 'bidder', 'amount', 'timestamp')
     list_filter = ('timestamp',)

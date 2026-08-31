@@ -1,0 +1,274 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static %}
+
+{% block extrastyle %}
+  {{ block.super }}
+  <link rel="stylesheet" href="{% static 'admin/css/dashboard.css' %}">
+  <style>
+    .bidkori-analytics {
+      margin-bottom: 2rem;
+    }
+
+    .bidkori-analytics h2 {
+      margin: 0 0 1rem;
+      font-size: 1.1rem;
+      font-weight: 600;
+    }
+
+    .bidkori-stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .bidkori-stat-card {
+      background: var(--body-bg, #fff);
+      border: 1px solid var(--hairline-color, #e5e5e5);
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+    }
+
+    .bidkori-stat-label {
+      color: var(--body-quiet-color, #666);
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 0.35rem;
+    }
+
+    .bidkori-stat-value {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: var(--body-fg, #111);
+      line-height: 1.2;
+    }
+
+    .bidkori-charts {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .bidkori-chart-panel {
+      background: var(--body-bg, #fff);
+      border: 1px solid var(--hairline-color, #e5e5e5);
+      border-radius: 8px;
+      padding: 1rem;
+    }
+
+    .bidkori-chart-panel h3 {
+      margin: 0 0 0.75rem;
+      font-size: 0.95rem;
+      font-weight: 600;
+    }
+
+    .bidkori-recent-bids {
+      background: var(--body-bg, #fff);
+      border: 1px solid var(--hairline-color, #e5e5e5);
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .bidkori-recent-bids table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .bidkori-recent-bids th,
+    .bidkori-recent-bids td {
+      padding: 0.5rem 0.75rem;
+      text-align: left;
+      border-bottom: 1px solid var(--hairline-color, #e5e5e5);
+    }
+
+    .bidkori-recent-bids th {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      color: var(--body-quiet-color, #666);
+    }
+  </style>
+{% endblock %}
+
+{% block coltype %}colMS{% endblock %}
+
+{% block bodyclass %}{{ block.super }} dashboard{% endblock %}
+
+{% block breadcrumbs %}{% endblock %}
+
+{% block nav-sidebar %}{% include "admin/nav_sidebar.html" %}{% endblock %}
+
+{% block content %}
+<div id="content-main">
+  <section class="bidkori-analytics">
+    <h2>{% translate "Platform Analytics" %}</h2>
+
+    <div class="bidkori-stats">
+      <div class="bidkori-stat-card">
+        <div class="bidkori-stat-label">{% translate "Active Auctions" %}</div>
+        <div class="bidkori-stat-value">{{ total_active_auctions }}</div>
+      </div>
+      <div class="bidkori-stat-card">
+        <div class="bidkori-stat-label">{% translate "Total Bids Placed" %}</div>
+        <div class="bidkori-stat-value">{{ total_bids_placed }}</div>
+      </div>
+      <div class="bidkori-stat-card">
+        <div class="bidkori-stat-label">{% translate "Total Volume" %}</div>
+        <div class="bidkori-stat-value">${{ total_bidding_volume|floatformat:2 }}</div>
+      </div>
+      <div class="bidkori-stat-card">
+        <div class="bidkori-stat-label">{% translate "Avg Price Growth" %}</div>
+        <div class="bidkori-stat-value">${{ average_price_growth|floatformat:2 }}</div>
+      </div>
+    </div>
+
+    <div class="bidkori-charts">
+      <div class="bidkori-chart-panel">
+        <h3>{% translate "Category: Starting vs Highest Bid" %}</h3>
+        <canvas id="category-chart" height="220"></canvas>
+      </div>
+      <div class="bidkori-chart-panel">
+        <h3>{% translate "Bid Price Trend" %}</h3>
+        <canvas id="trend-chart" height="220"></canvas>
+      </div>
+    </div>
+
+    <div class="bidkori-recent-bids">
+      <h3>{% translate "Recent Bids" %}</h3>
+      {% if recent_bids %}
+        <table>
+          <thead>
+            <tr>
+              <th>{% translate "Bidder" %}</th>
+              <th>{% translate "Amount" %}</th>
+              <th>{% translate "Auction" %}</th>
+              <th>{% translate "Timestamp" %}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for bid in recent_bids %}
+              <tr>
+                <td>{{ bid.bidder__username }}</td>
+                <td>${{ bid.amount|floatformat:2 }}</td>
+                <td>#{{ bid.auction_id }}</td>
+                <td>{{ bid.timestamp }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <p>{% translate "No bids recorded yet." %}</p>
+      {% endif %}
+    </div>
+  </section>
+
+  {% include "admin/app_list.html" with app_list=app_list show_changelinks=True %}
+</div>
+{% endblock %}
+
+{% block sidebar %}
+<div id="content-related">
+  <div class="module" id="recent-actions-module">
+    <h2>{% translate 'Recent actions' %}</h2>
+    {% load log %}
+    {% get_admin_log 10 as admin_log for_user user %}
+    {% if not admin_log %}
+      <p>{% translate 'None available' %}</p>
+    {% else %}
+      <ul class="actionlist">
+        {% for entry in admin_log %}
+          <li class="{% if entry.is_addition %}addlink{% endif %}{% if entry.is_change %}changelink{% endif %}{% if entry.is_deletion %}deletelink{% endif %}">
+            {% if entry.is_deletion or not entry.get_admin_url %}
+              {{ entry.object_repr }}
+            {% else %}
+              <a href="{{ entry.get_admin_url }}">{{ entry.object_repr }}</a>
+            {% endif %}
+            <br>
+            {% if entry.content_type %}
+              <span class="mini quiet">{% filter capfirst %}{{ entry.content_type.name }}{% endfilter %}</span>
+            {% else %}
+              <span class="mini quiet">{% translate 'Unknown content' %}</span>
+            {% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block extrahead %}
+  {{ block.super }}
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  {{ category_data_json|json_script:"bidkori-category-data" }}
+  {{ bid_trend_json|json_script:"bidkori-bid-trend" }}
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      const categoryData = JSON.parse(
+        document.getElementById('bidkori-category-data').textContent
+      );
+      const bidTrend = JSON.parse(
+        document.getElementById('bidkori-bid-trend').textContent
+      );
+
+      const categoryCtx = document.getElementById('category-chart');
+      if (categoryCtx && categoryData.length) {
+        new Chart(categoryCtx, {
+          type: 'bar',
+          data: {
+            labels: categoryData.map((row) => row.category),
+            datasets: [
+              {
+                label: 'Avg Starting Price',
+                data: categoryData.map((row) => row.avg_starting_price),
+                backgroundColor: 'rgba(65, 118, 144, 0.8)',
+              },
+              {
+                label: 'Avg Highest Bid',
+                data: categoryData.map((row) => row.avg_highest_bid),
+                backgroundColor: 'rgba(22, 163, 74, 0.8)',
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              y: { beginAtZero: true },
+            },
+          },
+        });
+      }
+
+      const trendCtx = document.getElementById('trend-chart');
+      if (trendCtx && bidTrend.length) {
+        new Chart(trendCtx, {
+          type: 'line',
+          data: {
+            labels: bidTrend.map((row) => new Date(row.timestamp).toLocaleString()),
+            datasets: [
+              {
+                label: 'Bid Amount',
+                data: bidTrend.map((row) => row.amount),
+                borderColor: 'rgba(37, 99, 235, 0.9)',
+                backgroundColor: 'rgba(37, 99, 235, 0.12)',
+                fill: true,
+                tension: 0.25,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              y: { beginAtZero: true },
+            },
+          },
+        });
+      }
+    });
+  </script>
+{% endblock %}
