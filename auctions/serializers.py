@@ -80,6 +80,32 @@ class AuctionSerializer(serializers.ModelSerializer):
 
         return attrs
 
+    def to_internal_value(self, data):
+        """Accept nested product JSON or flat multipart title/description fields."""
+        import json
+
+        if hasattr(data, 'copy'):
+            payload = data.copy()
+        else:
+            payload = dict(data)
+
+        product = payload.get('product')
+        if isinstance(product, str):
+            try:
+                payload['product'] = json.loads(product)
+            except json.JSONDecodeError as exc:
+                raise serializers.ValidationError(
+                    {'product': 'Invalid product JSON payload.'}
+                ) from exc
+        elif not product and payload.get('title'):
+            payload['product'] = {
+                'title': payload.get('title'),
+                'description': payload.get('description', ''),
+                'condition': payload.get('condition') or Product.Condition.USED_GOOD,
+            }
+
+        return super().to_internal_value(payload)
+
     def _collect_uploaded_images(self, validated_data):
         """Return image files from validated data and/or multipart FILES."""
         images = list(validated_data.pop('uploaded_images', []) or [])
