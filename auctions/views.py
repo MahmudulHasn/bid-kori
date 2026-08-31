@@ -7,6 +7,7 @@ from django.utils import timezone
 from django.views.generic import TemplateView
 from drf_spectacular.utils import OpenApiParameter, OpenApiTypes, extend_schema
 from rest_framework import generics, status, viewsets
+from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
@@ -25,6 +26,7 @@ from .serializers import (
     TransitionStatusSerializer,
 )
 from .services import AuctionStateMachine, BidService
+from .throttling import BidBurstThrottle
 
 AUCTION_LIST_PARAMETERS = [
     OpenApiParameter(
@@ -157,6 +159,105 @@ class AuctionViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(seller=self.request.user)
 
+    def get_throttles(self):
+        if getattr(self, 'action', None) == 'place_bid':
+            return [BidBurstThrottle()]
+        return super().get_throttles()
+
+    def permission_denied(self, request, message=None, code=None):
+        if getattr(self, 'action', None) == 'place_bid':
+            from rest_framework.exceptions import PermissionDenied
+
+            raise PermissionDenied(
+                detail={
+                    'error': message
+                    or 'Action forbidden: Sellers cannot bid on their own listings.',
+                }
+            )
+        return super().permission_denied(request, message=message, code=code)
+
+    @extend_schema(
+        tags=['Bidding'],
+        summary='Place a bid on an auction',
+        request=PlaceBidRequestSerializer,
+        responses={
+            201: BidSerializer,
+            400: ErrorMessageSerializer,
+            403: ErrorMessageSerializer,
+            429: {'description': 'Bid rate limit exceeded (10/minute).'},
+        },
+    )
+    @action(
+        detail=True,
+        methods=['post'],
+        url_path='place-bid',
+        permission_classes=[IsAuthenticated, IsNotSeller],
+        throttle_classes=[BidBurstThrottle],
+    )
+    def place_bid(self, request, pk=None, auction_id=None):
+        """Place a bid with atomic locking and bid-scoped rate limiting."""
+        target_id = auction_id or pk
+        auction = get_object_or_404(
+            Auction.objects.select_related('product__seller'),
+            pk=target_id,
+        )
+
+        if request.user == auction.product.seller:
+            return Response(
+                {
+                    'error': (
+                        'Action forbidden: Sellers cannot bid on their own listings.'
+                    ),
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        raw_amount = request.data.get('amount', request.data.get('bid_amount'))
+        if raw_amount is None or raw_amount == '':
+            return Response(
+                {'error': 'Bid amount must be a valid number.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            bid_amount = Decimal(str(raw_amount))
+        except (InvalidOperation, TypeError, ValueError):
+            return Response(
+                {'error': 'Bid amount must be a valid number.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if bid_amount <= 0:
+            return Response(
+                {'error': 'Bid amount must be greater than zero.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            bid = BidService.place_bid(
+                auction_id=target_id,
+                bidder=request.user,
+                amount=bid_amount,
+            )
+        except ValidationError as exc:
+            message = exc.messages[0] if getattr(exc, 'messages', None) else str(exc)
+            if 'higher than the current highest bid' in message:
+                return Response(
+                    {
+                        'error': (
+                            'Bid amount must be higher than the current highest bid.'
+                        ),
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            return Response(
+                {'error': message},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        serializer = BidSerializer(bid, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
 
 # Backwards-compatible aliases used by existing URL imports / docs.
 AuctionListCreateView = AuctionViewSet.as_view({'get': 'list', 'post': 'create'})
@@ -166,7 +267,7 @@ AuctionDetailView = AuctionViewSet.as_view({
     'patch': 'partial_update',
     'delete': 'destroy',
 })
-
+PlaceBidView = AuctionViewSet.as_view({'post': 'place_bid'})
 
 class AuctionImageUploadView(APIView):
     """Upload one or more images to an existing auction (multipart/form-data)."""
@@ -324,100 +425,6 @@ class ActiveAuctionListView(APIView):
             context={'request': request},
         )
         return Response(serializer.data, status=status.HTTP_200_OK)
-
-
-class PlaceBidView(APIView):
-    """Place a bid on an active auction.
-
-    Validates active status and that the bid beats the current highest bid.
-    Sellers cannot bid on their own auctions. Bid writes run atomically under
-    ``select_for_update`` to prevent concurrent race conditions.
-    """
-
-    permission_classes = [IsAuthenticated, IsNotSeller]
-
-    def permission_denied(self, request, message=None, code=None):
-        from rest_framework.exceptions import PermissionDenied
-
-        raise PermissionDenied(
-            detail={
-                'error': message
-                or 'Action forbidden: Sellers cannot bid on their own listings.',
-            }
-        )
-
-    @extend_schema(
-        tags=['Bidding'],
-        summary='Place a bid on an auction',
-        request=PlaceBidRequestSerializer,
-        responses={
-            201: BidSerializer,
-            400: ErrorMessageSerializer,
-            403: ErrorMessageSerializer,
-        },
-    )
-    def post(self, request, auction_id):
-        # Pre-check seller ownership outside the lock (cheap fail-fast).
-        auction = get_object_or_404(
-            Auction.objects.select_related('product__seller'),
-            pk=auction_id,
-        )
-
-        if request.user == auction.product.seller:
-            return Response(
-                {
-                    'error': (
-                        'Action forbidden: Sellers cannot bid on their own listings.'
-                    ),
-                },
-                status=status.HTTP_403_FORBIDDEN,
-            )
-
-        raw_amount = request.data.get('amount', request.data.get('bid_amount'))
-        if raw_amount is None or raw_amount == '':
-            return Response(
-                {'error': 'Bid amount must be a valid number.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        try:
-            bid_amount = Decimal(str(raw_amount))
-        except (InvalidOperation, TypeError, ValueError):
-            return Response(
-                {'error': 'Bid amount must be a valid number.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        if bid_amount <= 0:
-            return Response(
-                {'error': 'Bid amount must be greater than zero.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        try:
-            bid = BidService.place_bid(
-                auction_id=auction_id,
-                bidder=request.user,
-                amount=bid_amount,
-            )
-        except ValidationError as exc:
-            message = exc.messages[0] if getattr(exc, 'messages', None) else str(exc)
-            if 'higher than the current highest bid' in message:
-                return Response(
-                    {
-                        'error': (
-                            'Bid amount must be higher than the current highest bid.'
-                        ),
-                    },
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-            return Response(
-                {'error': message},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        serializer = BidSerializer(bid, context={'request': request})
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
 class AuctionBidHistoryView(APIView):

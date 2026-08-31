@@ -38,7 +38,7 @@ urlpatterns = [
     ),
     path(
         '<int:auction_id>/place-bid/',
-        PlaceBidView.as_view(),
+        PlaceBidView,
         name='place-bid',
     ),
     path(
