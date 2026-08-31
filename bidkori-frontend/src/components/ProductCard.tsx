@@ -2,23 +2,16 @@ import Image from 'next/image';
 import Link from 'next/link';
 
 import type { Auction } from '@/lib/types';
+import { resolveMediaUrl } from '@/lib/media';
 
 type ProductCardProps = {
   auction: Auction;
 };
 
-function resolveImageUrl(imagePath?: string | null) {
-  if (!imagePath) return null;
-  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
-    return imagePath;
-  }
-  return `http://127.0.0.1:8000${imagePath.startsWith('/') ? '' : '/'}${imagePath}`;
-}
-
 export default function ProductCard({ auction }: ProductCardProps) {
   const title = auction.product?.title ?? 'Untitled listing';
   const bid = auction.current_highest_bid ?? auction.starting_bid ?? '0.00';
-  const imageUrl = resolveImageUrl(auction.images?.[0]?.image);
+  const imageUrl = resolveMediaUrl(auction.images?.[0]?.image);
 
   return (
     <Link
