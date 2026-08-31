@@ -5,43 +5,107 @@ from django.db.models import Avg, Count, F, Sum
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.views.generic import TemplateView
-from rest_framework import generics, status
+from rest_framework import generics, status, viewsets
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import Auction, Bid
+from .models import Auction, AuctionImage, Bid
 from .permissions import IsNotSeller
-from .serializers import AuctionDetailSerializer, AuctionSerializer, BidSerializer
+from .serializers import (
+    AuctionDetailSerializer,
+    AuctionImageSerializer,
+    AuctionSerializer,
+    BidSerializer,
+)
 from .services import AuctionStateMachine, BidService
 
 
-class AuctionListCreateView(generics.ListCreateAPIView):
-    """List all auctions or create a new one.
+class AuctionViewSet(viewsets.ModelViewSet):
+    """List, create, retrieve, update, and delete auctions.
 
-    GET returns every auction (refreshing each one's time-based status first),
-    while POST creates a new auction (and its product) for the current user.
+    Accepts JSON and multipart/form-data so listing images can be uploaded
+    alongside auction creation (field name: ``images``).
     """
 
     serializer_class = AuctionSerializer
     permission_classes = [IsAuthenticatedOrReadOnly]
+    parser_classes = (MultiPartParser, FormParser, JSONParser)
 
     def get_queryset(self):
-        queryset = Auction.objects.select_related('product').all()
+        return (
+            Auction.objects.select_related('product', 'winning_bidder')
+            .prefetch_related('images')
+            .all()
+        )
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
         for auction in queryset:
             auction.update_status_by_time()
-        return queryset
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        instance.update_status_by_time()
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
 
     def perform_create(self, serializer):
         serializer.save(seller=self.request.user)
 
 
-class AuctionDetailView(generics.RetrieveUpdateDestroyAPIView):
-    """Retrieve, update, or delete a single auction by its primary key."""
+# Backwards-compatible aliases used by existing URL imports / docs.
+AuctionListCreateView = AuctionViewSet.as_view({'get': 'list', 'post': 'create'})
+AuctionDetailView = AuctionViewSet.as_view({
+    'get': 'retrieve',
+    'put': 'update',
+    'patch': 'partial_update',
+    'delete': 'destroy',
+})
 
-    queryset = Auction.objects.select_related('product').all()
-    serializer_class = AuctionSerializer
-    permission_classes = [IsAuthenticatedOrReadOnly]
+
+class AuctionImageUploadView(APIView):
+    """Upload one or more images to an existing auction (multipart/form-data)."""
+
+    permission_classes = [IsAuthenticated]
+    parser_classes = (MultiPartParser, FormParser)
+
+    def post(self, request, auction_id):
+        auction = get_object_or_404(
+            Auction.objects.select_related('product__seller'),
+            pk=auction_id,
+        )
+
+        if request.user != auction.product.seller:
+            return Response(
+                {'error': 'Only the seller can upload images for this auction.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        files = request.FILES.getlist('images') or request.FILES.getlist('image')
+        if not files:
+            return Response(
+                {'error': 'No images provided. Use multipart field "images".'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        created = [
+            AuctionImage.objects.create(auction=auction, image=image_file)
+            for image_file in files
+        ]
+        serializer = AuctionImageSerializer(
+            created,
+            many=True,
+            context={'request': request},
+        )
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
 class TransitionAuctionStateView(APIView):
@@ -81,7 +145,7 @@ class ActiveAuctionListView(APIView):
                 end_time__gt=timezone.now(),
             )
             .select_related('product', 'winning_bidder')
-            .prefetch_related('bids__bidder')
+            .prefetch_related('bids__bidder', 'images')
         )
         serializer = AuctionDetailSerializer(
             auctions,

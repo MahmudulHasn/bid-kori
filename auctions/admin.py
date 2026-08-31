@@ -2,7 +2,12 @@ from django.contrib import admin
 
 from config.admin import bidkori_admin_site
 
-from .models import Auction, Bid
+from .models import Auction, AuctionImage, Bid
+
+
+class AuctionImageInline(admin.TabularInline):
+    model = AuctionImage
+    extra = 1
 
 
 @admin.register(Auction, site=bidkori_admin_site)
@@ -17,6 +22,14 @@ class AuctionAdmin(admin.ModelAdmin):
     )
     list_filter = ('status',)
     search_fields = ('product__title',)
+    inlines = [AuctionImageInline]
+
+
+@admin.register(AuctionImage, site=bidkori_admin_site)
+class AuctionImageAdmin(admin.ModelAdmin):
+    list_display = ('id', 'auction', 'image', 'uploaded_at')
+    list_filter = ('uploaded_at',)
+    search_fields = ('auction__product__title',)
 
 
 @admin.register(Bid, site=bidkori_admin_site)

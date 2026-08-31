@@ -73,6 +73,24 @@ class Auction(models.Model):
         return False
 
 
+class AuctionImage(models.Model):
+    """An uploaded image attached to an auction listing."""
+
+    auction = models.ForeignKey(
+        Auction,
+        related_name='images',
+        on_delete=models.CASCADE,
+    )
+    image = models.ImageField(upload_to='auction_images/')
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['uploaded_at']
+
+    def __str__(self):
+        return f'Image {self.pk} for {self.auction}'
+
+
 class Bid(models.Model):
     """A single bid placed by a registered user on an auction."""
 

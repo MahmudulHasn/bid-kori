@@ -6,6 +6,7 @@ from .views import (
     AnalyticsSummaryView,
     AuctionBidHistoryView,
     AuctionDetailView,
+    AuctionImageUploadView,
     AuctionListCreateView,
     PlaceBidView,
     TransitionAuctionStateView,
@@ -23,12 +24,17 @@ urlpatterns = [
         AnalyticsDashboardView.as_view(),
         name='analytics-dashboard',
     ),
-    path('', AuctionListCreateView.as_view(), name='auction-list-create'),
-    path('<int:pk>/', AuctionDetailView.as_view(), name='auction-detail'),
+    path('', AuctionListCreateView, name='auction-list-create'),
+    path('<int:pk>/', AuctionDetailView, name='auction-detail'),
     path(
         '<int:pk>/transition/',
         TransitionAuctionStateView.as_view(),
         name='auction-transition',
+    ),
+    path(
+        '<int:auction_id>/images/',
+        AuctionImageUploadView.as_view(),
+        name='auction-image-upload',
     ),
     path(
         '<int:auction_id>/place-bid/',

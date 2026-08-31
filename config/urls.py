@@ -1,6 +1,9 @@
 from config.admin import bidkori_admin_site
-from django.urls import include, path
+from django.conf import settings
+from django.conf.urls.static import static
 from django.http import JsonResponse
+from django.urls import include, path
+
 
 def api_root(request):
     return JsonResponse({
@@ -23,3 +26,6 @@ urlpatterns = [
     path('api/auctions/', include('auctions.urls')),
     path('api/users/', include('users.urls')),
 ]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
