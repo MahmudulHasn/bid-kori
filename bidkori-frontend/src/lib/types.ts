@@ -21,5 +21,25 @@ export type Auction = {
   end_time?: string;
   start_time?: string;
   status?: string;
+  is_paid?: boolean;
+  winning_bidder?: number | null;
   images?: AuctionImage[];
+};
+
+export type UserBid = {
+  id: number;
+  auction: number | Auction;
+  bidder_username?: string;
+  amount: string | number;
+  timestamp?: string;
+};
+
+export type PaymentSummary = {
+  id: number;
+  auction: number;
+  user: number;
+  amount: string | number;
+  status: string;
+  transaction_id: string;
+  created_at?: string;
 };
