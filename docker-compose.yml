@@ -1,0 +1,35 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: bidkori_db
+    environment:
+      - POSTGRES_DB=bidkori
+      - POSTGRES_USER=bidkori_user
+      - POSTGRES_PASSWORD=bidkori_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bidkori_user -d bidkori"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build: .
+    container_name: bidkori_web
+    command: sh -c "python manage.py migrate && gunicorn config.wsgi:application --bind 0.0.0.0:8000"
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgres://bidkori_user:bidkori_pass@db:5432/bidkori
+      - SECRET_KEY=django-insecure-bidkori-dev-key
+      - DEBUG=True
+      - ALLOWED_HOSTS=*
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
