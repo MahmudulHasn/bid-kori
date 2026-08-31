@@ -39,6 +39,14 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 const TOKEN_KEY = 'token';
 const USER_KEY = 'user';
 
+function setAuthCookie(token: string) {
+  document.cookie = `token=${encodeURIComponent(token)}; path=/; SameSite=Lax`;
+}
+
+function clearAuthCookie() {
+  document.cookie = 'token=; path=/; Max-Age=0; SameSite=Lax';
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [token, setToken] = useState<string | null>(null);
@@ -50,6 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const storedUser = localStorage.getItem(USER_KEY);
       if (storedToken) {
         setToken(storedToken);
+        setAuthCookie(storedToken);
       }
       if (storedUser) {
         setUser(JSON.parse(storedUser) as AuthUser);
@@ -57,6 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       localStorage.removeItem(TOKEN_KEY);
       localStorage.removeItem(USER_KEY);
+      clearAuthCookie();
     } finally {
       setIsLoading(false);
     }
@@ -65,6 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const persistSession = useCallback((nextToken: string, nextUser: AuthUser) => {
     localStorage.setItem(TOKEN_KEY, nextToken);
     localStorage.setItem(USER_KEY, JSON.stringify(nextUser));
+    setAuthCookie(nextToken);
     setToken(nextToken);
     setUser(nextUser);
   }, []);
@@ -106,6 +117,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(() => {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
+    clearAuthCookie();
     setToken(null);
     setUser(null);
     toast.success('Logged out successfully.');
