@@ -2,6 +2,8 @@ from django.urls import path
 
 from .views import (
     ActiveAuctionListView,
+    AnalyticsDashboardView,
+    AnalyticsSummaryView,
     AuctionBidHistoryView,
     AuctionDetailView,
     AuctionListCreateView,
@@ -15,6 +17,12 @@ app_name = 'auctions'
 urlpatterns = [
     path('my-bids/', UserBidsView.as_view(), name='my-bids'),
     path('active/', ActiveAuctionListView.as_view(), name='active-auctions'),
+    path('analytics/', AnalyticsSummaryView.as_view(), name='analytics-summary'),
+    path(
+        'analytics/dashboard/',
+        AnalyticsDashboardView.as_view(),
+        name='analytics-dashboard',
+    ),
     path('', AuctionListCreateView.as_view(), name='auction-list-create'),
     path('<int:pk>/', AuctionDetailView.as_view(), name='auction-detail'),
     path(

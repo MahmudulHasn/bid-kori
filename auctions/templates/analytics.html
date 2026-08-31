@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BidKori Analytics Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #1e293b;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --accent-2: #a78bfa;
+      --border: #334155;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Inter, system-ui, -apple-system, sans-serif;
+      background: linear-gradient(160deg, #0f172a 0%, #1e1b4b 100%);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 2rem;
+    }
+
+    h1 {
+      margin: 0 0 0.25rem;
+      font-size: 1.75rem;
+      font-weight: 700;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      margin-bottom: 2rem;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem;
+    }
+
+    .card-label {
+      color: var(--muted);
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .card-value {
+      font-size: 2rem;
+      font-weight: 700;
+      margin-top: 0.35rem;
+      color: var(--accent);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .panel {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem;
+    }
+
+    .panel h2 {
+      margin: 0 0 1rem;
+      font-size: 1.1rem;
+    }
+
+    .bidders {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .bidders li {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.6rem 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.95rem;
+    }
+
+    .bidders li:last-child { border-bottom: none; }
+
+    .error {
+      background: #7f1d1d;
+      border: 1px solid #ef4444;
+      color: #fecaca;
+      padding: 1rem;
+      border-radius: 8px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>BidKori Analytics</h1>
+  <p class="subtitle">Live auction metrics and bidding trends</p>
+
+  <div id="error" class="error"></div>
+
+  <section class="cards">
+    <div class="card">
+      <div class="card-label">Active Auctions</div>
+      <div class="card-value" id="active-auctions">—</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Total Bids Placed</div>
+      <div class="card-value" id="total-bids">—</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Bidding Volume</div>
+      <div class="card-value" id="bidding-volume">—</div>
+    </div>
+  </section>
+
+  <section class="grid">
+    <div class="panel">
+      <h2>Bid Price Growth Over Time</h2>
+      <canvas id="line-chart"></canvas>
+    </div>
+    <div class="panel">
+      <h2>Category: Starting vs Highest Bid</h2>
+      <canvas id="bar-chart"></canvas>
+    </div>
+    <div class="panel">
+      <h2>Top Active Bidders</h2>
+      <ul class="bidders" id="top-bidders"></ul>
+    </div>
+  </section>
+
+  <script>
+    const API_URL = '/api/auctions/analytics/';
+    let lineChart;
+    let barChart;
+
+    function formatCurrency(value) {
+      const num = Number(value);
+      if (Number.isNaN(num)) return '—';
+      return new Intl.NumberFormat('en-BD', {
+        style: 'currency',
+        currency: 'BDT',
+        maximumFractionDigits: 2,
+      }).format(num);
+    }
+
+    function showError(message) {
+      const el = document.getElementById('error');
+      el.textContent = message;
+      el.style.display = 'block';
+    }
+
+    function renderSummary(data) {
+      document.getElementById('active-auctions').textContent = data.total_active_auctions;
+      document.getElementById('total-bids').textContent = data.total_bids_placed;
+      document.getElementById('bidding-volume').textContent = formatCurrency(
+        data.total_bidding_volume,
+      );
+
+      const list = document.getElementById('top-bidders');
+      list.innerHTML = '';
+      (data.top_active_bidders || []).forEach((bidder) => {
+        const li = document.createElement('li');
+        li.innerHTML = `
+          <span>${bidder.username}</span>
+          <span>${bidder.bid_count} bids · ${formatCurrency(bidder.total_bid_amount)}</span>
+        `;
+        list.appendChild(li);
+      });
+    }
+
+    function renderLineChart(history) {
+      const ctx = document.getElementById('line-chart');
+      const labels = history.map((item) => new Date(item.timestamp).toLocaleString());
+      const amounts = history.map((item) => Number(item.amount));
+
+      if (lineChart) lineChart.destroy();
+
+      lineChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Bid Amount',
+            data: amounts,
+            borderColor: '#38bdf8',
+            backgroundColor: 'rgba(56, 189, 248, 0.15)',
+            fill: true,
+            tension: 0.25,
+          }],
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { labels: { color: '#f8fafc' } } },
+          scales: {
+            x: { ticks: { color: '#94a3b8', maxRotation: 45 }, grid: { color: '#334155' } },
+            y: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } },
+          },
+        },
+      });
+    }
+
+    function renderBarChart(categories) {
+      const ctx = document.getElementById('bar-chart');
+      const labels = categories.map((row) => row.category);
+      const starting = categories.map((row) => Number(row.avg_starting_price));
+      const highest = categories.map((row) => Number(row.avg_highest_bid));
+
+      if (barChart) barChart.destroy();
+
+      barChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [
+            {
+              label: 'Avg Starting Price',
+              data: starting,
+              backgroundColor: 'rgba(167, 139, 250, 0.8)',
+            },
+            {
+              label: 'Avg Highest Bid',
+              data: highest,
+              backgroundColor: 'rgba(56, 189, 248, 0.8)',
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { labels: { color: '#f8fafc' } } },
+          scales: {
+            x: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } },
+            y: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } },
+          },
+        },
+      });
+    }
+
+    async function loadAnalytics() {
+      try {
+        const response = await fetch(API_URL);
+        if (!response.ok) {
+          throw new Error(`API returned ${response.status}`);
+        }
+        const data = await response.json();
+        renderSummary(data);
+        renderLineChart(data.bid_escalation_history || []);
+        renderBarChart(data.category_breakdown || []);
+      } catch (error) {
+        showError(`Failed to load analytics: ${error.message}`);
+      }
+    }
+
+    loadAnalytics();
+  </script>
+</body>
+</html>

@@ -1,8 +1,10 @@
 from decimal import Decimal, InvalidOperation
 
 from django.core.exceptions import ValidationError
+from django.db.models import Avg, Count, F, Sum
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from django.views.generic import TemplateView
 from rest_framework import generics, status
 from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
@@ -199,3 +201,86 @@ class UserBidsView(generics.ListAPIView):
             'auction__product',
             'bidder',
         ).filter(bidder=self.request.user)
+
+
+class AnalyticsSummaryView(APIView):
+    """Aggregate auction and bidding metrics for dashboards and reporting."""
+
+    def get(self, request):
+        now = timezone.now()
+
+        total_active_auctions = Auction.objects.filter(
+            status=Auction.Status.ACTIVE,
+            end_time__gt=now,
+        ).count()
+
+        total_bids_placed = Bid.objects.count()
+
+        volume_aggregate = Auction.objects.aggregate(
+            total_bidding_volume=Sum('current_highest_bid'),
+        )
+        total_bidding_volume = volume_aggregate['total_bidding_volume'] or Decimal('0.00')
+
+        category_breakdown = [
+            {
+                'category': row['product__category__name'] or 'Uncategorized',
+                'avg_starting_price': row['avg_starting_price'],
+                'avg_highest_bid': row['avg_highest_bid'],
+                'avg_price_growth': row['avg_price_growth'],
+                'auction_count': row['auction_count'],
+            }
+            for row in Auction.objects.select_related('product__category')
+            .values('product__category__name')
+            .annotate(
+                avg_starting_price=Avg('starting_bid'),
+                avg_highest_bid=Avg('current_highest_bid'),
+                avg_price_growth=Avg(F('current_highest_bid') - F('starting_bid')),
+                auction_count=Count('id'),
+            )
+            .order_by('product__category__name')
+        ]
+
+        bid_escalation_history = [
+            {
+                'bid_id': bid['id'],
+                'auction_id': bid['auction_id'],
+                'amount': bid['amount'],
+                'timestamp': bid['timestamp'].isoformat(),
+                'bidder_username': bid['bidder__username'],
+            }
+            for bid in Bid.objects.select_related('bidder')
+            .order_by('timestamp')
+            .values('id', 'auction_id', 'amount', 'timestamp', 'bidder__username')[:100]
+        ]
+
+        top_active_bidders = [
+            {
+                'username': row['bidder__username'],
+                'bid_count': row['bid_count'],
+                'total_bid_amount': row['total_bid_amount'],
+            }
+            for row in Bid.objects.values('bidder__username')
+            .annotate(
+                bid_count=Count('id'),
+                total_bid_amount=Sum('amount'),
+            )
+            .order_by('-bid_count', '-total_bid_amount')[:5]
+        ]
+
+        return Response(
+            {
+                'total_active_auctions': total_active_auctions,
+                'total_bids_placed': total_bids_placed,
+                'total_bidding_volume': total_bidding_volume,
+                'category_breakdown': category_breakdown,
+                'bid_escalation_history': bid_escalation_history,
+                'top_active_bidders': top_active_bidders,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class AnalyticsDashboardView(TemplateView):
+    """Serve the interactive Chart.js analytics dashboard."""
+
+    template_name = 'analytics.html'
