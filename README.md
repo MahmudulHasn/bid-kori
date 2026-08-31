@@ -1,203 +1,160 @@
-# BidKori API
+# BidKori
 
-A decoupled RESTful auction and live bidding backend built with **Django** and **Django REST Framework**.
+A full-stack real-time auction marketplace: **Django REST** backend + **Next.js** frontend.
 
-BidKori powers product catalog management, authenticated buyer/seller workflows, and a bidding engine that validates live bids, enforces minimum increments, and tracks winning bidders.
+BidKori handles product catalogs, authenticated buyer/seller workflows, atomic live bidding, multi-image media, automated auction lifecycle closure, rate-limited bid protection, winner checkout simulation, and an interactive web client with live polling.
+
+**Platform status:** Full-Stack Platform Ready / Production Hardened (Update 3 complete).
 
 ---
 
-## Tech Stack & Tools
+## Tech Stack
+
+### Backend
 
 | Layer | Technology |
 | --- | --- |
-| Backend Framework | Django 6, Django REST Framework (DRF) |
-| Authentication | Token-based auth (`rest_framework.authtoken`) |
-| Database | SQLite (development) / PostgreSQL-compatible |
-| Environment | Python 3.x, Virtual Environment (`venv`) |
-| Supporting packages | `django-cors-headers`, `python-dotenv`, `psycopg2-binary` |
+| Framework | Django, Django REST Framework |
+| Database | PostgreSQL 15 |
+| Containers | Docker & Docker Compose |
+| Static files | WhiteNoise |
+| API docs | drf-spectacular (OpenAPI 3.0) — Swagger UI & ReDoc |
+| Media | Pillow (`ImageField` uploads) |
+| Auth | DRF Token Authentication |
+| Supporting | `django-cors-headers`, `python-dotenv`, `dj-database-url`, `psycopg2-binary`, `gunicorn`, `requests` |
+
+### Frontend (`bidkori-frontend/`)
+
+| Layer | Technology |
+| --- | --- |
+| Framework | Next.js (App Router) |
+| Language | TypeScript |
+| Styling | Tailwind CSS |
+| Data fetching | SWR |
+| HTTP client | Axios |
+| Icons / toasts | Lucide React, React Hot Toast |
 
 ---
 
-## Team Contributions & Architecture Breakdown
+## Project Architecture & Progress Checklist
 
-| Contributor | Focus | Highlights |
-| --- | --- | --- |
-| **Mahmud** | Core Infrastructure & Catalog | App architecture, base routing, Product models, categories, and catalog endpoints (`/api/products/`) |
-| **Rafi** | Authentication & Security | Identity management, user registration, token-based authentication (`/api/users/login/`, `/api/users/register/`), and DRF global security settings |
-| **Samira** | Profiles, Guardrails & Dashboards | Foreign Key model linkage, custom DRF permissions (`IsSellerOrReadOnly`, `IsNotSeller`), Seller Dashboard (`/api/products/my-listings/`), and Buyer Dashboard (`/api/auctions/my-bids/`) |
-| **Toufiq** | Bidding Engine & Automation | Real-time bid validation, minimum bid calculations, winning bidder updates, active auctions list (`/api/auctions/active/`), and live bid history (`/api/auctions/<id>/history/`) |
+### Update 3 — Backend / DevOps + Frontend (100% complete)
+
+- [x] **PostgreSQL & Dockerization (Toufiq)** — Containerized Postgres + web services, WhiteNoise static serving, 50-thread atomic concurrency stress test (`select_for_update`).
+- [x] **Media & Lifecycle Engine (Mahmud)** — Multi-image auction uploads, persistent Docker `media_data` volume, `close_expired_auctions` management command.
+- [x] **API Docs & Security (Rafi)** — Interactive OpenAPI docs at `/api/schema/swagger-ui/` and `/api/schema/redoc/`, CORS for frontend origins, offline Postman exporter (`export_postman`).
+- [x] **Hardening & Payments (Samira)** — DRF rate limiting (`BidBurstThrottle` / `bids: 10/minute`), outbid Django email signals, winner payment checkout (`POST /api/auctions/{id}/checkout/`).
+- [x] **Next.js Frontend Phase (Toufiq)** — Auth context, responsive catalog grid, multi-image create forms, real-time SWR polling + countdown timers, winner payment dashboard.
 
 ### App Boundaries
 
 - **`products`** — Product listings, categories, seller catalog endpoints
-- **`auctions`** — Auction lifecycle, bidding engine, bid history, buyer dashboard
+- **`auctions`** — Auction lifecycle, bidding engine, media, payments, analytics
 - **`users`** — Registration, login, authenticated profile (`/me/`)
+- **`bidkori-frontend`** — Next.js App Router client for marketplace UX
 
 ---
 
-## Getting Started & Local Setup
+## Team Contributions
 
-### 1. Clone the repository
+| Contributor | Focus | Highlights |
+| --- | --- | --- |
+| **Mahmud** | Catalog, media, lifecycle | Product models, multi-image uploads, `close_expired_auctions`, persistent media volumes |
+| **Rafi** | Auth, docs, CORS | Token auth, OpenAPI/Swagger/ReDoc, Postman export, CORS for Next.js |
+| **Samira** | Guardrails, throttling, payments | Seller/bidder permissions, `BidBurstThrottle`, checkout simulation, outbid alerts |
+| **Toufiq** | Bidding, Docker, frontend | Atomic `select_for_update` bidding, Docker Compose, stress tests, Next.js marketplace UI |
 
-```bash
-git clone https://github.com/<your-org>/bid-kori.git
-cd bid-kori
+---
+
+## Quickstart (Windows PowerShell)
+
+### A. Backend with Docker (recommended)
+
+```powershell
+cd G:\bid-kori
+docker compose up --build -d
+docker compose exec web python manage.py seed_data
+docker compose exec web python manage.py createsuperuser
 ```
 
-### 2. Create and activate a virtual environment
+API: [http://127.0.0.1:8000/](http://127.0.0.1:8000/)  
+Swagger: [http://127.0.0.1:8000/api/schema/swagger-ui/](http://127.0.0.1:8000/api/schema/swagger-ui/)  
+Admin: [http://127.0.0.1:8000/admin/](http://127.0.0.1:8000/admin/)
 
-```bash
-python3 -m venv venv
-source venv/bin/activate        # macOS / Linux
-# venv\Scripts\activate         # Windows
+Useful commands:
+
+```powershell
+docker compose logs -f web
+docker compose exec web python manage.py close_expired_auctions
+docker compose exec web python manage.py export_postman
+.\venv\Scripts\python.exe scripts\stress_test.py --docker
 ```
 
-### 3. Install dependencies
+### B. Backend local (venv + SQLite fallback)
 
-```bash
-pip install Django djangorestframework django-cors-headers python-dotenv psycopg2-binary
-```
-
-> Tip: once `requirements.txt` is populated, prefer `pip install -r requirements.txt`.
-
-### 4. (Optional) Configure PostgreSQL
-
-By default the project uses SQLite. To use PostgreSQL, create a `.env` file in the project root:
-
-```env
-DB_NAME=bidkori
-DB_USER=postgres
-DB_PASSWORD=your_password
-DB_HOST=localhost
-DB_PORT=5432
-```
-
-### 5. Run migrations
-
-```bash
-python manage.py makemigrations
+```powershell
+cd G:\bid-kori
+python -m venv venv
+.\venv\Scripts\Activate.ps1
+pip install -r requirements.txt
 python manage.py migrate
-```
-
-### 6. Create a superuser
-
-```bash
-python manage.py createsuperuser
-```
-
-### 7. Launch the development server
-
-```bash
+python manage.py seed_data
 python manage.py runserver
 ```
 
-The API root is available at [http://127.0.0.1:8000/](http://127.0.0.1:8000/).
+Optional Postgres via `.env` / `DATABASE_URL` (used automatically by `dj-database-url`).
+
+### C. Next.js frontend
+
+```powershell
+cd G:\bid-kori\bidkori-frontend
+npm install
+npm run dev
+```
+
+Frontend: [http://localhost:3000/](http://localhost:3000/)  
+Ensure the Django API is reachable at `http://127.0.0.1:8000`.
 
 ---
 
-## API Endpoint Reference
+## API Endpoint Reference (selected)
 
-### Products
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `POST` | `/api/users/register/` | Register + token |
+| `POST` | `/api/users/login/` | Login + token |
+| `GET` | `/api/auctions/` | List auctions (`status`, `category`, `search` filters) |
+| `POST` | `/api/auctions/` | Create auction (JSON or multipart + images) |
+| `POST` | `/api/auctions/<id>/images/` | Upload auction images |
+| `POST` | `/api/auctions/<id>/place-bid/` | Place bid (atomic + rate limited) |
+| `POST` | `/api/auctions/<id>/checkout/` | Winner mock payment checkout |
+| `GET` | `/api/auctions/my-bids/` | Buyer bid dashboard data |
+| `GET` | `/api/schema/swagger-ui/` | Interactive OpenAPI docs |
 
-| Method | Endpoint | Access | Description |
-| --- | --- | --- | --- |
-| `GET` | `/api/products/` | Public | List all products |
-| `POST` | `/api/products/` | Authenticated | Create a product listing |
-| `GET` | `/api/products/<id>/` | Public | Retrieve a single product |
-| `PUT` / `PATCH` | `/api/products/<id>/` | Authenticated (seller) | Update own product |
-| `DELETE` | `/api/products/<id>/` | Authenticated (seller) | Delete own product |
-| `GET` | `/api/products/my-listings/` | Authenticated | Seller dashboard — current user's listings |
+Auth header:
 
-### Authentication
-
-| Method | Endpoint | Access | Description |
-| --- | --- | --- | --- |
-| `POST` | `/api/users/register/` | Public | Register a new user and receive an auth token |
-| `POST` | `/api/users/login/` | Public | Authenticate with username/password and receive a token |
-| `GET` | `/api/users/me/` | Authenticated | Return the authenticated user's profile |
-
-### Auctions & Bidding
-
-| Method | Endpoint | Access | Description |
-| --- | --- | --- | --- |
-| `GET` | `/api/auctions/` | Public | List all auctions |
-| `POST` | `/api/auctions/` | Authenticated | Create an auction (with nested product) |
-| `GET` | `/api/auctions/<id>/` | Public | Retrieve auction details |
-| `PUT` / `PATCH` / `DELETE` | `/api/auctions/<id>/` | Authenticated | Update or delete an auction |
-| `GET` | `/api/auctions/active/` | Public | List active auctions (`ACTIVE` + future `end_time`) |
-| `POST` | `/api/auctions/<auction_id>/place-bid/` | Authenticated (not seller) | Place a bid; validates activity, amount, and min increment |
-| `GET` | `/api/auctions/<auction_id>/history/` | Public | Live bid history ordered by highest amount |
-| `GET` | `/api/auctions/my-bids/` | Authenticated | Buyer dashboard — bids placed by the current user |
-| `POST` | `/api/auctions/<id>/transition/` | Authenticated | Transition auction status via the state machine |
-
-### Admin
-
-| Method | Endpoint | Access | Description |
-| --- | --- | --- | --- |
-| — | `/admin/` | Staff | Django Admin for models and data management |
+```http
+Authorization: Token <your-token>
+```
 
 ---
 
-## Testing & Usage
+## Testing Scripts
 
-### Django Admin
+| Script / command | Purpose |
+| --- | --- |
+| `python manage.py seed_data` | Demo users, products, auctions, bids |
+| `python manage.py close_expired_auctions` | Close expired ACTIVE auctions + assign winners |
+| `python manage.py export_postman` | Write `docs/BidKori_v3.postman_collection.json` |
+| `python scripts/integration_test.py` | End-to-end bidding lifecycle |
+| `python scripts/stress_test.py --docker` | 50 concurrent place-bid workers |
+| `python scripts/test_mahmud_features.py --docker` | Media upload + auto-close verification |
 
-1. Start the server and open [http://127.0.0.1:8000/admin/](http://127.0.0.1:8000/admin/).
-2. Sign in with the superuser created during setup.
-3. Inspect and manage **Products**, **Auctions**, and **Bids** directly.
+### Update 3 stress-test highlights
 
-### DRF Browsable API
-
-Browse HTML forms for endpoints when session authentication is enabled (e.g. after logging in via Admin). Useful for quick manual checks during development.
-
-### Postman (or any HTTP client)
-
-1. **Register or log in** to obtain a token:
-
-```http
-POST /api/users/login/
-Content-Type: application/json
-
-{
-  "username": "buyer_test",
-  "password": "your_password"
-}
-```
-
-2. Copy the `token` from the response.
-
-3. Send authenticated requests with the DRF token header:
-
-```http
-Authorization: Token <your-token>
-Content-Type: application/json
-```
-
-4. **Example — place a bid:**
-
-```http
-POST /api/auctions/1/place-bid/
-Authorization: Token <your-token>
-Content-Type: application/json
-
-{
-  "bid_amount": "550.00"
-}
-```
-
-5. **Example — fetch active auctions:**
-
-```http
-GET /api/auctions/active/
-```
-
-6. **Example — view bid history:**
-
-```http
-GET /api/auctions/1/history/
-```
-
-> **Note:** This project uses DRF **Token Authentication**. The correct header scheme is `Authorization: Token <token>` (not `Bearer`, unless you later adopt JWT).
+- **50 concurrent workers** posting incremental bids
+- **Zero HTTP 500 / deadlock crashes**
+- **Final `current_highest_bid` matched max accepted bid** (atomic consistency under `select_for_update`)
 
 ---
 
@@ -205,11 +162,17 @@ GET /api/auctions/1/history/
 
 ```text
 bid-kori/
-├── auctions/          # Bidding engine, auction lifecycle, bid history
-├── products/          # Catalog, categories, seller listings
-├── users/             # Registration, login, profile
-├── config/            # Django settings, root URLconf
-├── manage.py
+├── auctions/                 # Bidding, media, payments, lifecycle commands
+├── products/                 # Catalog & seed data
+├── users/                    # Auth & profiles
+├── config/                   # Settings, URLs, CORS, spectacular
+├── scripts/                  # Integration & stress tests
+├── docs/                     # Exported Postman collection
+├── bidkori-frontend/         # Next.js App Router client
+├── docker-compose.yml
+├── Dockerfile
+├── requirements.txt
+├── PITCH.md
 └── README.md
 ```
 
