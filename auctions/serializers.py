@@ -2,7 +2,7 @@ from django.db import transaction
 from rest_framework import serializers
 
 from products.models import Product
-from .models import Auction, AuctionImage, Bid
+from .models import Auction, AuctionImage, Bid, Payment
 
 
 class ProductSerializer(serializers.ModelSerializer):
@@ -53,10 +53,11 @@ class AuctionSerializer(serializers.ModelSerializer):
             'winning_bidder',
             'status',
             'is_featured',
+            'is_paid',
             'images',
             'uploaded_images',
         ]
-        read_only_fields = ['current_highest_bid', 'winning_bidder', 'status']
+        read_only_fields = ['current_highest_bid', 'winning_bidder', 'status', 'is_paid']
 
     def validate_starting_bid(self, value):
         if value <= 0:
@@ -151,6 +152,23 @@ class TransitionStatusSerializer(serializers.Serializer):
     status = serializers.ChoiceField(choices=Auction.Status.choices)
 
 
+class PaymentSerializer(serializers.ModelSerializer):
+    """Serializes a mock checkout payment for an auction winner."""
+
+    class Meta:
+        model = Payment
+        fields = [
+            'id',
+            'auction',
+            'user',
+            'amount',
+            'status',
+            'transaction_id',
+            'created_at',
+        ]
+        read_only_fields = fields
+
+
 class AuctionDetailSerializer(serializers.ModelSerializer):
     """Detailed auction payload including product labels and recent bids."""
 
@@ -176,6 +194,7 @@ class AuctionDetailSerializer(serializers.ModelSerializer):
             'current_highest_bid',
             'winning_bidder_username',
             'status',
+            'is_paid',
             'is_active',
             'recent_bids',
             'images',

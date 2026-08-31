@@ -8,6 +8,7 @@ from .views import (
     AuctionDetailView,
     AuctionImageUploadView,
     AuctionListCreateView,
+    CheckoutView,
     PlaceBidView,
     TransitionAuctionStateView,
     UserBidsView,
@@ -30,6 +31,11 @@ urlpatterns = [
         '<int:pk>/transition/',
         TransitionAuctionStateView.as_view(),
         name='auction-transition',
+    ),
+    path(
+        '<int:pk>/checkout/',
+        CheckoutView,
+        name='auction-checkout',
     ),
     path(
         '<int:auction_id>/images/',

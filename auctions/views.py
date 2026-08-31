@@ -1,6 +1,8 @@
 from decimal import Decimal, InvalidOperation
+import uuid
 
 from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.db.models import Avg, Count, F, Q, Sum
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -13,7 +15,7 @@ from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnl
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import Auction, AuctionImage, Bid
+from .models import Auction, AuctionImage, Bid, Payment
 from .permissions import IsNotSeller
 from .serializers import (
     AuctionDetailSerializer,
@@ -22,6 +24,7 @@ from .serializers import (
     AuctionSerializer,
     BidSerializer,
     ErrorMessageSerializer,
+    PaymentSerializer,
     PlaceBidRequestSerializer,
     TransitionStatusSerializer,
 )
@@ -258,6 +261,96 @@ class AuctionViewSet(viewsets.ModelViewSet):
         serializer = BidSerializer(bid, context={'request': request})
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
+    @extend_schema(
+        tags=['Payments'],
+        summary='Checkout and pay for a won auction (mock)',
+        request=None,
+        responses={
+            200: PaymentSerializer,
+            400: ErrorMessageSerializer,
+            403: ErrorMessageSerializer,
+        },
+    )
+    @action(
+        detail=True,
+        methods=['post'],
+        url_path='checkout',
+        permission_classes=[IsAuthenticated],
+    )
+    def checkout(self, request, pk=None, auction_id=None):
+        """Mock payment checkout for the auction winning bidder."""
+        target_id = auction_id or pk
+        auction = get_object_or_404(
+            Auction.objects.select_related('winning_bidder', 'product'),
+            pk=target_id,
+        )
+
+        if auction.status != Auction.Status.CLOSED:
+            return Response(
+                {'error': 'Checkout is only allowed for CLOSED auctions.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if auction.winning_bidder_id is None:
+            return Response(
+                {'error': 'This auction has no winning bidder to charge.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if request.user != auction.winning_bidder:
+            return Response(
+                {'error': 'Only the winning bidder can complete checkout.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        existing = Payment.objects.filter(auction=auction).first()
+        if existing is not None and (
+            existing.status == Payment.Status.COMPLETED or auction.is_paid
+        ):
+            return Response(
+                {
+                    'error': 'Payment already completed for this auction.',
+                    'payment': PaymentSerializer(
+                        existing, context={'request': request}
+                    ).data,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        amount = auction.current_highest_bid
+        transaction_id = f'TXN-{uuid.uuid4().hex[:16].upper()}'
+
+        with transaction.atomic():
+            if existing is not None:
+                payment = existing
+                payment.user = request.user
+                payment.amount = amount
+                payment.status = Payment.Status.COMPLETED
+                payment.transaction_id = transaction_id
+                payment.save(
+                    update_fields=[
+                        'user',
+                        'amount',
+                        'status',
+                        'transaction_id',
+                        'updated_at',
+                    ]
+                )
+            else:
+                payment = Payment.objects.create(
+                    auction=auction,
+                    user=request.user,
+                    amount=amount,
+                    status=Payment.Status.COMPLETED,
+                    transaction_id=transaction_id,
+                )
+
+            auction.is_paid = True
+            auction.save(update_fields=['is_paid'])
+
+        serializer = PaymentSerializer(payment, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
 
 # Backwards-compatible aliases used by existing URL imports / docs.
 AuctionListCreateView = AuctionViewSet.as_view({'get': 'list', 'post': 'create'})
@@ -268,6 +361,7 @@ AuctionDetailView = AuctionViewSet.as_view({
     'delete': 'destroy',
 })
 PlaceBidView = AuctionViewSet.as_view({'post': 'place_bid'})
+CheckoutView = AuctionViewSet.as_view({'post': 'checkout'})
 
 class AuctionImageUploadView(APIView):
     """Upload one or more images to an existing auction (multipart/form-data)."""
