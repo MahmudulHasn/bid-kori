@@ -1,6 +1,7 @@
 from decimal import Decimal, InvalidOperation
 import uuid
 
+from django.contrib.auth.mixins import UserPassesTestMixin
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Avg, Count, F, Q, Sum
@@ -11,7 +12,7 @@ from drf_spectacular.utils import OpenApiParameter, OpenApiTypes, extend_schema
 from rest_framework import generics, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
-from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
+from rest_framework.permissions import IsAdminUser, IsAuthenticated, IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -573,12 +574,20 @@ class UserBidsView(generics.ListAPIView):
 
 
 class AnalyticsSummaryView(APIView):
-    """Aggregate auction and bidding metrics for dashboards and reporting."""
+    """Aggregate auction and bidding metrics for dashboards and reporting.
+
+    Staff-only: includes bidder-level fields intended for internal operations.
+    """
+
+    permission_classes = [IsAdminUser]
 
     @extend_schema(
         tags=['Analytics'],
-        summary='Auction analytics summary',
-        responses={200: OpenApiTypes.OBJECT},
+        summary='Auction analytics summary (staff only)',
+        responses={
+            200: OpenApiTypes.OBJECT,
+            403: {'description': 'Admin privileges required.'},
+        },
     )
     def get(self, request):
         now = timezone.now()
@@ -654,7 +663,11 @@ class AnalyticsSummaryView(APIView):
         )
 
 
-class AnalyticsDashboardView(TemplateView):
-    """Serve the interactive Chart.js analytics dashboard."""
+class AnalyticsDashboardView(UserPassesTestMixin, TemplateView):
+    """Serve the interactive Chart.js analytics dashboard (staff only)."""
 
     template_name = 'analytics.html'
+    raise_exception = True
+
+    def test_func(self):
+        return self.request.user.is_authenticated and self.request.user.is_staff
