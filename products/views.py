@@ -1,8 +1,6 @@
-from decimal import Decimal, InvalidOperation
-
-from rest_framework import generics, status
+from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
-from rest_framework.response import Response
+from rest_framework.exceptions import PermissionDenied
 
 from .models import Product
 from .permissions import IsSellerOrReadOnly
@@ -10,38 +8,29 @@ from .serializers import ProductSerializer
 
 
 class ProductListCreateView(generics.ListCreateAPIView):
-    """List all products or create a new one for the authenticated user."""
+    """List all products or create a new one for the authenticated user.
+
+    Pricing is stored on related auctions (``Auction.starting_bid``) when listings
+    are created via ``POST /api/auctions/``. This catalog endpoint has no
+    ``starting_price`` model field; any legacy ``starting_price`` request value is
+    ignored by the serializer until a later API consistency pass.
+    """
 
     queryset = Product.objects.select_related('category', 'seller').all()
     serializer_class = ProductSerializer
     permission_classes = [IsAuthenticatedOrReadOnly, IsSellerOrReadOnly]
 
-    def create(self, request, *args, **kwargs):
-        raw_starting_price = request.data.get('starting_price')
-        if raw_starting_price is None or raw_starting_price == '':
-            return Response(
-                {'error': 'Starting price must be a positive number.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        try:
-            starting_price = Decimal(str(raw_starting_price))
-        except (InvalidOperation, TypeError, ValueError):
-            return Response(
-                {'error': 'Starting price must be a positive number.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        if starting_price <= 0:
-            return Response(
-                {'error': 'Starting price must be a positive number.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        return super().create(request, *args, **kwargs)
-
     def perform_create(self, serializer):
         serializer.save(seller=self.request.user)
+
+    def permission_denied(self, request, message=None, code=None):
+        if not request.user or not request.user.is_authenticated:
+            return super().permission_denied(request, message=message, code=code)
+        raise PermissionDenied(
+            detail={
+                'error': message or IsSellerOrReadOnly.message,
+            }
+        )
 
 
 # Alias matching Samira's ProductListView naming for the list/create endpoint.
@@ -60,12 +49,11 @@ class ProductDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAuthenticatedOrReadOnly, IsSellerOrReadOnly]
 
     def permission_denied(self, request, message=None, code=None):
-        from rest_framework.exceptions import PermissionDenied
-
+        if not request.user or not request.user.is_authenticated:
+            return super().permission_denied(request, message=message, code=code)
         raise PermissionDenied(
             detail={
-                'error': message
-                or 'Action forbidden: Only the seller can modify this listing.',
+                'error': message or IsSellerOrReadOnly.message,
             }
         )
 
