@@ -1,6 +1,25 @@
-from rest_framework.permissions import BasePermission
+from rest_framework.permissions import SAFE_METHODS, BasePermission
 
 from .models import Auction
+
+
+class IsAuctionSellerOrReadOnly(BasePermission):
+    """Allow read access to anyone; write access only to the auction's product seller."""
+
+    message = 'Action forbidden: Only the seller can modify this auction.'
+
+    def has_permission(self, request, view):
+        if request.method in SAFE_METHODS:
+            return True
+        return bool(request.user and request.user.is_authenticated)
+
+    def has_object_permission(self, request, view, obj):
+        if request.method in SAFE_METHODS:
+            return True
+        auction = obj if isinstance(obj, Auction) else getattr(obj, 'auction', None)
+        if auction is None:
+            return False
+        return request.user == auction.product.seller
 
 
 class IsNotSeller(BasePermission):

@@ -16,7 +16,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .models import Auction, AuctionImage, Bid, Payment
-from .permissions import IsNotSeller
+from .permissions import IsAuctionSellerOrReadOnly, IsNotSeller
 from .serializers import (
     AuctionDetailSerializer,
     AuctionImageSerializer,
@@ -65,7 +65,7 @@ class AuctionViewSet(viewsets.ModelViewSet):
     """
 
     serializer_class = AuctionSerializer
-    permission_classes = [IsAuthenticatedOrReadOnly]
+    permission_classes = [IsAuthenticatedOrReadOnly, IsAuctionSellerOrReadOnly]
     parser_classes = (MultiPartParser, FormParser, JSONParser)
 
     def get_queryset(self):
@@ -168,13 +168,23 @@ class AuctionViewSet(viewsets.ModelViewSet):
         return super().get_throttles()
 
     def permission_denied(self, request, message=None, code=None):
-        if getattr(self, 'action', None) == 'place_bid':
-            from rest_framework.exceptions import PermissionDenied
+        from rest_framework.exceptions import PermissionDenied
 
+        if getattr(self, 'action', None) == 'place_bid':
             raise PermissionDenied(
                 detail={
                     'error': message
                     or 'Action forbidden: Sellers cannot bid on their own listings.',
+                }
+            )
+        if getattr(self, 'action', None) in {
+            'update',
+            'partial_update',
+            'destroy',
+        }:
+            raise PermissionDenied(
+                detail={
+                    'error': message or IsAuctionSellerOrReadOnly.message,
                 }
             )
         return super().permission_denied(request, message=message, code=code)
@@ -366,7 +376,7 @@ CheckoutView = AuctionViewSet.as_view({'post': 'checkout'})
 class AuctionImageUploadView(APIView):
     """Upload one or more images to an existing auction (multipart/form-data)."""
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAuctionSellerOrReadOnly]
     parser_classes = (MultiPartParser, FormParser)
 
     @extend_schema(
@@ -397,12 +407,7 @@ class AuctionImageUploadView(APIView):
             Auction.objects.select_related('product__seller'),
             pk=auction_id,
         )
-
-        if request.user != auction.product.seller:
-            return Response(
-                {'error': 'Only the seller can upload images for this auction.'},
-                status=status.HTTP_403_FORBIDDEN,
-            )
+        self.check_object_permissions(request, auction)
 
         files = request.FILES.getlist('images') or request.FILES.getlist('image')
         if not files:
@@ -433,7 +438,7 @@ class AuctionImageUploadView(APIView):
 class TransitionAuctionStateView(APIView):
     """Transition an auction to a new status via the state machine."""
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAuctionSellerOrReadOnly]
 
     @extend_schema(
         tags=['Auctions'],
@@ -442,10 +447,15 @@ class TransitionAuctionStateView(APIView):
         responses={
             200: AuctionSerializer,
             400: ErrorMessageSerializer,
+            403: ErrorMessageSerializer,
         },
     )
     def post(self, request, pk):
-        auction = get_object_or_404(Auction, pk=pk)
+        auction = get_object_or_404(
+            Auction.objects.select_related('product__seller'),
+            pk=pk,
+        )
+        self.check_object_permissions(request, auction)
         new_status = request.data.get('status')
 
         if not new_status:
