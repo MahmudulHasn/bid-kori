@@ -31,7 +31,7 @@ type AuthContextValue = {
     password: string,
     confirmPassword: string,
   ) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -40,11 +40,18 @@ const TOKEN_KEY = 'token';
 const USER_KEY = 'user';
 
 function setAuthCookie(token: string) {
+  // Routing convenience only — backend validates Authorization header.
   document.cookie = `token=${encodeURIComponent(token)}; path=/; SameSite=Lax`;
 }
 
 function clearAuthCookie() {
   document.cookie = 'token=; path=/; Max-Age=0; SameSite=Lax';
+}
+
+function clearStoredSession() {
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(USER_KEY);
+  clearAuthCookie();
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -53,23 +60,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    try {
+    let cancelled = false;
+
+    const hydrateSession = async () => {
       const storedToken = localStorage.getItem(TOKEN_KEY);
-      const storedUser = localStorage.getItem(USER_KEY);
-      if (storedToken) {
+      if (!storedToken) {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+        return;
+      }
+
+      setAuthCookie(storedToken);
+
+      try {
+        const { data } = await api.get<AuthUser>('/users/me/');
+        if (cancelled) {
+          return;
+        }
         setToken(storedToken);
-        setAuthCookie(storedToken);
+        setUser(data);
+        localStorage.setItem(USER_KEY, JSON.stringify(data));
+      } catch {
+        if (!cancelled) {
+          clearStoredSession();
+          setToken(null);
+          setUser(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
       }
-      if (storedUser) {
-        setUser(JSON.parse(storedUser) as AuthUser);
-      }
-    } catch {
-      localStorage.removeItem(TOKEN_KEY);
-      localStorage.removeItem(USER_KEY);
-      clearAuthCookie();
-    } finally {
-      setIsLoading(false);
-    }
+    };
+
+    hydrateSession();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const persistSession = useCallback((nextToken: string, nextUser: AuthUser) => {
@@ -114,13 +143,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [persistSession],
   );
 
-  const logout = useCallback(() => {
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(USER_KEY);
-    clearAuthCookie();
-    setToken(null);
-    setUser(null);
-    toast.success('Logged out successfully.');
+  const logout = useCallback(async () => {
+    try {
+      await api.post('/users/logout/');
+    } catch {
+      // Always clear local session even if revocation fails.
+    } finally {
+      clearStoredSession();
+      setToken(null);
+      setUser(null);
+      toast.success('Logged out successfully.');
+    }
   }, []);
 
   const value = useMemo<AuthContextValue>(

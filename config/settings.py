@@ -200,6 +200,10 @@ REST_FRAMEWORK = {
     'EXCEPTION_HANDLER': 'config.exceptions.custom_exception_handler',
 }
 
+# DRF authtoken rows do not expire automatically. Server-side revocation is
+# available via POST /api/users/logout/. Token TTL/rotation policy is deferred
+# until a broader auth architecture review (see users/auth_tokens.py).
+
 
 SPECTACULAR_SETTINGS = {
     'TITLE': 'BidKori API',

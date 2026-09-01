@@ -29,9 +29,12 @@ export default function LoginPage() {
       toast.success('Logged in successfully.');
       router.push('/');
     } catch (error: unknown) {
+      const data = (error as { response?: { data?: Record<string, unknown> } })
+        ?.response?.data;
       const message =
-        (error as { response?: { data?: { detail?: string } } })?.response?.data
-          ?.detail || 'Login failed. Check your credentials.';
+        (typeof data?.error === 'string' && data.error) ||
+        (typeof data?.detail === 'string' && data.detail) ||
+        'Login failed. Check your credentials.';
       toast.error(String(message));
     } finally {
       setSubmitting(false);

@@ -20,6 +20,7 @@ def api_root(request):
             "auctions": "/api/auctions/",
             "register": "/api/users/register/",
             "login": "/api/users/login/",
+            "logout": "/api/users/logout/",
             "me": "/api/users/me/",
             "schema": "/api/schema/",
             "swagger": "/api/schema/swagger-ui/",

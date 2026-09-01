@@ -1,11 +1,12 @@
 from django.contrib.auth import authenticate
 from drf_spectacular.utils import extend_schema
 from rest_framework import serializers, status
-from rest_framework.authtoken.models import Token
+from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from .auth_tokens import issue_auth_token, revoke_auth_token
 from .serializers import UserRegistrationSerializer, UserSerializer
 
 
@@ -19,8 +20,8 @@ class AuthTokenResponseSerializer(serializers.Serializer):
 class LoginRequestSerializer(serializers.Serializer):
     """Schema for username/password login requests."""
 
-    username = serializers.CharField()
-    password = serializers.CharField(write_only=True)
+    username = serializers.CharField(trim_whitespace=True)
+    password = serializers.CharField(write_only=True, trim_whitespace=False)
 
 
 class RegisterView(APIView):
@@ -38,7 +39,7 @@ class RegisterView(APIView):
         serializer = UserRegistrationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
-        token, _ = Token.objects.get_or_create(user=user)
+        token = issue_auth_token(user)
         return Response(
             {
                 'token': token.key,
@@ -59,28 +60,23 @@ class LoginView(APIView):
         request=LoginRequestSerializer,
         responses={
             200: AuthTokenResponseSerializer,
-            400: {'description': 'Username and password are required.'},
+            400: {'description': 'Invalid request payload.'},
             401: {'description': 'Invalid credentials.'},
         },
     )
     def post(self, request):
-        username = request.data.get('username')
-        password = request.data.get('password')
+        serializer = LoginRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
 
-        if not username or not password:
-            return Response(
-                {'detail': 'Username and password are required.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        username = serializer.validated_data['username']
+        password = serializer.validated_data['password']
 
         user = authenticate(username=username, password=password)
-        if user is None:
-            return Response(
-                {'detail': 'Invalid credentials.'},
-                status=status.HTTP_401_UNAUTHORIZED,
-            )
+        if user is None or not user.is_active:
+            # Generic message — do not reveal whether the username exists.
+            raise AuthenticationFailed('Invalid credentials.')
 
-        token, _ = Token.objects.get_or_create(user=user)
+        token = issue_auth_token(user)
         return Response(
             {
                 'token': token.key,
@@ -88,6 +84,22 @@ class LoginView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+
+
+class LogoutView(APIView):
+    """Revoke the authenticated user's API token."""
+
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        tags=['Users'],
+        summary='Log out and revoke the current API token',
+        request=None,
+        responses={204: {'description': 'Token revoked.'}},
+    )
+    def post(self, request):
+        revoke_auth_token(request.user)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class UserProfileView(APIView):
