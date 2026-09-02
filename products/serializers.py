@@ -12,7 +12,7 @@ class CategorySerializer(serializers.ModelSerializer):
 
 
 class ProductSerializer(serializers.ModelSerializer):
-    """Serializes a product listing, attaching the seller from the request."""
+    """Serializes product catalog fields only (no auction pricing)."""
 
     class Meta:
         model = Product

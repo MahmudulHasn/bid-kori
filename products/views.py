@@ -10,10 +10,9 @@ from .serializers import ProductSerializer
 class ProductListCreateView(generics.ListCreateAPIView):
     """List all products or create a new one for the authenticated user.
 
-    Pricing is stored on related auctions (``Auction.starting_bid``) when listings
-    are created via ``POST /api/auctions/``. This catalog endpoint has no
-    ``starting_price`` model field; any legacy ``starting_price`` request value is
-    ignored by the serializer until a later API consistency pass.
+    Product payloads contain catalog fields only (title, description, condition,
+    category). Auction pricing belongs on ``Auction.starting_bid`` /
+    ``Auction.current_highest_bid`` via ``POST /api/auctions/``.
     """
 
     queryset = Product.objects.select_related('category', 'seller').all()

@@ -14,9 +14,10 @@ class Command(BaseCommand):
     """Seed the database with demo users, products, auctions, and bids.
 
     Creates a seller, two buyers, and four products owned by the seller. Each
-    product gets a 7-day ACTIVE auction with two simulated bids, and the
-    auction's highest bid / winning bidder are updated accordingly. The command
-    is idempotent: re-running it will not create duplicates or crash.
+    product gets a 7-day ACTIVE auction with two simulated bids. The auction's
+    ``current_highest_bid`` is updated from Bid rows; ``winning_bidder`` is left
+    unset until authoritative close. The command is idempotent: re-running it
+    will not create duplicates or crash.
     """
 
     help = 'Seeds demo users, products, auctions, and simulated bids.'
@@ -47,7 +48,7 @@ class Command(BaseCommand):
                 '50mm prime lens. Fully mechanical, tested, and ready to shoot.'
             ),
             'condition': Product.Condition.USED_GOOD,
-            'starting_price': Decimal('4500.00'),
+            'starting_bid': Decimal('4500.00'),
         },
         {
             'title': 'Mechanical Keyboard',
@@ -56,7 +57,7 @@ class Command(BaseCommand):
                 'brown switches, PBT keycaps, and per-key RGB lighting.'
             ),
             'condition': Product.Condition.USED_LIKE_NEW,
-            'starting_price': Decimal('3200.00'),
+            'starting_bid': Decimal('3200.00'),
         },
         {
             'title': 'Leather Jacket',
@@ -65,7 +66,7 @@ class Command(BaseCommand):
                 'Size M, minimal wear, with a soft quilted inner lining.'
             ),
             'condition': Product.Condition.USED_GOOD,
-            'starting_price': Decimal('6000.00'),
+            'starting_bid': Decimal('6000.00'),
         },
         {
             'title': 'Antique Watch',
@@ -74,7 +75,7 @@ class Command(BaseCommand):
                 'restored dial, sapphire crystal, and a genuine leather strap.'
             ),
             'condition': Product.Condition.FAIR,
-            'starting_price': Decimal('15000.00'),
+            'starting_bid': Decimal('15000.00'),
         },
     ]
 
@@ -109,7 +110,7 @@ class Command(BaseCommand):
         now = timezone.now()
 
         for data in self.PRODUCTS:
-            starting_price = data['starting_price']
+            starting_bid = data['starting_bid']
 
             product, created = Product.objects.get_or_create(
                 title=data['title'],
@@ -123,7 +124,7 @@ class Command(BaseCommand):
                 self.stdout.write(
                     self.style.SUCCESS(
                         f"Created product '{product.title}' "
-                        f"(starting price: {starting_price})."
+                        f"(auction starting_bid: {starting_bid})."
                     )
                 )
             else:
@@ -136,8 +137,8 @@ class Command(BaseCommand):
             auction, auction_created = Auction.objects.get_or_create(
                 product=product,
                 defaults={
-                    'starting_bid': starting_price,
-                    'current_highest_bid': starting_price,
+                    'starting_bid': starting_bid,
+                    'current_highest_bid': starting_bid,
                     'start_time': now,
                     'end_time': now + datetime.timedelta(days=7),
                     'status': Auction.Status.ACTIVE,
@@ -157,8 +158,8 @@ class Command(BaseCommand):
                 )
 
             planned_bids = [
-                (buyer_one, starting_price + Decimal('10.00')),
-                (buyer_two, starting_price + Decimal('25.00')),
+                (buyer_one, starting_bid + Decimal('10.00')),
+                (buyer_two, starting_bid + Decimal('25.00')),
             ]
 
             for bidder, amount in planned_bids:
@@ -174,14 +175,14 @@ class Command(BaseCommand):
                         )
                     )
 
-            highest_bid = auction.bids.order_by('-amount').first()
+            highest_bid = auction.bids.order_by('-amount', 'timestamp').first()
             if highest_bid is not None and (
                 auction.current_highest_bid != highest_bid.amount
-                or auction.winning_bidder_id != highest_bid.bidder_id
             ):
+                # During ACTIVE, only current_highest_bid is provisional;
+                # winning_bidder is assigned at authoritative close.
                 auction.current_highest_bid = highest_bid.amount
-                auction.winning_bidder = highest_bid.bidder
-                auction.save(update_fields=['current_highest_bid', 'winning_bidder'])
+                auction.save(update_fields=['current_highest_bid'])
                 self.stdout.write(
                     self.style.SUCCESS(
                         f"  Highest bid: {highest_bid.amount} by "

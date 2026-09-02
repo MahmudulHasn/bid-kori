@@ -97,23 +97,30 @@ class ProductAuthorizationTests(APITestCase):
         product = Product.objects.get(pk=response.data['id'])
         self.assertEqual(product.seller, self.owner)
         self.assertEqual(product.title, 'New catalog item')
+        # Pricing lives on Auction, not Product.
+        self.assertNotIn('starting_price', response.data)
+        self.assertNotIn('starting_bid', response.data)
 
-    def test_authenticated_create_ignores_legacy_starting_price(self):
-        """starting_price is not a Product field; it must not block creation."""
+    def test_product_create_does_not_require_or_store_starting_price(self):
+        """Unknown pricing fields are ignored; Product has no price columns."""
         self._auth(self.owner_token)
         response = self.client.post(
             '/api/products/',
             {
-                'title': 'Legacy payload item',
-                'description': 'Includes ignored starting_price',
+                'title': 'No-price catalog item',
+                'description': 'Pricing belongs on auctions',
                 'condition': 'USED_GOOD',
                 'starting_price': '1500.00',
+                'starting_bid': '1500.00',
             },
             format='json',
         )
         self.assertEqual(response.status_code, 201)
         product = Product.objects.get(pk=response.data['id'])
-        self.assertEqual(product.title, 'Legacy payload item')
+        self.assertEqual(product.title, 'No-price catalog item')
+        self.assertFalse(hasattr(product, 'starting_price'))
+        self.assertNotIn('starting_price', response.data)
+        self.assertNotIn('starting_bid', response.data)
 
     def test_unauthenticated_cannot_create_product(self):
         response = self.client.post(
@@ -135,3 +142,47 @@ class ProductAuthorizationTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         ids = {item['id'] for item in response.data}
         self.assertEqual(ids, {own_product.pk})
+
+
+class ProductAuctionContractTests(APITestCase):
+    """Product vs Auction pricing field ownership."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='seller',
+            email='seller@test.com',
+            password='pass12345',
+        )
+        self.token = Token.objects.create(user=self.user)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
+
+    def test_auction_create_uses_starting_bid_not_product_price(self):
+        from django.utils import timezone
+        from datetime import timedelta
+
+        now = timezone.now()
+        response = self.client.post(
+            '/api/auctions/',
+            {
+                'product': {
+                    'title': 'Contract Camera',
+                    'description': 'Nested product',
+                    'condition': 'USED_GOOD',
+                },
+                'starting_bid': '2500.00',
+                'min_increment': '50.00',
+                'start_time': now.isoformat(),
+                'end_time': (now + timedelta(days=1)).isoformat(),
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertIn('starting_bid', response.data)
+        self.assertNotIn('starting_price', response.data)
+        self.assertEqual(str(response.data['starting_bid']), '2500.00')
+        self.assertEqual(
+            str(response.data['current_highest_bid']),
+            '2500.00',
+        )
+        self.assertNotIn('starting_price', response.data.get('product', {}))
+        self.assertNotIn('starting_bid', response.data.get('product', {}))

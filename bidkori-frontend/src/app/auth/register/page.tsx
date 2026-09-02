@@ -40,8 +40,8 @@ export default function RegisterPage() {
       const data = (error as { response?: { data?: Record<string, unknown> } })
         ?.response?.data;
       const message =
-        (typeof data?.detail === 'string' && data.detail) ||
         (typeof data?.error === 'string' && data.error) ||
+        (typeof data?.detail === 'string' && data.detail) ||
         'Registration failed. Please check your details.';
       toast.error(String(message));
     } finally {

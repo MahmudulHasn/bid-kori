@@ -461,7 +461,7 @@ class TransitionAuctionStateView(APIView):
 
         if not new_status:
             return Response(
-                {'detail': "Field 'status' is required."},
+                {'error': "Field 'status' is required."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -469,7 +469,7 @@ class TransitionAuctionStateView(APIView):
             auction = AuctionLifecycleService.transition(pk, new_status)
         except ValidationError as exc:
             return Response(
-                {'detail': exc.messages[0] if exc.messages else str(exc)},
+                {'error': exc.messages[0] if exc.messages else str(exc)},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 

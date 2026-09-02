@@ -153,7 +153,6 @@ class IntegrationTestRunner:
                 'Automated integration-test listing for Toufiq bidding engine.'
             ),
             'condition': 'USED_LIKE_NEW',
-            'starting_price': str(self.starting_bid),
         }
 
         create_resp = self.session.post(
@@ -305,12 +304,14 @@ class IntegrationTestRunner:
             highest == self.buyer_two_bid,
             f'expected={self.buyer_two_bid} got={highest}',
         )
+        # Final winner is assigned only at authoritative close; during ACTIVE
+        # winning_bidder remains unset while current_highest_bid tracks the live high.
         self._check(
-            'winning_bidder_username updated',
-            winner == 'buyer_two',
-            f'expected=buyer_two got={winner!r}',
+            'winning_bidder unset during ACTIVE (finalized only at close)',
+            winner in (None, ''),
+            f'expected empty/null got={winner!r}',
         )
-        return highest == self.buyer_two_bid and winner == 'buyer_two'
+        return highest == self.buyer_two_bid and winner in (None, '')
 
     def stage_guardrails(self) -> bool:
         self._section('5. Guardrail Checks - self-bid + low bid')
