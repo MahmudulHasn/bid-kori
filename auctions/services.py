@@ -10,7 +10,10 @@ class AuctionLifecycleService:
     """Authoritative auction close and cancel operations.
 
     All transitions to CLOSED or CANCELLED must go through this service.
-    ``reserve_price`` is stored but not enforced yet (deferred work).
+
+    Reserve price (optional): when set, the highest bid must meet or exceed
+    ``reserve_price`` to produce a winner; otherwise the auction closes with
+    no winner. Reserve is evaluated only at close time.
     """
 
     ALLOWED_TRANSITIONS = {
@@ -40,16 +43,31 @@ class AuctionLifecycleService:
         )
 
     @classmethod
+    def _reserve_met(cls, auction, highest_bid):
+        """Return True when there is no reserve or the highest bid meets it."""
+        if highest_bid is None:
+            return False
+        if auction.reserve_price is None:
+            return True
+        return highest_bid.amount >= auction.reserve_price
+
+    @classmethod
     def _finalize_close(cls, auction):
         """Close an ACTIVE auction and assign the final winner from Bid rows.
 
         Caller must already hold a row lock on ``auction``.
+        When ``reserve_price`` is set and the highest bid is below it, the
+        auction closes with ``winning_bidder=None`` (no sale).
         """
         highest_bid = cls._resolve_highest_bid(auction)
         auction.status = Auction.Status.CLOSED
+
         if highest_bid is not None:
-            auction.winning_bidder = highest_bid.bidder
             auction.current_highest_bid = highest_bid.amount
+            if cls._reserve_met(auction, highest_bid):
+                auction.winning_bidder = highest_bid.bidder
+            else:
+                auction.winning_bidder = None
             auction.save(
                 update_fields=['status', 'winning_bidder', 'current_highest_bid']
             )

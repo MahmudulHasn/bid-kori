@@ -565,3 +565,129 @@ class AuctionLifecycleTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn('transaction_id', response.data)
 
+
+class ReservePriceTests(APITestCase):
+    """Reserve-price evaluation at authoritative close."""
+
+    def setUp(self):
+        self.seller = User.objects.create_user(
+            username='reserve_seller',
+            email='reserve_seller@test.com',
+            password='pass12345',
+        )
+        self.buyer = User.objects.create_user(
+            username='reserve_buyer',
+            email='reserve_buyer@test.com',
+            password='pass12345',
+        )
+        self.seller_token = Token.objects.create(user=self.seller)
+
+    def _create_auction(self, *, reserve_price=None, starting_bid=100):
+        now = timezone.now()
+        product = Product.objects.create(
+            seller=self.seller,
+            title='Reserve Item',
+            description='Desc',
+        )
+        return Auction.objects.create(
+            product=product,
+            starting_bid=starting_bid,
+            current_highest_bid=starting_bid,
+            min_increment=10,
+            reserve_price=reserve_price,
+            start_time=now - timedelta(minutes=5),
+            end_time=now + timedelta(hours=1),
+            status=Auction.Status.ACTIVE,
+        )
+
+    def test_no_reserve_highest_bid_wins(self):
+        from .models import Bid
+        from .services import AuctionLifecycleService
+
+        auction = self._create_auction(reserve_price=None)
+        Bid.objects.create(auction=auction, bidder=self.buyer, amount=150)
+
+        closed, did_close = AuctionLifecycleService.close_auction(auction.pk)
+        self.assertTrue(did_close)
+        self.assertEqual(closed.status, Auction.Status.CLOSED)
+        self.assertEqual(closed.winning_bidder, self.buyer)
+        self.assertEqual(float(closed.current_highest_bid), 150.0)
+
+    def test_highest_bid_below_reserve_no_winner(self):
+        from .models import Bid
+        from .services import AuctionLifecycleService
+
+        auction = self._create_auction(reserve_price=200)
+        Bid.objects.create(auction=auction, bidder=self.buyer, amount=150)
+
+        closed, _ = AuctionLifecycleService.close_auction(auction.pk)
+        self.assertEqual(closed.status, Auction.Status.CLOSED)
+        self.assertIsNone(closed.winning_bidder)
+        self.assertEqual(float(closed.current_highest_bid), 150.0)
+
+    def test_highest_bid_exactly_equal_to_reserve_wins(self):
+        from .models import Bid
+        from .services import AuctionLifecycleService
+
+        auction = self._create_auction(reserve_price=200)
+        Bid.objects.create(auction=auction, bidder=self.buyer, amount=200)
+
+        closed, _ = AuctionLifecycleService.close_auction(auction.pk)
+        self.assertEqual(closed.winning_bidder, self.buyer)
+        self.assertEqual(float(closed.current_highest_bid), 200.0)
+
+    def test_highest_bid_above_reserve_wins(self):
+        from .models import Bid
+        from .services import AuctionLifecycleService
+
+        auction = self._create_auction(reserve_price=200)
+        Bid.objects.create(auction=auction, bidder=self.buyer, amount=250)
+
+        closed, _ = AuctionLifecycleService.close_auction(auction.pk)
+        self.assertEqual(closed.winning_bidder, self.buyer)
+        self.assertEqual(float(closed.current_highest_bid), 250.0)
+
+    def test_no_bids_with_reserve_no_winner(self):
+        from .services import AuctionLifecycleService
+
+        auction = self._create_auction(reserve_price=200)
+        closed, _ = AuctionLifecycleService.close_auction(auction.pk)
+        self.assertEqual(closed.status, Auction.Status.CLOSED)
+        self.assertIsNone(closed.winning_bidder)
+
+    def test_repeated_close_with_reserve_is_idempotent(self):
+        from .models import Bid
+        from .services import AuctionLifecycleService
+
+        auction = self._create_auction(reserve_price=200)
+        Bid.objects.create(auction=auction, bidder=self.buyer, amount=150)
+
+        first, first_closed = AuctionLifecycleService.close_auction(auction.pk)
+        self.assertTrue(first_closed)
+        self.assertIsNone(first.winning_bidder)
+
+        second, second_closed = AuctionLifecycleService.close_auction(auction.pk)
+        self.assertFalse(second_closed)
+        self.assertEqual(second.status, Auction.Status.CLOSED)
+        self.assertIsNone(second.winning_bidder)
+        self.assertEqual(float(second.current_highest_bid), 150.0)
+
+    def test_reserve_price_not_exposed_on_public_retrieve(self):
+        auction = self._create_auction(reserve_price=500)
+        response = self.client.get(f'/api/auctions/{auction.pk}/')
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn('reserve_price', response.data)
+
+    def test_below_reserve_closed_auction_cannot_checkout(self):
+        from .models import Bid
+        from .services import AuctionLifecycleService
+
+        auction = self._create_auction(reserve_price=200)
+        Bid.objects.create(auction=auction, bidder=self.buyer, amount=150)
+        AuctionLifecycleService.close_auction(auction.pk)
+
+        token = Token.objects.create(user=self.buyer)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {token.key}')
+        response = self.client.post(f'/api/auctions/{auction.pk}/checkout/')
+        self.assertEqual(response.status_code, 400)
+

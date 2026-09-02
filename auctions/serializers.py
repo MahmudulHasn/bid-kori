@@ -39,6 +39,16 @@ class AuctionSerializer(serializers.ModelSerializer):
         help_text='One or more image files (multipart/form-data field name: images).',
     )
 
+    # Write-only: sellers may set a reserve on create/update, but the value is
+    # not returned on public auction payloads (avoids informing bidders).
+    reserve_price = serializers.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        required=False,
+        allow_null=True,
+        write_only=True,
+    )
+
     class Meta:
         model = Auction
         fields = [
@@ -67,6 +77,13 @@ class AuctionSerializer(serializers.ModelSerializer):
     def validate_min_increment(self, value):
         if value <= 0:
             raise serializers.ValidationError('Minimum increment must be greater than 0.')
+        return value
+
+    def validate_reserve_price(self, value):
+        if value is not None and value <= 0:
+            raise serializers.ValidationError(
+                'Reserve price must be greater than 0 when provided.'
+            )
         return value
 
     def validate(self, attrs):
