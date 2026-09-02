@@ -1,0 +1,39 @@
+.env
+.env.*
+!.env.example
+!.env*.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+
+# Django
+db.sqlite3
+db.sqlite3-journal
+staticfiles/
+media/
+*.log
+local_settings.py
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Frontend (also has its own ignore)
+bidkori-frontend/node_modules/
+bidkori-frontend/.next/
+bidkori-frontend/.env.local

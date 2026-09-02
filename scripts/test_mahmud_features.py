@@ -26,8 +26,9 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-DOCKER_DATABASE_URL = (
-    'postgres://bidkori_user:bidkori_pass@127.0.0.1:5432/bidkori'
+DOCKER_DATABASE_URL = os.getenv(
+    'DATABASE_URL',
+    '',
 )
 
 
@@ -44,8 +45,8 @@ def _parse_args() -> argparse.Namespace:
         '--docker',
         action='store_true',
         help=(
-            'Use Docker Compose Postgres (DATABASE_URL) so ORM/call_command '
-            'match the containerized API.'
+            'Use Docker Compose Postgres (DATABASE_URL from environment/.env) '
+            'so ORM/call_command match the containerized API.'
         ),
     )
     return parser.parse_args()
@@ -53,9 +54,17 @@ def _parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = _parse_args()
-    if args.docker and not os.getenv('DATABASE_URL'):
-        os.environ['DATABASE_URL'] = DOCKER_DATABASE_URL
+    if args.docker:
+        database_url = os.getenv('DATABASE_URL', '').strip()
+        if not database_url:
+            print(
+                '[FAIL] --docker requires DATABASE_URL in the environment '
+                '(see .env.example). Do not hardcode credentials.'
+            )
+            return 1
+        os.environ['DATABASE_URL'] = database_url
 
+    # Ensure local scripts can load settings when .env provides SECRET_KEY.
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
 
     try:
