@@ -76,6 +76,11 @@ class AuctionViewSet(viewsets.ModelViewSet):
             .all()
         )
 
+        # List filters must not affect retrieve/update/destroy/place_bid/checkout;
+        # otherwise e.g. GET /auctions/1/?status=CLOSED 404s an ACTIVE auction.
+        if getattr(self, 'action', None) != 'list':
+            return queryset
+
         status_param = self.request.query_params.get('status')
         category = self.request.query_params.get('category')
         search = self.request.query_params.get('search')
@@ -102,9 +107,19 @@ class AuctionViewSet(viewsets.ModelViewSet):
         responses={200: AuctionSerializer(many=True)},
     )
     def list(self, request, *args, **kwargs):
+        # Close expired ACTIVE rows before filtering so ?status=ACTIVE cannot
+        # return auctions that become CLOSED during serialization.
+        now = timezone.now()
+        expired_ids = list(
+            Auction.objects.filter(
+                status=Auction.Status.ACTIVE,
+                end_time__lte=now,
+            ).values_list('pk', flat=True)
+        )
+        for auction_id in expired_ids:
+            AuctionLifecycleService.close_if_expired(auction_id)
+
         queryset = self.filter_queryset(self.get_queryset())
-        for auction in queryset:
-            auction.update_status_by_time()
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
@@ -502,10 +517,13 @@ class ActiveAuctionListView(APIView):
         responses={200: AuctionDetailSerializer(many=True)},
     )
     def get(self, request):
+        now = timezone.now()
+        # Match Auction.is_biddable(): ACTIVE and within [start_time, end_time).
         auctions = (
             Auction.objects.filter(
                 status=Auction.Status.ACTIVE,
-                end_time__gt=timezone.now(),
+                start_time__lte=now,
+                end_time__gt=now,
             )
             .select_related('product', 'product__category', 'winning_bidder')
             .prefetch_related('bids__bidder', 'images')

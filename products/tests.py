@@ -143,6 +143,20 @@ class ProductAuthorizationTests(APITestCase):
         ids = {item['id'] for item in response.data}
         self.assertEqual(ids, {own_product.pk})
 
+    def test_my_listings_requires_authentication(self):
+        response = self.client.get('/api/products/my-listings/')
+        self.assertIn(response.status_code, (401, 403))
+
+    def test_product_list_is_public_catalog_not_scoped_to_caller(self):
+        own_product = self._create_product(seller=self.owner, title='Mine')
+        other_product = self._create_product(seller=self.other, title='Theirs')
+        self._auth(self.owner_token)
+        response = self.client.get('/api/products/')
+        self.assertEqual(response.status_code, 200)
+        ids = {item['id'] for item in response.data}
+        self.assertEqual(ids, {own_product.pk, other_product.pk})
+        self.assertIsInstance(response.data, list)
+
 
 class ProductAuctionContractTests(APITestCase):
     """Product vs Auction pricing field ownership."""

@@ -1028,3 +1028,200 @@ class BidServiceConcurrencyTests(TransactionTestCase):
         self.assertEqual(auction.current_highest_bid, max_accepted)
         self.assertIsNone(auction.winning_bidder)
 
+
+class AuctionListFilterAuthorizationTests(APITestCase):
+    """List/filter correctness and private queryset scoping."""
+
+    def setUp(self):
+        from products.models import Category
+
+        self.seller = User.objects.create_user(
+            username='list_seller',
+            email='list_seller@test.com',
+            password='pass12345',
+        )
+        self.buyer = User.objects.create_user(
+            username='list_buyer',
+            email='list_buyer@test.com',
+            password='pass12345',
+        )
+        self.other_buyer = User.objects.create_user(
+            username='other_buyer',
+            email='other_buyer@test.com',
+            password='pass12345',
+        )
+        self.buyer_token = Token.objects.create(user=self.buyer)
+        self.other_token = Token.objects.create(user=self.other_buyer)
+
+        self.electronics = Category.objects.create(
+            name='Electronics',
+            slug='electronics',
+        )
+        self.gaming = Category.objects.create(name='Gaming', slug='gaming')
+        self.now = timezone.now()
+
+    def _create_auction(
+        self,
+        *,
+        title='Item',
+        description='Desc',
+        category=None,
+        status=Auction.Status.ACTIVE,
+        start_time=None,
+        end_time=None,
+        starting_bid=100,
+    ):
+        product = Product.objects.create(
+            seller=self.seller,
+            title=title,
+            description=description,
+            category=category,
+        )
+        return Auction.objects.create(
+            product=product,
+            starting_bid=starting_bid,
+            current_highest_bid=starting_bid,
+            min_increment=10,
+            start_time=start_time or self.now - timedelta(hours=1),
+            end_time=end_time or self.now + timedelta(days=1),
+            status=status,
+        )
+
+    def test_status_filter_returns_only_matching_auctions(self):
+        active = self._create_auction(title='Live Camera')
+        closed = self._create_auction(title='Sold Phone', status=Auction.Status.CLOSED)
+        cancelled = self._create_auction(
+            title='Cancelled Watch',
+            status=Auction.Status.CANCELLED,
+        )
+
+        response = self.client.get('/api/auctions/', {'status': 'ACTIVE'})
+        self.assertEqual(response.status_code, 200)
+        ids = {row['id'] for row in response.data}
+        self.assertIn(active.pk, ids)
+        self.assertNotIn(closed.pk, ids)
+        self.assertNotIn(cancelled.pk, ids)
+
+        closed_resp = self.client.get('/api/auctions/', {'status': 'CLOSED'})
+        closed_ids = {row['id'] for row in closed_resp.data}
+        self.assertEqual(closed_ids, {closed.pk})
+
+    def test_category_filter_by_slug_and_name(self):
+        electronics = self._create_auction(
+            title='Laptop',
+            category=self.electronics,
+        )
+        gaming = self._create_auction(title='Console', category=self.gaming)
+
+        by_slug = self.client.get('/api/auctions/', {'category': 'electronics'})
+        self.assertEqual({row['id'] for row in by_slug.data}, {electronics.pk})
+
+        by_name = self.client.get('/api/auctions/', {'category': 'Gaming'})
+        self.assertEqual({row['id'] for row in by_name.data}, {gaming.pk})
+
+    def test_search_is_server_side_on_title_and_description(self):
+        match_title = self._create_auction(
+            title='Vintage Camera Body',
+            description='plain box',
+        )
+        match_desc = self._create_auction(
+            title='Other Item',
+            description='Includes vintage lens kit',
+        )
+        self._create_auction(title='Kitchen Mixer', description='blender')
+
+        response = self.client.get('/api/auctions/', {'search': 'vintage'})
+        self.assertEqual(response.status_code, 200)
+        ids = {row['id'] for row in response.data}
+        self.assertEqual(ids, {match_title.pk, match_desc.pk})
+
+    def test_expired_active_excluded_from_status_active_list(self):
+        live = self._create_auction(title='Still Live')
+        expired = self._create_auction(
+            title='Expired Stale',
+            start_time=self.now - timedelta(days=2),
+            end_time=self.now - timedelta(minutes=1),
+            status=Auction.Status.ACTIVE,
+        )
+
+        response = self.client.get('/api/auctions/', {'status': 'ACTIVE'})
+        ids = {row['id'] for row in response.data}
+        self.assertIn(live.pk, ids)
+        self.assertNotIn(expired.pk, ids)
+        expired.refresh_from_db()
+        self.assertEqual(expired.status, Auction.Status.CLOSED)
+
+    def test_active_endpoint_excludes_inactive_and_not_started(self):
+        live = self._create_auction(title='Live Now')
+        self._create_auction(title='Closed', status=Auction.Status.CLOSED)
+        self._create_auction(title='Cancelled', status=Auction.Status.CANCELLED)
+        self._create_auction(
+            title='Expired',
+            end_time=self.now - timedelta(minutes=1),
+        )
+        scheduled = self._create_auction(
+            title='Not Started',
+            start_time=self.now + timedelta(hours=2),
+            end_time=self.now + timedelta(days=1),
+        )
+
+        response = self.client.get('/api/auctions/active/')
+        self.assertEqual(response.status_code, 200)
+        ids = {row['id'] for row in response.data}
+        self.assertEqual(ids, {live.pk})
+        self.assertNotIn(scheduled.pk, ids)
+
+    def test_active_endpoint_supports_category_and_search(self):
+        target = self._create_auction(
+            title='Retro Camera',
+            description='film body',
+            category=self.electronics,
+        )
+        self._create_auction(
+            title='Retro Console',
+            description='gaming',
+            category=self.gaming,
+        )
+
+        response = self.client.get(
+            '/api/auctions/active/',
+            {'category': 'electronics', 'search': 'camera'},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual({row['id'] for row in response.data}, {target.pk})
+
+    def test_list_query_params_do_not_break_retrieve(self):
+        auction = self._create_auction(title='Detail Target')
+        response = self.client.get(
+            f'/api/auctions/{auction.pk}/',
+            {'status': 'CLOSED', 'search': 'nope', 'category': 'missing'},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['id'], auction.pk)
+
+    def test_my_bids_returns_only_authenticated_user_bids(self):
+        from .models import Bid
+
+        auction = self._create_auction(title='Bid Target')
+        own = Bid.objects.create(auction=auction, bidder=self.buyer, amount=110)
+        Bid.objects.create(auction=auction, bidder=self.other_buyer, amount=120)
+
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.buyer_token.key}')
+        response = self.client.get('/api/auctions/my-bids/')
+        self.assertEqual(response.status_code, 200)
+        ids = {row['id'] for row in response.data}
+        self.assertEqual(ids, {own.pk})
+        for row in response.data:
+            self.assertEqual(row['bidder_username'], self.buyer.username)
+
+    def test_my_bids_requires_authentication(self):
+        response = self.client.get('/api/auctions/my-bids/')
+        self.assertIn(response.status_code, (401, 403))
+
+    def test_list_response_is_bare_array_not_paginated(self):
+        self._create_auction(title='Array Shape')
+        response = self.client.get('/api/auctions/')
+        self.assertEqual(response.status_code, 200)
+        self.assertIsInstance(response.data, list)
+        self.assertNotIn('results', response.data)
+
