@@ -900,7 +900,16 @@ class BidServiceHardeningTests(APITestCase):
 
 
 class BidServiceConcurrencyTests(TransactionTestCase):
-    """Concurrent place_bid attempts (PostgreSQL). SQLite is covered sequentially."""
+    """Concurrent place_bid attempts.
+
+    PostgreSQL: ``test_concurrent_bids_preserve_highest`` uses threads +
+    ``SELECT FOR UPDATE`` to assert only consistent highs survive contention.
+
+    SQLite: that threaded test is skipped (`has_select_for_update` is false).
+    ``test_contended_sequential_bids_preserve_highest`` still verifies
+    contested amounts applied back-to-back keep Bid rows and
+    ``current_highest_bid`` aligned on SQLite.
+    """
 
     def setUp(self):
         self.seller = User.objects.create_user(
