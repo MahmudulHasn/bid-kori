@@ -4,7 +4,7 @@ from io import BytesIO
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import override_settings
+from django.test import TransactionTestCase, override_settings
 from django.utils import timezone
 from PIL import Image
 from rest_framework.authtoken.models import Token
@@ -690,4 +690,341 @@ class ReservePriceTests(APITestCase):
         self.client.credentials(HTTP_AUTHORIZATION=f'Token {token.key}')
         response = self.client.post(f'/api/auctions/{auction.pk}/checkout/')
         self.assertEqual(response.status_code, 400)
+
+
+class BidServiceHardeningTests(APITestCase):
+    """Hardened BidService.place_bid validation, atomicity, and winner semantics."""
+
+    def setUp(self):
+        self.seller = User.objects.create_user(
+            username='bid_seller',
+            email='bid_seller@test.com',
+            password='pass12345',
+        )
+        self.buyer_a = User.objects.create_user(
+            username='bid_buyer_a',
+            email='bid_buyera@test.com',
+            password='pass12345',
+        )
+        self.buyer_b = User.objects.create_user(
+            username='bid_buyer_b',
+            email='bid_buyerb@test.com',
+            password='pass12345',
+        )
+        self.buyer_a_token = Token.objects.create(user=self.buyer_a)
+        self.seller_token = Token.objects.create(user=self.seller)
+
+    def _create_auction(
+        self,
+        *,
+        start_offset=timedelta(minutes=-5),
+        end_offset=timedelta(hours=1),
+        starting_bid=100,
+        min_increment=10,
+        status=Auction.Status.ACTIVE,
+    ):
+        now = timezone.now()
+        product = Product.objects.create(
+            seller=self.seller,
+            title='Bid Hardening Item',
+            description='Desc',
+        )
+        return Auction.objects.create(
+            product=product,
+            starting_bid=starting_bid,
+            current_highest_bid=starting_bid,
+            min_increment=min_increment,
+            start_time=now + start_offset,
+            end_time=now + end_offset,
+            status=status,
+        )
+
+    def test_valid_bid(self):
+        from .models import Bid
+        from .services import BidService
+
+        auction = self._create_auction()
+        bid = BidService.place_bid(auction.pk, self.buyer_a, 110)
+        self.assertEqual(float(bid.amount), 110.0)
+        auction.refresh_from_db()
+        self.assertEqual(float(auction.current_highest_bid), 110.0)
+        self.assertIsNone(auction.winning_bidder)
+        self.assertEqual(Bid.objects.filter(auction=auction).count(), 1)
+
+    def test_invalid_low_bid(self):
+        from .models import Bid
+        from .services import BidService
+
+        auction = self._create_auction()
+        BidService.place_bid(auction.pk, self.buyer_a, 110)
+        with self.assertRaises(ValidationError):
+            BidService.place_bid(auction.pk, self.buyer_b, 105)
+        self.assertEqual(Bid.objects.filter(auction=auction).count(), 1)
+        auction.refresh_from_db()
+        self.assertEqual(float(auction.current_highest_bid), 110.0)
+
+    def test_minimum_increment_enforced(self):
+        from .services import BidService
+
+        auction = self._create_auction(min_increment=25)
+        BidService.place_bid(auction.pk, self.buyer_a, 125)
+        # 125 + 25 = 150 required; 140 is too low
+        with self.assertRaises(ValidationError) as ctx:
+            BidService.place_bid(auction.pk, self.buyer_b, 140)
+        self.assertIn('at least', str(ctx.exception))
+
+    def test_seller_self_bid_rejected_by_service(self):
+        from .models import Bid
+        from .services import BidService
+
+        auction = self._create_auction()
+        with self.assertRaises(ValidationError) as ctx:
+            BidService.place_bid(auction.pk, self.seller, 110)
+        self.assertIn('Sellers cannot bid', str(ctx.exception))
+        self.assertEqual(Bid.objects.filter(auction=auction).count(), 0)
+
+    def test_seller_self_bid_rejected_by_api(self):
+        auction = self._create_auction()
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.seller_token.key}')
+        response = self.client.post(
+            f'/api/auctions/{auction.pk}/place-bid/',
+            {'amount': '110.00'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_closed_auction_rejects_bid(self):
+        from .services import AuctionLifecycleService, BidService
+
+        auction = self._create_auction()
+        AuctionLifecycleService.close_auction(auction.pk)
+        with self.assertRaises(ValidationError):
+            BidService.place_bid(auction.pk, self.buyer_a, 110)
+
+    def test_cancelled_auction_rejects_bid(self):
+        from .services import AuctionLifecycleService, BidService
+
+        auction = self._create_auction()
+        AuctionLifecycleService.cancel_auction(auction.pk)
+        with self.assertRaises(ValidationError):
+            BidService.place_bid(auction.pk, self.buyer_a, 110)
+
+    def test_expired_auction_rejects_bid_and_closes(self):
+        from .services import BidService
+
+        auction = self._create_auction(end_offset=timedelta(seconds=-1))
+        with self.assertRaises(ValidationError):
+            BidService.place_bid(auction.pk, self.buyer_a, 110)
+        auction.refresh_from_db()
+        self.assertEqual(auction.status, Auction.Status.CLOSED)
+
+    def test_failed_bid_rolls_back_database_state(self):
+        from .models import Bid
+        from .services import BidService
+
+        auction = self._create_auction()
+        BidService.place_bid(auction.pk, self.buyer_a, 110)
+        before_count = Bid.objects.filter(auction=auction).count()
+        before_high = Auction.objects.get(pk=auction.pk).current_highest_bid
+
+        with self.assertRaises(ValidationError):
+            BidService.place_bid(auction.pk, self.buyer_b, 111)
+
+        auction.refresh_from_db()
+        self.assertEqual(Bid.objects.filter(auction=auction).count(), before_count)
+        self.assertEqual(auction.current_highest_bid, before_high)
+        self.assertIsNone(auction.winning_bidder)
+
+    def test_active_bid_does_not_set_final_winner(self):
+        from .services import BidService
+
+        auction = self._create_auction()
+        BidService.place_bid(auction.pk, self.buyer_a, 110)
+        BidService.place_bid(auction.pk, self.buyer_b, 120)
+        auction.refresh_from_db()
+        self.assertIsNone(auction.winning_bidder)
+        self.assertEqual(float(auction.current_highest_bid), 120.0)
+
+    def test_final_winner_assigned_only_after_close(self):
+        from .services import AuctionLifecycleService, BidService
+
+        auction = self._create_auction()
+        BidService.place_bid(auction.pk, self.buyer_a, 110)
+        BidService.place_bid(auction.pk, self.buyer_b, 130)
+        auction.refresh_from_db()
+        self.assertIsNone(auction.winning_bidder)
+
+        closed, _ = AuctionLifecycleService.close_auction(auction.pk)
+        self.assertEqual(closed.winning_bidder, self.buyer_b)
+        self.assertEqual(float(closed.current_highest_bid), 130.0)
+
+    def test_unauthenticated_bidder_rejected(self):
+        from django.contrib.auth.models import AnonymousUser
+
+        from .services import BidService
+
+        auction = self._create_auction()
+        with self.assertRaises(ValidationError):
+            BidService.place_bid(auction.pk, AnonymousUser(), 110)
+
+    def test_invalid_amount_rejected(self):
+        from .services import BidService
+
+        auction = self._create_auction()
+        with self.assertRaises(ValidationError):
+            BidService.place_bid(auction.pk, self.buyer_a, 0)
+        with self.assertRaises(ValidationError):
+            BidService.place_bid(auction.pk, self.buyer_a, -10)
+        with self.assertRaises(ValidationError):
+            BidService.place_bid(auction.pk, self.buyer_a, 'not-a-number')
+
+    def test_place_bid_api_valid_and_auth_required(self):
+        auction = self._create_auction()
+        response = self.client.post(
+            f'/api/auctions/{auction.pk}/place-bid/',
+            {'amount': '110.00'},
+            format='json',
+        )
+        self.assertIn(response.status_code, (401, 403))
+
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.buyer_a_token.key}')
+        response = self.client.post(
+            f'/api/auctions/{auction.pk}/place-bid/',
+            {'amount': '110.00'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 201)
+        auction.refresh_from_db()
+        self.assertIsNone(auction.winning_bidder)
+        self.assertEqual(float(auction.current_highest_bid), 110.0)
+
+
+class BidServiceConcurrencyTests(TransactionTestCase):
+    """Concurrent place_bid attempts (PostgreSQL). SQLite is covered sequentially."""
+
+    def setUp(self):
+        self.seller = User.objects.create_user(
+            username='conc_seller',
+            email='conc_seller@test.com',
+            password='pass12345',
+        )
+        self.buyers = [
+            User.objects.create_user(
+                username=f'conc_buyer_{i}',
+                email=f'conc_buyer_{i}@test.com',
+                password='pass12345',
+            )
+            for i in range(5)
+        ]
+
+    def test_contended_sequential_bids_preserve_highest(self):
+        """Contended bids applied in rapid succession keep Bid and high in sync."""
+        from decimal import Decimal
+
+        from .models import Bid
+        from .services import BidService
+
+        now = timezone.now()
+        product = Product.objects.create(
+            seller=self.seller,
+            title='Contended Bid Item',
+            description='Desc',
+        )
+        auction = Auction.objects.create(
+            product=product,
+            starting_bid=100,
+            current_highest_bid=100,
+            min_increment=10,
+            start_time=now - timedelta(minutes=5),
+            end_time=now + timedelta(hours=1),
+            status=Auction.Status.ACTIVE,
+        )
+        amounts = [
+            Decimal('110'),
+            Decimal('120'),
+            Decimal('115'),
+            Decimal('130'),
+            Decimal('140'),
+        ]
+        accepted = []
+        for i, amount in enumerate(amounts):
+            try:
+                BidService.place_bid(auction.pk, self.buyers[i], amount)
+                accepted.append(amount)
+            except ValidationError:
+                pass
+
+        auction.refresh_from_db()
+        self.assertEqual(len(accepted), Bid.objects.filter(auction=auction).count())
+        self.assertEqual(auction.current_highest_bid, max(accepted))
+        self.assertIsNone(auction.winning_bidder)
+
+    def test_concurrent_bids_preserve_highest(self):
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        from decimal import Decimal
+
+        from django.db import connection
+
+        from .models import Bid
+        from .services import BidService
+
+        if not connection.features.has_select_for_update:
+            self.skipTest(
+                'Concurrent bid locking requires select_for_update (PostgreSQL).'
+            )
+
+        now = timezone.now()
+        product = Product.objects.create(
+            seller=self.seller,
+            title='Concurrent Bid Item',
+            description='Desc',
+        )
+        auction = Auction.objects.create(
+            product=product,
+            starting_bid=100,
+            current_highest_bid=100,
+            min_increment=10,
+            start_time=now - timedelta(minutes=5),
+            end_time=now + timedelta(hours=1),
+            status=Auction.Status.ACTIVE,
+        )
+        amounts = [
+            Decimal('110'),
+            Decimal('120'),
+            Decimal('130'),
+            Decimal('115'),
+            Decimal('140'),
+        ]
+
+        def attempt(index, amount):
+            connection.close()
+            try:
+                BidService.place_bid(auction.pk, self.buyers[index], amount)
+                return ('ok', amount)
+            except ValidationError:
+                return ('reject', amount)
+            except Exception as exc:  # noqa: BLE001
+                return ('error', str(exc))
+
+        results = []
+        with ThreadPoolExecutor(max_workers=5) as pool:
+            futures = [
+                pool.submit(attempt, i, amount) for i, amount in enumerate(amounts)
+            ]
+            for future in as_completed(futures):
+                results.append(future.result())
+
+        auction.refresh_from_db()
+        bid_count = Bid.objects.filter(auction=auction).count()
+        accepted = [r for r in results if r[0] == 'ok']
+        errors = [r for r in results if r[0] == 'error']
+
+        self.assertEqual(errors, [])
+        self.assertEqual(len(accepted), bid_count)
+        self.assertGreaterEqual(bid_count, 1)
+        max_accepted = max(
+            Bid.objects.filter(auction=auction).values_list('amount', flat=True)
+        )
+        self.assertEqual(auction.current_highest_bid, max_accepted)
+        self.assertIsNone(auction.winning_bidder)
 

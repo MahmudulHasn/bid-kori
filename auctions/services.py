@@ -164,7 +164,51 @@ class AuctionLifecycleService:
 
 
 class BidService:
-    """Atomically place a bid with row-level locking to prevent race conditions."""
+    """Atomically place a bid with row-level locking to prevent race conditions.
+
+    Distinguishes:
+    * Live high: ``current_highest_bid`` (and Bid rows) during ACTIVE
+    * Final winner: ``winning_bidder``, set only by ``AuctionLifecycleService``
+      at close — never by ``place_bid``
+    """
+
+    @classmethod
+    def _validate_bidder(cls, bidder):
+        if bidder is None or not getattr(bidder, 'is_authenticated', False):
+            raise ValidationError('Authentication required to place a bid.')
+        if not getattr(bidder, 'pk', None):
+            raise ValidationError('Authentication required to place a bid.')
+
+    @classmethod
+    def _validate_amount(cls, amount):
+        from decimal import Decimal, InvalidOperation
+
+        try:
+            value = amount if isinstance(amount, Decimal) else Decimal(str(amount))
+        except (InvalidOperation, TypeError, ValueError) as exc:
+            raise ValidationError('Bid amount must be a valid number.') from exc
+
+        if value <= 0:
+            raise ValidationError('Bid amount must be greater than zero.')
+        return value
+
+    @classmethod
+    def _minimum_to_beat(cls, auction):
+        """Derive the amount a new bid must exceed from Bid rows under lock.
+
+        Falls back to ``starting_bid`` when no bids exist. Preferring Bid rows
+        keeps increment checks consistent even if ``current_highest_bid`` drifts.
+        """
+        highest = (
+            Bid.objects.filter(auction=auction)
+            .order_by('-amount', 'timestamp')
+            .first()
+        )
+        if highest is not None:
+            return highest.amount
+        if auction.current_highest_bid and auction.current_highest_bid > 0:
+            return auction.current_highest_bid
+        return auction.starting_bid
 
     @classmethod
     def place_bid(cls, auction_id, bidder, amount):
@@ -174,6 +218,8 @@ class BidService:
         rejected. ``winning_bidder`` is only set when the auction closes;
         during ACTIVE bidding only ``current_highest_bid`` is updated.
         """
+        cls._validate_bidder(bidder)
+        amount = cls._validate_amount(amount)
         reject_bid = False
 
         with transaction.atomic():
@@ -184,16 +230,23 @@ class BidService:
             auction = get_object_or_404(queryset, pk=auction_id)
             now = timezone.now()
 
+            if auction.product.seller_id == bidder.pk:
+                raise ValidationError(
+                    'Action forbidden: Sellers cannot bid on their own listings.'
+                )
+
             if auction.status == Auction.Status.ACTIVE and now >= auction.end_time:
                 AuctionLifecycleService._finalize_close(auction)
+                reject_bid = True
+            elif auction.status in (
+                Auction.Status.CLOSED,
+                Auction.Status.CANCELLED,
+            ):
                 reject_bid = True
             elif not auction.is_biddable(now):
                 reject_bid = True
             else:
-                if auction.current_highest_bid and auction.current_highest_bid > 0:
-                    minimum_to_beat = auction.current_highest_bid
-                else:
-                    minimum_to_beat = auction.starting_bid
+                minimum_to_beat = cls._minimum_to_beat(auction)
 
                 if amount <= minimum_to_beat:
                     raise ValidationError(
@@ -213,6 +266,7 @@ class BidService:
                     amount=amount,
                 )
                 auction.current_highest_bid = amount
+                # Do not set winning_bidder here — final winner is assigned at close.
                 auction.save(update_fields=['current_highest_bid'])
 
         if reject_bid:
