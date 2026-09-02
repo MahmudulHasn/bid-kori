@@ -1,27 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const PROTECTED_PREFIXES = ['/dashboard', '/auctions/create'];
+import {
+  hasSessionHintCookie,
+  isProtectedPath,
+} from '@/lib/authRouting';
 
 /**
- * Client-side route guard only.
+ * UX / navigation guard only.
  *
- * Checks for the presence of a `token` cookie to steer unauthenticated users
- * toward the login page. This is NOT server authentication — any cookie value
- * satisfies the check. The Django API validates `Authorization: Token …` on
- * every protected request.
+ * Presence of a session-hint cookie (or legacy `token` cookie) only steers
+ * browsers toward login. It is NOT authentication. Django validates
+ * `Authorization: Token …` on every protected API request; AuthProvider
+ * verifies the token via `GET /users/me/` before treating the user as signed in.
  */
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const isProtected = PROTECTED_PREFIXES.some(
-    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
-  );
 
-  if (!isProtected) {
+  if (!isProtectedPath(pathname)) {
     return NextResponse.next();
   }
 
-  const token = request.cookies.get('token')?.value;
-  if (!token) {
+  if (!hasSessionHintCookie(request.cookies)) {
     const loginUrl = new URL('/auth/login', request.url);
     loginUrl.searchParams.set('next', pathname);
     return NextResponse.redirect(loginUrl);
@@ -31,5 +30,11 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/auctions/create/:path*'],
+  // Explicit roots + nested paths so /dashboard and /auctions/create always match.
+  matcher: [
+    '/dashboard',
+    '/dashboard/:path*',
+    '/auctions/create',
+    '/auctions/create/:path*',
+  ],
 };

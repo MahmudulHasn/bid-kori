@@ -1,25 +1,30 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { FormEvent, useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { FormEvent, Suspense, useEffect, useState } from 'react';
 import { LogIn } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 import { useAuth } from '@/context/AuthContext';
+import { isSafeNextPath } from '@/lib/authRouting';
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
-  const { login, isAuthenticated } = useAuth();
+  const searchParams = useSearchParams();
+  const { login, isAuthenticated, isLoading } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  const nextPath = searchParams.get('next');
+  const redirectTo = isSafeNextPath(nextPath) ? nextPath : '/';
+
   useEffect(() => {
-    if (isAuthenticated) {
-      router.replace('/');
+    if (!isLoading && isAuthenticated) {
+      router.replace(redirectTo);
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, isLoading, redirectTo, router]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -27,7 +32,7 @@ export default function LoginPage() {
     try {
       await login(username.trim(), password);
       toast.success('Logged in successfully.');
-      router.push('/');
+      router.push(redirectTo);
     } catch (error: unknown) {
       const data = (error as { response?: { data?: Record<string, unknown> } })
         ?.response?.data;
@@ -107,5 +112,19 @@ export default function LoginPage() {
         </p>
       </div>
     </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-4 py-12">
+          <p className="text-sm text-zinc-500">Loading…</p>
+        </main>
+      }
+    >
+      <LoginForm />
+    </Suspense>
   );
 }

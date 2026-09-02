@@ -12,6 +12,15 @@ import {
 import toast from 'react-hot-toast';
 
 import api from '@/lib/api';
+import {
+  AUTH_EXPIRED_EVENT,
+  TOKEN_KEY,
+  USER_KEY,
+} from '@/lib/authRouting';
+import {
+  clearClientAuthStorage,
+  setSessionHintCookie,
+} from '@/lib/authStorage';
 
 export type AuthUser = {
   id: number;
@@ -36,28 +45,16 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-const TOKEN_KEY = 'token';
-const USER_KEY = 'user';
-
-function setAuthCookie(token: string) {
-  // Routing convenience only — backend validates Authorization header.
-  document.cookie = `token=${encodeURIComponent(token)}; path=/; SameSite=Lax`;
-}
-
-function clearAuthCookie() {
-  document.cookie = 'token=; path=/; Max-Age=0; SameSite=Lax';
-}
-
-function clearStoredSession() {
-  localStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem(USER_KEY);
-  clearAuthCookie();
-}
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  const resetSessionState = useCallback(() => {
+    clearClientAuthStorage();
+    setToken(null);
+    setUser(null);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -66,12 +63,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const storedToken = localStorage.getItem(TOKEN_KEY);
       if (!storedToken) {
         if (!cancelled) {
+          clearClientAuthStorage();
           setIsLoading(false);
         }
         return;
       }
 
-      setAuthCookie(storedToken);
+      // UX hint for middleware only — auth still requires /users/me/ success.
+      setSessionHintCookie();
 
       try {
         const { data } = await api.get<AuthUser>('/users/me/');
@@ -81,11 +80,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setToken(storedToken);
         setUser(data);
         localStorage.setItem(USER_KEY, JSON.stringify(data));
+        setSessionHintCookie();
       } catch {
         if (!cancelled) {
-          clearStoredSession();
-          setToken(null);
-          setUser(null);
+          resetSessionState();
         }
       } finally {
         if (!cancelled) {
@@ -99,12 +97,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
+  }, [resetSessionState]);
+
+  useEffect(() => {
+    const onExpired = () => {
+      setToken(null);
+      setUser(null);
+      setIsLoading(false);
+    };
+    window.addEventListener(AUTH_EXPIRED_EVENT, onExpired);
+    return () => window.removeEventListener(AUTH_EXPIRED_EVENT, onExpired);
   }, []);
 
   const persistSession = useCallback((nextToken: string, nextUser: AuthUser) => {
     localStorage.setItem(TOKEN_KEY, nextToken);
     localStorage.setItem(USER_KEY, JSON.stringify(nextUser));
-    setAuthCookie(nextToken);
+    setSessionHintCookie();
     setToken(nextToken);
     setUser(nextUser);
   }, []);
@@ -149,18 +157,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       // Always clear local session even if revocation fails.
     } finally {
-      clearStoredSession();
-      setToken(null);
-      setUser(null);
+      resetSessionState();
       toast.success('Logged out successfully.');
     }
-  }, []);
+  }, [resetSessionState]);
 
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
       token,
       isLoading,
+      // Requires backend-verified user from /users/me/ (or login/register).
       isAuthenticated: Boolean(token && user),
       login,
       register,

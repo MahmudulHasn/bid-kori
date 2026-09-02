@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import { useEffect, useMemo, useState } from 'react';
 import { CreditCard, Gavel, Trophy } from 'lucide-react';
 import toast from 'react-hot-toast';
 import useSWR from 'swr';
@@ -33,9 +34,18 @@ function formatMoney(value: string | number | undefined) {
 }
 
 export default function DashboardPage() {
+  const router = useRouter();
+  const pathname = usePathname();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const [payingId, setPayingId] = useState<number | null>(null);
   const [paidOverrides, setPaidOverrides] = useState<Record<number, string>>({});
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!isAuthenticated) {
+      router.replace(`/auth/login?next=${encodeURIComponent(pathname || '/dashboard')}`);
+    }
+  }, [authLoading, isAuthenticated, pathname, router]);
 
   const {
     data: auctions,

@@ -1,7 +1,13 @@
 import axios from 'axios';
 
+import {
+  clearClientAuthStorage,
+  notifyAuthExpired,
+} from '@/lib/authStorage';
+import { getApiBaseUrl } from '@/lib/config';
+
 const api = axios.create({
-  baseURL: 'http://127.0.0.1:8000/api',
+  baseURL: getApiBaseUrl(),
   headers: {
     'Content-Type': 'application/json',
   },
@@ -22,5 +28,27 @@ api.interceptors.request.use((config) => {
 
   return config;
 });
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const status = error?.response?.status;
+    const requestUrl = String(error?.config?.url ?? '');
+    const isCredentialRequest =
+      requestUrl.includes('/users/login/') ||
+      requestUrl.includes('/users/register/');
+
+    if (
+      status === 401 &&
+      typeof window !== 'undefined' &&
+      !isCredentialRequest
+    ) {
+      clearClientAuthStorage();
+      notifyAuthExpired();
+    }
+
+    return Promise.reject(error);
+  },
+);
 
 export default api;

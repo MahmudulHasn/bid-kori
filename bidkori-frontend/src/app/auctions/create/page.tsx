@@ -1,14 +1,17 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { FormEvent, useEffect, useState } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 import { ImagePlus, PlusCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 
+import { useAuth } from '@/context/AuthContext';
 import api from '@/lib/api';
 
 export default function CreateAuctionPage() {
   const router = useRouter();
+  const pathname = usePathname();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [startingBid, setStartingBid] = useState('');
@@ -16,8 +19,21 @@ export default function CreateAuctionPage() {
   const [images, setImages] = useState<FileList | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  useEffect(() => {
+    if (authLoading) return;
+    if (!isAuthenticated) {
+      router.replace(
+        `/auth/login?next=${encodeURIComponent(pathname || '/auctions/create')}`,
+      );
+    }
+  }, [authLoading, isAuthenticated, pathname, router]);
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!isAuthenticated) {
+      toast.error('Please sign in to create an auction.');
+      return;
+    }
     setSubmitting(true);
 
     try {
@@ -74,6 +90,9 @@ export default function CreateAuctionPage() {
 
   return (
     <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-10 sm:px-6">
+      {(authLoading || !isAuthenticated) && (
+        <p className="mb-6 text-sm text-zinc-500">Checking your session…</p>
+      )}
       <div className="mb-8 flex items-start gap-3">
         <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/15 text-amber-700 dark:text-amber-300">
           <PlusCircle className="h-5 w-5" aria-hidden />
