@@ -2,15 +2,17 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { FormEvent, useMemo, useState } from 'react';
-import { Clock3, Gavel, ImageOff } from 'lucide-react';
+import { Clock3, Gavel, ImageOff, Shield } from 'lucide-react';
 import toast from 'react-hot-toast';
 import useSWR from 'swr';
 
 import { useAuth } from '@/context/AuthContext';
 import { useAuctionTimer } from '@/hooks/useAuctionTimer';
 import api from '@/lib/api';
+import { getApiErrorMessage, getApiStatus } from '@/lib/apiErrors';
+import { isAuctionOwnedByUser } from '@/lib/auctionOwnership';
 import { resolveMediaUrl } from '@/lib/media';
 import type { Auction } from '@/lib/types';
 
@@ -25,10 +27,12 @@ function pad(value: number) {
 
 export default function AuctionDetailPage() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
   const auctionId = params?.id;
-  const { isAuthenticated } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const [bidAmount, setBidAmount] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [managing, setManaging] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
 
   const { data: auction, error, isLoading, mutate } = useSWR(
@@ -40,6 +44,9 @@ export default function AuctionDetailPage() {
   const timer = useAuctionTimer(auction?.end_time);
   const isAuctionClosed =
     timer.isClosed || auction?.status === 'CLOSED' || auction?.status === 'CANCELLED';
+
+  const isOwner = isAuctionOwnedByUser(auction, user);
+  const canShowSellerControls = isOwner && !authLoading;
 
   const imageUrls = useMemo(() => {
     const urls = (auction?.images ?? [])
@@ -58,8 +65,16 @@ export default function AuctionDetailPage() {
   const handlePlaceBid = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
+    if (authLoading) {
+      toast.error('Checking your session… please try again in a moment.');
+      return;
+    }
     if (!isAuthenticated) {
       toast.error('Please log in to place a bid.');
+      return;
+    }
+    if (isOwner) {
+      toast.error('You cannot bid on your own auction.');
       return;
     }
     if (!auctionId || isAuctionClosed) {
@@ -80,18 +95,12 @@ export default function AuctionDetailPage() {
       setBidAmount('');
       await mutate();
     } catch (err: unknown) {
-      const status = (err as { response?: { status?: number; data?: Record<string, unknown> } })
-        ?.response?.status;
-      const data = (err as { response?: { data?: Record<string, unknown> } })?.response
-        ?.data;
-      const apiMessage =
-        (typeof data?.error === 'string' && data.error) ||
-        (typeof data?.detail === 'string' && data.detail) ||
-        null;
+      const status = getApiStatus(err);
+      const apiMessage = getApiErrorMessage(err, '');
 
       if (status === 429) {
         toast.error(
-          "Too many bids. Samira's rate limit is 10 bids per minute — please wait and try again.",
+          'Too many bids. Please wait a minute and try again.',
         );
       } else if (status === 400) {
         toast.error(
@@ -107,6 +116,74 @@ export default function AuctionDetailPage() {
       }
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleCancelAuction = async () => {
+    if (!auctionId || !canShowSellerControls) return;
+    if (auction?.status !== 'ACTIVE') {
+      toast.error('Only active auctions can be cancelled.');
+      return;
+    }
+
+    const confirmed = window.confirm(
+      'Cancel this auction? Bidders will no longer be able to place bids.',
+    );
+    if (!confirmed) return;
+
+    setManaging(true);
+    try {
+      await api.post(`/auctions/${auctionId}/transition/`, {
+        status: 'CANCELLED',
+      });
+      toast.success('Auction cancelled.');
+      await mutate();
+    } catch (err: unknown) {
+      const status = getApiStatus(err);
+      const message = getApiErrorMessage(
+        err,
+        'Could not cancel this auction.',
+      );
+      if (status === 401) {
+        toast.error('Please log in again to manage this auction.');
+      } else if (status === 403) {
+        toast.error(message || 'Only the seller can cancel this auction.');
+      } else {
+        toast.error(message);
+      }
+    } finally {
+      setManaging(false);
+    }
+  };
+
+  const handleDeleteAuction = async () => {
+    if (!auctionId || !canShowSellerControls) return;
+
+    const confirmed = window.confirm(
+      'Permanently delete this auction listing? This cannot be undone.',
+    );
+    if (!confirmed) return;
+
+    setManaging(true);
+    try {
+      await api.delete(`/auctions/${auctionId}/`);
+      toast.success('Auction deleted.');
+      router.push('/');
+    } catch (err: unknown) {
+      const status = getApiStatus(err);
+      const message = getApiErrorMessage(
+        err,
+        'Could not delete this auction.',
+      );
+      if (status === 401) {
+        toast.error('Please log in again to manage this auction.');
+      } else if (status === 403) {
+        toast.error(message || 'Only the seller can delete this auction.');
+      } else {
+        toast.error(message);
+      }
+    } finally {
+      setManaging(false);
     }
   };
 
@@ -231,7 +308,46 @@ export default function AuctionDetailPage() {
               Minimum increment: ৳
               {minIncrement.toLocaleString(undefined, { minimumFractionDigits: 2 })}
             </p>
+            {auction.status && (
+              <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+                Status: {auction.status}
+              </p>
+            )}
           </div>
+
+          {canShowSellerControls && (
+            <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
+              <div className="mb-3 flex items-center gap-2">
+                <Shield className="h-4 w-4 text-amber-700 dark:text-amber-300" aria-hidden />
+                <h2 className="text-base font-semibold text-zinc-900 dark:text-white">
+                  Seller controls
+                </h2>
+              </div>
+              <p className="mb-4 text-sm text-zinc-500 dark:text-zinc-400">
+                You own this listing. Management actions are enforced by the API.
+              </p>
+              <div className="flex flex-col gap-2">
+                {auction.status === 'ACTIVE' && (
+                  <button
+                    type="button"
+                    onClick={handleCancelAuction}
+                    disabled={managing}
+                    className="rounded-lg border border-zinc-300 px-4 py-2.5 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:text-zinc-100 dark:hover:bg-zinc-900"
+                  >
+                    {managing ? 'Working…' : 'Cancel auction'}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={handleDeleteAuction}
+                  disabled={managing}
+                  className="rounded-lg border border-red-200 px-4 py-2.5 text-sm font-semibold text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/40"
+                >
+                  {managing ? 'Working…' : 'Delete listing'}
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
             <div className="mb-4 flex items-center gap-2">
@@ -244,6 +360,10 @@ export default function AuctionDetailPage() {
             {isAuctionClosed ? (
               <p className="text-sm text-zinc-500 dark:text-zinc-400">
                 Bidding is closed for this auction.
+              </p>
+            ) : isOwner ? (
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                Sellers cannot bid on their own listings.
               </p>
             ) : (
               <form onSubmit={handlePlaceBid} className="space-y-3">
@@ -264,17 +384,22 @@ export default function AuctionDetailPage() {
                 </label>
                 <button
                   type="submit"
-                  disabled={submitting || !isAuthenticated}
+                  disabled={submitting || authLoading || !isAuthenticated}
                   className="flex w-full items-center justify-center gap-2 rounded-lg bg-amber-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {submitting ? 'Placing bid…' : 'Place Bid'}
                 </button>
-                {!isAuthenticated && (
+                {!authLoading && !isAuthenticated && (
                   <p className="text-xs text-zinc-500 dark:text-zinc-400">
                     <Link href="/auth/login" className="text-amber-700 hover:underline">
                       Log in
                     </Link>{' '}
                     to place a bid.
+                  </p>
+                )}
+                {authLoading && (
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                    Checking your session…
                   </p>
                 )}
               </form>

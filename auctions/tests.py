@@ -1225,3 +1225,10 @@ class AuctionListFilterAuthorizationTests(APITestCase):
         self.assertIsInstance(response.data, list)
         self.assertNotIn('results', response.data)
 
+    def test_auction_payload_includes_product_seller_for_ownership_ux(self):
+        auction = self._create_auction(title='Owned Item')
+        response = self.client.get(f'/api/auctions/{auction.pk}/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['product']['seller'], self.seller.pk)
+        self.assertNotIn('reserve_price', response.data)
+

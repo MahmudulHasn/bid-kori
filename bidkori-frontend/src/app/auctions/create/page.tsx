@@ -79,10 +79,18 @@ export default function CreateAuctionPage() {
         error as { response?: { data?: Record<string, unknown> } }
       )?.response?.data;
       const message =
-        (typeof responseData?.detail === 'string' && responseData.detail) ||
         (typeof responseData?.error === 'string' && responseData.error) ||
+        (typeof responseData?.detail === 'string' && responseData.detail) ||
         'Failed to create auction. Check your inputs and try again.';
-      toast.error(String(message));
+      const status = (error as { response?: { status?: number } })?.response
+        ?.status;
+      if (status === 401) {
+        toast.error('Please log in to create an auction.');
+      } else if (status === 403) {
+        toast.error(message || 'You are not allowed to create this auction.');
+      } else {
+        toast.error(String(message));
+      }
     } finally {
       setSubmitting(false);
     }

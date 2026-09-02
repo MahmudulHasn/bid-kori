@@ -10,6 +10,8 @@ export type AuctionProduct = {
   description?: string;
   condition?: string;
   category?: number | null;
+  /** Product seller user id — used for UX ownership checks only. */
+  seller?: number | string | null;
 };
 
 export type Auction = {

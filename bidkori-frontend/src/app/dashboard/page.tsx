@@ -9,6 +9,7 @@ import useSWR from 'swr';
 
 import { useAuth } from '@/context/AuthContext';
 import api from '@/lib/api';
+import { getApiErrorMessage, getApiStatus } from '@/lib/apiErrors';
 import type { Auction, PaymentSummary, UserBid } from '@/lib/types';
 
 const fetchAuctions = async (url: string) => {
@@ -94,6 +95,10 @@ export default function DashboardPage() {
   }, [auctions, user]);
 
   const handlePayNow = async (auctionId: number) => {
+    if (!user) {
+      toast.error('Please log in to complete checkout.');
+      return;
+    }
     setPayingId(auctionId);
     try {
       const { data } = await api.post<PaymentSummary>(
@@ -110,14 +115,18 @@ export default function DashboardPage() {
         { revalidate: true },
       );
     } catch (error: unknown) {
-      const response = (
-        error as { response?: { status?: number; data?: Record<string, unknown> } }
-      )?.response;
-      const message =
-        (typeof response?.data?.error === 'string' && response.data.error) ||
-        (typeof response?.data?.detail === 'string' && response.data.detail) ||
-        'Checkout failed. Please try again.';
-      toast.error(String(message));
+      const status = getApiStatus(error);
+      const message = getApiErrorMessage(
+        error,
+        'Checkout failed. Please try again.',
+      );
+      if (status === 401) {
+        toast.error('Please log in again to complete checkout.');
+      } else if (status === 403) {
+        toast.error(message || 'Only the winning bidder can complete checkout.');
+      } else {
+        toast.error(message);
+      }
     } finally {
       setPayingId(null);
     }
@@ -245,7 +254,10 @@ export default function DashboardPage() {
               const isPaid =
                 Boolean(auction.is_paid) || Boolean(paidOverrides[auction.id]);
               const showPayNow =
-                auction.status === 'CLOSED' && !isPaid;
+                Boolean(user) &&
+                auction.status === 'CLOSED' &&
+                auction.winning_bidder === user.id &&
+                !isPaid;
 
               return (
                 <article

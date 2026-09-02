@@ -6,11 +6,16 @@ from .models import Auction, AuctionImage, Bid, Payment
 
 
 class ProductSerializer(serializers.ModelSerializer):
-    """Serializes the core details of a product listing."""
+    """Serializes the core details of a product listing.
+
+    ``seller`` is read-only so clients can determine ownership for UX;
+    write paths still assign the seller from the authenticated user.
+    """
 
     class Meta:
         model = Product
-        fields = ['id', 'title', 'description', 'condition', 'category']
+        fields = ['id', 'title', 'description', 'condition', 'category', 'seller']
+        read_only_fields = ['id', 'seller']
 
 
 class AuctionImageSerializer(serializers.ModelSerializer):
