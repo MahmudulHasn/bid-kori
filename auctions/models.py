@@ -57,21 +57,31 @@ class Auction(models.Model):
     def __str__(self):
         return f'Auction for {self.product} ({self.get_status_display()})'
 
+    def is_biddable(self, now=None):
+        """Return True when the auction accepts bids (ACTIVE and in window)."""
+        if now is None:
+            now = timezone.now()
+        return (
+            self.status == self.Status.ACTIVE
+            and self.start_time <= now
+            and now < self.end_time
+        )
+
     def is_active(self):
-        """Return True when the auction is ACTIVE and has not yet ended."""
-        return self.status == self.Status.ACTIVE and timezone.now() < self.end_time
+        """Return True when the auction is open for bidding."""
+        return self.is_biddable()
 
     def update_status_by_time(self):
-        """Close an ACTIVE auction once its end time has passed.
+        """Close an expired ACTIVE auction via the authoritative lifecycle service.
 
-        Persists any change and returns True if the status was updated.
+        Returns True when the auction was closed by this call.
         """
-        if self.status == self.Status.ACTIVE and timezone.now() >= self.end_time:
-            self.status = self.Status.CLOSED
-            self.save(update_fields=['status'])
-            return True
+        from .services import AuctionLifecycleService
 
-        return False
+        _, closed = AuctionLifecycleService.close_if_expired(self.pk)
+        if closed:
+            self.refresh_from_db()
+        return closed
 
 
 class AuctionImage(models.Model):

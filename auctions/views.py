@@ -29,7 +29,7 @@ from .serializers import (
     PlaceBidRequestSerializer,
     TransitionStatusSerializer,
 )
-from .services import AuctionStateMachine, BidService
+from .services import AuctionLifecycleService, BidService
 from .throttling import BidBurstThrottle
 
 AUCTION_LIST_PARAMETERS = [
@@ -437,7 +437,7 @@ class AuctionImageUploadView(APIView):
 
 
 class TransitionAuctionStateView(APIView):
-    """Transition an auction to a new status via the state machine."""
+    """Transition an auction to a new status via the lifecycle service."""
 
     permission_classes = [IsAuthenticated, IsAuctionSellerOrReadOnly]
 
@@ -466,7 +466,7 @@ class TransitionAuctionStateView(APIView):
             )
 
         try:
-            AuctionStateMachine.transition(auction, new_status)
+            auction = AuctionLifecycleService.transition(pk, new_status)
         except ValidationError as exc:
             return Response(
                 {'detail': exc.messages[0] if exc.messages else str(exc)},

@@ -2,6 +2,7 @@ from datetime import timedelta
 from io import BytesIO
 
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
 from django.utils import timezone
@@ -139,6 +140,7 @@ class AuctionAuthorizationTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         auction.refresh_from_db()
         self.assertEqual(auction.status, Auction.Status.CANCELLED)
+        self.assertIsNone(auction.winning_bidder)
 
     def test_non_owner_cannot_transition_auction(self):
         auction = self._create_auction()
@@ -287,84 +289,279 @@ class AnalyticsAuthorizationTests(APITestCase):
         self.assertContains(response, 'BidKori Analytics')
 
 
-class AnalyticsAuthorizationTests(APITestCase):
-    """Staff-only access for analytics API and dashboard."""
+class AuctionLifecycleTests(APITestCase):
+    """Authoritative close/cancel and bidding lifecycle."""
 
     def setUp(self):
-        self.staff = User.objects.create_user(
-            username='staff',
-            email='staff@test.com',
-            password='pass12345',
-            is_staff=True,
-        )
-        self.regular = User.objects.create_user(
-            username='bidder',
-            email='bidder@test.com',
+        self.seller = User.objects.create_user(
+            username='seller',
+            email='seller@test.com',
             password='pass12345',
         )
-        self.staff_token = Token.objects.create(user=self.staff)
-        self.regular_token = Token.objects.create(user=self.regular)
+        self.buyer_a = User.objects.create_user(
+            username='buyer_a',
+            email='buyera@test.com',
+            password='pass12345',
+        )
+        self.buyer_b = User.objects.create_user(
+            username='buyer_b',
+            email='buyerb@test.com',
+            password='pass12345',
+        )
+        self.seller_token = Token.objects.create(user=self.seller)
+        self.buyer_a_token = Token.objects.create(user=self.buyer_a)
+        self.buyer_b_token = Token.objects.create(user=self.buyer_b)
 
+    def _create_auction(
+        self,
+        *,
+        start_offset=timedelta(seconds=-60),
+        end_offset=timedelta(hours=1),
+        starting_bid=100,
+        min_increment=10,
+    ):
         now = timezone.now()
         product = Product.objects.create(
-            seller=self.staff,
-            title='Analytics Test Item',
+            seller=self.seller,
+            title='Lifecycle Item',
             description='Desc',
         )
-        auction = Auction.objects.create(
+        return Auction.objects.create(
             product=product,
-            starting_bid=100,
-            current_highest_bid=110,
-            min_increment=10,
-            start_time=now,
-            end_time=now + timedelta(days=1),
+            starting_bid=starting_bid,
+            current_highest_bid=starting_bid,
+            min_increment=min_increment,
+            start_time=now + start_offset,
+            end_time=now + end_offset,
             status=Auction.Status.ACTIVE,
         )
-        from .models import Bid
-
-        Bid.objects.create(auction=auction, bidder=self.regular, amount=110)
 
     def _auth(self, token):
         self.client.credentials(HTTP_AUTHORIZATION=f'Token {token.key}')
 
-    def test_anonymous_cannot_access_analytics_summary(self):
-        response = self.client.get('/api/auctions/analytics/')
-        self.assertIn(response.status_code, (401, 403))
-        self.assertNotIn('bidder_username', response.content.decode())
+    def test_close_auction_with_bids_assigns_highest_bidder(self):
+        from .models import Bid
+        from .services import AuctionLifecycleService
 
-    def test_regular_user_cannot_access_analytics_summary(self):
-        self._auth(self.regular_token)
-        response = self.client.get('/api/auctions/analytics/')
-        self.assertEqual(response.status_code, 403)
+        auction = self._create_auction()
+        Bid.objects.create(auction=auction, bidder=self.buyer_a, amount=110)
+        Bid.objects.create(auction=auction, bidder=self.buyer_b, amount=120)
 
-    def test_staff_can_access_analytics_summary(self):
-        self._auth(self.staff_token)
-        response = self.client.get('/api/auctions/analytics/')
-        self.assertEqual(response.status_code, 200)
-        self.assertIn('total_active_auctions', response.data)
-        self.assertIn('total_bids_placed', response.data)
-        self.assertIn('total_bidding_volume', response.data)
-        self.assertIn('category_breakdown', response.data)
-        self.assertIn('bid_escalation_history', response.data)
-        self.assertIn('top_active_bidders', response.data)
-        self.assertGreaterEqual(len(response.data['top_active_bidders']), 1)
-        self.assertEqual(
-            response.data['top_active_bidders'][0]['username'],
-            self.regular.username,
+        closed, did_close = AuctionLifecycleService.close_auction(auction.pk)
+        self.assertTrue(did_close)
+        self.assertEqual(closed.status, Auction.Status.CLOSED)
+        self.assertEqual(closed.winning_bidder, self.buyer_b)
+        self.assertEqual(float(closed.current_highest_bid), 120.0)
+
+    def test_close_auction_with_no_bids(self):
+        from .services import AuctionLifecycleService
+
+        auction = self._create_auction()
+        closed, did_close = AuctionLifecycleService.close_auction(auction.pk)
+        self.assertTrue(did_close)
+        self.assertEqual(closed.status, Auction.Status.CLOSED)
+        self.assertIsNone(closed.winning_bidder)
+
+    def test_equal_bid_amounts_earliest_timestamp_wins(self):
+        from datetime import datetime
+
+        from django.utils.timezone import make_aware
+
+        from .models import Bid
+        from .services import AuctionLifecycleService
+
+        auction = self._create_auction()
+        earlier = make_aware(datetime(2026, 1, 1, 12, 0, 0))
+        later = make_aware(datetime(2026, 1, 1, 12, 5, 0))
+        Bid.objects.create(
+            auction=auction,
+            bidder=self.buyer_a,
+            amount=150,
+            timestamp=earlier,
+        )
+        Bid.objects.create(
+            auction=auction,
+            bidder=self.buyer_b,
+            amount=150,
+            timestamp=later,
         )
 
-    def test_anonymous_cannot_access_analytics_dashboard(self):
-        response = self.client.get('/api/auctions/analytics/dashboard/')
-        self.assertEqual(response.status_code, 403)
+        closed, _ = AuctionLifecycleService.close_auction(auction.pk)
+        self.assertEqual(closed.winning_bidder, self.buyer_a)
 
-    def test_regular_user_cannot_access_analytics_dashboard(self):
-        self.client.force_login(self.regular)
-        response = self.client.get('/api/auctions/analytics/dashboard/')
-        self.assertEqual(response.status_code, 403)
+    def test_close_already_closed_is_idempotent(self):
+        from .services import AuctionLifecycleService
 
-    def test_staff_can_access_analytics_dashboard(self):
-        self.client.force_login(self.staff)
-        response = self.client.get('/api/auctions/analytics/dashboard/')
+        auction = self._create_auction(end_offset=timedelta(hours=-1))
+        auction.status = Auction.Status.CLOSED
+        auction.save(update_fields=['status'])
+
+        closed, did_close = AuctionLifecycleService.close_auction(auction.pk)
+        self.assertFalse(did_close)
+        self.assertEqual(closed.status, Auction.Status.CLOSED)
+
+    def test_close_if_expired_does_nothing_before_end_time(self):
+        from .services import AuctionLifecycleService
+
+        auction = self._create_auction(end_offset=timedelta(hours=1))
+        _, closed = AuctionLifecycleService.close_if_expired(auction.pk)
+        self.assertFalse(closed)
+        auction.refresh_from_db()
+        self.assertEqual(auction.status, Auction.Status.ACTIVE)
+
+    def test_cancel_active_clears_winner(self):
+        from .models import Bid
+        from .services import AuctionLifecycleService
+
+        auction = self._create_auction()
+        auction.winning_bidder = self.buyer_a
+        auction.save(update_fields=['winning_bidder'])
+        Bid.objects.create(auction=auction, bidder=self.buyer_a, amount=110)
+
+        cancelled, did_cancel = AuctionLifecycleService.cancel_auction(auction.pk)
+        self.assertTrue(did_cancel)
+        self.assertEqual(cancelled.status, Auction.Status.CANCELLED)
+        self.assertIsNone(cancelled.winning_bidder)
+
+    def test_cannot_cancel_closed_auction(self):
+        from .services import AuctionLifecycleService
+
+        auction = self._create_auction()
+        AuctionLifecycleService.close_auction(auction.pk)
+        with self.assertRaises(ValidationError):
+            AuctionLifecycleService.cancel_auction(auction.pk)
+
+    def test_bid_before_end_time_succeeds(self):
+        from .services import BidService
+
+        auction = self._create_auction()
+        bid = BidService.place_bid(auction.pk, self.buyer_a, 110)
+        self.assertEqual(float(bid.amount), 110.0)
+        auction.refresh_from_db()
+        self.assertEqual(float(auction.current_highest_bid), 110.0)
+        self.assertIsNone(auction.winning_bidder)
+
+    def test_bid_at_or_after_end_time_rejected_and_closes(self):
+        from .services import BidService, AuctionLifecycleService
+
+        auction = self._create_auction(end_offset=timedelta(seconds=-1))
+        with self.assertRaises(ValidationError):
+            BidService.place_bid(auction.pk, self.buyer_a, 110)
+
+        auction.refresh_from_db()
+        self.assertEqual(auction.status, Auction.Status.CLOSED)
+
+    def test_bid_on_closed_auction_rejected(self):
+        from .services import AuctionLifecycleService, BidService
+
+        auction = self._create_auction()
+        AuctionLifecycleService.close_auction(auction.pk)
+        with self.assertRaises(ValidationError):
+            BidService.place_bid(auction.pk, self.buyer_a, 110)
+
+    def test_bid_on_cancelled_auction_rejected(self):
+        from .services import AuctionLifecycleService, BidService
+
+        auction = self._create_auction()
+        AuctionLifecycleService.cancel_auction(auction.pk)
+        with self.assertRaises(ValidationError):
+            BidService.place_bid(auction.pk, self.buyer_a, 110)
+
+    def test_future_start_time_prevents_bidding(self):
+        from .services import BidService
+
+        auction = self._create_auction(start_offset=timedelta(hours=1))
+        with self.assertRaises(ValidationError):
+            BidService.place_bid(auction.pk, self.buyer_a, 110)
+
+    def test_retrieve_expired_auction_returns_closed_with_winner(self):
+        from .models import Bid
+
+        auction = self._create_auction(end_offset=timedelta(seconds=-1))
+        Bid.objects.create(auction=auction, bidder=self.buyer_a, amount=110)
+
+        response = self.client.get(f'/api/auctions/{auction.pk}/')
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'BidKori Analytics')
+        self.assertEqual(response.data['status'], Auction.Status.CLOSED)
+        self.assertEqual(response.data['winning_bidder'], self.buyer_a.pk)
+
+    def test_close_expired_auctions_command(self):
+        from io import StringIO
+
+        from django.core.management import call_command
+
+        from .models import Bid
+
+        auction = self._create_auction(end_offset=timedelta(seconds=-1))
+        Bid.objects.create(auction=auction, bidder=self.buyer_b, amount=115)
+
+        out = StringIO()
+        call_command('close_expired_auctions', stdout=out)
+        auction.refresh_from_db()
+        self.assertEqual(auction.status, Auction.Status.CLOSED)
+        self.assertEqual(auction.winning_bidder, self.buyer_b)
+
+    def test_transition_to_closed_assigns_final_winner(self):
+        from .models import Bid
+
+        auction = self._create_auction()
+        Bid.objects.create(auction=auction, bidder=self.buyer_a, amount=110)
+        self._auth(self.seller_token)
+
+        response = self.client.post(
+            f'/api/auctions/{auction.pk}/transition/',
+            {'status': 'CLOSED'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 200)
+        auction.refresh_from_db()
+        self.assertEqual(auction.status, Auction.Status.CLOSED)
+        self.assertEqual(auction.winning_bidder, self.buyer_a)
+
+    def test_transition_to_cancelled_clears_winner(self):
+        auction = self._create_auction()
+        auction.winning_bidder = self.buyer_a
+        auction.save(update_fields=['winning_bidder'])
+        self._auth(self.seller_token)
+
+        response = self.client.post(
+            f'/api/auctions/{auction.pk}/transition/',
+            {'status': 'CANCELLED'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 200)
+        auction.refresh_from_db()
+        self.assertEqual(auction.status, Auction.Status.CANCELLED)
+        self.assertIsNone(auction.winning_bidder)
+
+    def test_cancelled_auction_cannot_checkout(self):
+        from .services import AuctionLifecycleService
+
+        auction = self._create_auction()
+        AuctionLifecycleService.cancel_auction(auction.pk)
+        self._auth(self.buyer_a_token)
+        response = self.client.post(f'/api/auctions/{auction.pk}/checkout/')
+        self.assertEqual(response.status_code, 400)
+
+    def test_closed_no_winner_cannot_checkout(self):
+        from .services import AuctionLifecycleService
+
+        auction = self._create_auction()
+        AuctionLifecycleService.close_auction(auction.pk)
+        self._auth(self.buyer_a_token)
+        response = self.client.post(f'/api/auctions/{auction.pk}/checkout/')
+        self.assertEqual(response.status_code, 400)
+
+    def test_winner_can_checkout_after_authoritative_close(self):
+        from .models import Bid
+        from .services import AuctionLifecycleService
+
+        auction = self._create_auction()
+        Bid.objects.create(auction=auction, bidder=self.buyer_a, amount=110)
+        AuctionLifecycleService.close_auction(auction.pk)
+
+        self._auth(self.buyer_a_token)
+        response = self.client.post(f'/api/auctions/{auction.pk}/checkout/')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('transaction_id', response.data)
 
