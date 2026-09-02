@@ -435,7 +435,7 @@ class AuctionImageUploadView(APIView):
         # Validate via schema serializer (keeps Swagger + runtime aligned).
         upload_serializer = AuctionImageUploadSerializer(
             data={'images': files},
-            context={'request': request},
+            context={'request': request, 'auction': auction},
         )
         upload_serializer.is_valid(raise_exception=True)
 

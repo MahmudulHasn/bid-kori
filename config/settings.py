@@ -180,6 +180,16 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 MEDIA_URL = os.getenv('MEDIA_URL', '/media/')
 MEDIA_ROOT = BASE_DIR / 'media'
 
+# Auction image upload limits (content validated via Pillow — see auctions.image_validation).
+AUCTION_IMAGE_MAX_BYTES = int(os.getenv('AUCTION_IMAGE_MAX_BYTES', str(5 * 1024 * 1024)))
+AUCTION_IMAGE_MAX_WIDTH = int(os.getenv('AUCTION_IMAGE_MAX_WIDTH', '4096'))
+AUCTION_IMAGE_MAX_HEIGHT = int(os.getenv('AUCTION_IMAGE_MAX_HEIGHT', '4096'))
+AUCTION_IMAGE_MIN_WIDTH = int(os.getenv('AUCTION_IMAGE_MIN_WIDTH', '1'))
+AUCTION_IMAGE_MIN_HEIGHT = int(os.getenv('AUCTION_IMAGE_MIN_HEIGHT', '1'))
+AUCTION_IMAGE_MAX_PER_AUCTION = int(os.getenv('AUCTION_IMAGE_MAX_PER_AUCTION', '10'))
+AUCTION_IMAGE_MAX_PER_REQUEST = int(os.getenv('AUCTION_IMAGE_MAX_PER_REQUEST', '5'))
+AUCTION_IMAGE_ALLOWED_FORMATS = ('JPEG', 'PNG', 'WEBP', 'GIF')
+
 STORAGES = {
     'default': {
         'BACKEND': 'django.core.files.storage.FileSystemStorage',

@@ -1,7 +1,12 @@
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from rest_framework import serializers
 
 from products.models import Product
+from .image_validation import (
+    validate_auction_image,
+    validate_auction_image_quota,
+)
 from .models import Auction, AuctionImage, Bid, Payment
 
 
@@ -16,6 +21,18 @@ class ProductSerializer(serializers.ModelSerializer):
         model = Product
         fields = ['id', 'title', 'description', 'condition', 'category', 'seller']
         read_only_fields = ['id', 'seller']
+
+
+class AuctionImageField(serializers.FileField):
+    """Upload field that validates image *content* via Pillow (not extension)."""
+
+    def to_internal_value(self, data):
+        file_obj = super().to_internal_value(data)
+        try:
+            validate_auction_image(file_obj)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(exc.messages) from exc
+        return file_obj
 
 
 class AuctionImageSerializer(serializers.ModelSerializer):
@@ -38,7 +55,7 @@ class AuctionSerializer(serializers.ModelSerializer):
     product = ProductSerializer()
     images = AuctionImageSerializer(many=True, read_only=True)
     uploaded_images = serializers.ListField(
-        child=serializers.ImageField(max_length=None, allow_empty_file=False),
+        child=AuctionImageField(max_length=None, allow_empty_file=False),
         write_only=True,
         required=False,
         help_text='One or more image files (multipart/form-data field name: images).',
@@ -137,7 +154,19 @@ class AuctionSerializer(serializers.ModelSerializer):
             for key in ('images', 'image', 'uploaded_images'):
                 for uploaded in request.FILES.getlist(key):
                     if uploaded not in images:
+                        try:
+                            validate_auction_image(uploaded)
+                        except DjangoValidationError as exc:
+                            raise serializers.ValidationError(
+                                {'images': exc.messages}
+                            ) from exc
                         images.append(uploaded)
+
+        if images:
+            try:
+                validate_auction_image_quota(auction=None, incoming_count=len(images))
+            except DjangoValidationError as exc:
+                raise serializers.ValidationError({'images': exc.messages}) from exc
         return images
 
     def create(self, validated_data):
@@ -189,9 +218,21 @@ class AuctionImageUploadSerializer(serializers.Serializer):
     """Multipart payload for uploading one or more auction images."""
 
     images = serializers.ListField(
-        child=serializers.ImageField(),
+        child=AuctionImageField(allow_empty_file=False),
         help_text='One or more image files (multipart field name: images).',
+        allow_empty=False,
     )
+
+    def validate_images(self, images):
+        auction = self.context.get('auction')
+        try:
+            validate_auction_image_quota(
+                auction=auction,
+                incoming_count=len(images),
+            )
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(exc.messages) from exc
+        return images
 
 
 class TransitionStatusSerializer(serializers.Serializer):

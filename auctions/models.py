@@ -2,6 +2,8 @@ from django.contrib.auth.models import User
 from django.db import models
 from django.utils import timezone
 
+from .image_validation import validate_auction_image
+
 
 class Auction(models.Model):
     """An auction listing for a single product, tracking its bidding lifecycle."""
@@ -92,7 +94,10 @@ class AuctionImage(models.Model):
         related_name='images',
         on_delete=models.CASCADE,
     )
-    image = models.ImageField(upload_to='auction_images/')
+    image = models.ImageField(
+        upload_to='auction_images/',
+        validators=[validate_auction_image],
+    )
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

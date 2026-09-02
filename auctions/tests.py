@@ -1029,6 +1029,148 @@ class BidServiceConcurrencyTests(TransactionTestCase):
         self.assertIsNone(auction.winning_bidder)
 
 
+@override_settings(
+    STORAGES={
+        'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
+        'staticfiles': {
+            'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
+        },
+    }
+)
+class AuctionImageUploadHardeningTests(APITestCase):
+    """Content-based image upload validation and authorization."""
+
+    def setUp(self):
+        self.owner = User.objects.create_user(
+            username='img_owner',
+            email='img_owner@test.com',
+            password='pass12345',
+        )
+        self.other = User.objects.create_user(
+            username='img_other',
+            email='img_other@test.com',
+            password='pass12345',
+        )
+        self.owner_token = Token.objects.create(user=self.owner)
+        self.other_token = Token.objects.create(user=self.other)
+        now = timezone.now()
+        product = Product.objects.create(
+            seller=self.owner,
+            title='Image Listing',
+            description='Desc',
+        )
+        self.auction = Auction.objects.create(
+            product=product,
+            starting_bid=100,
+            current_highest_bid=100,
+            min_increment=10,
+            start_time=now - timedelta(hours=1),
+            end_time=now + timedelta(days=1),
+            status=Auction.Status.ACTIVE,
+        )
+
+    def _auth(self, token):
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {token.key}')
+
+    def _upload(self, *, token=None, files=None, auction=None):
+        if token is not None:
+            self._auth(token)
+        else:
+            self.client.credentials()
+        target = auction or self.auction
+        payload = {}
+        if files is not None:
+            if isinstance(files, list):
+                payload['images'] = files
+            else:
+                payload['images'] = files
+        return self.client.post(
+            f'/api/auctions/{target.pk}/images/',
+            payload,
+            format='multipart',
+        )
+
+    def test_valid_image_upload_by_owner(self):
+        response = self._upload(token=self.owner_token, files=_make_test_image())
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(self.auction.images.count(), 1)
+
+    def test_invalid_file_rejected_even_with_image_extension(self):
+        fake = SimpleUploadedFile(
+            'fake.png',
+            b'this is not an image payload',
+            content_type='image/png',
+        )
+        response = self._upload(token=self.owner_token, files=fake)
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(self.auction.images.count(), 0)
+
+    @override_settings(AUCTION_IMAGE_MAX_BYTES=200)
+    def test_oversized_file_rejected(self):
+        buffer = BytesIO()
+        # Large enough PNG that exceeds the 200-byte test cap.
+        Image.new('RGB', (120, 120), color='blue').save(buffer, format='PNG')
+        buffer.seek(0)
+        payload = buffer.read()
+        self.assertGreater(len(payload), 200)
+        oversized = SimpleUploadedFile(
+            'big.png',
+            payload,
+            content_type='image/png',
+        )
+        response = self._upload(token=self.owner_token, files=oversized)
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(self.auction.images.count(), 0)
+
+    @override_settings(
+        AUCTION_IMAGE_MAX_WIDTH=50,
+        AUCTION_IMAGE_MAX_HEIGHT=50,
+    )
+    def test_oversized_dimensions_rejected(self):
+        buffer = BytesIO()
+        Image.new('RGB', (80, 80), color='green').save(buffer, format='PNG')
+        buffer.seek(0)
+        large = SimpleUploadedFile(
+            'large.png',
+            buffer.read(),
+            content_type='image/png',
+        )
+        response = self._upload(token=self.owner_token, files=large)
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(self.auction.images.count(), 0)
+
+    def test_unauthenticated_upload_rejected(self):
+        response = self._upload(token=None, files=_make_test_image())
+        self.assertIn(response.status_code, (401, 403))
+        self.assertEqual(self.auction.images.count(), 0)
+
+    def test_other_seller_cannot_upload_to_auction(self):
+        response = self._upload(token=self.other_token, files=_make_test_image())
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(self.auction.images.count(), 0)
+
+    @override_settings(AUCTION_IMAGE_MAX_PER_AUCTION=1, AUCTION_IMAGE_MAX_PER_REQUEST=2)
+    def test_per_auction_quota_enforced(self):
+        first = self._upload(token=self.owner_token, files=_make_test_image('one.png'))
+        self.assertEqual(first.status_code, 201, first.data)
+        second = self._upload(token=self.owner_token, files=_make_test_image('two.png'))
+        self.assertEqual(second.status_code, 400)
+        self.assertEqual(self.auction.images.count(), 1)
+
+    def test_valid_png_accepted_with_misleading_filename(self):
+        buffer = BytesIO()
+        Image.new('RGB', (12, 12), color='red').save(buffer, format='PNG')
+        buffer.seek(0)
+        spoofed = SimpleUploadedFile(
+            'not-really.exe',
+            buffer.read(),
+            content_type='application/octet-stream',
+        )
+        response = self._upload(token=self.owner_token, files=spoofed)
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(self.auction.images.count(), 1)
+
+
 class AuctionListFilterAuthorizationTests(APITestCase):
     """List/filter correctness and private queryset scoping."""
 
