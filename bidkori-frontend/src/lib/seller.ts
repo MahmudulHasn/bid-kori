@@ -1,5 +1,5 @@
 import { isAuctionOwnedByUser } from './auctionOwnership.ts';
-import type { Auction, Product } from './types.ts';
+import type { AuthUser, Auction, Product } from './types.ts';
 
 export const RECENT_SELLER_PRODUCTS_LIMIT = 4;
 export const RECENT_SELLER_AUCTIONS_LIMIT = 4;
@@ -82,18 +82,76 @@ export function getRecentSellerAuctions(
     .slice(0, Math.max(0, limit));
 }
 
+export type SellerProductSort = 'newest' | 'oldest' | 'name';
+
+export function sortSellerProducts(
+  products: readonly Product[],
+  sort: SellerProductSort = 'newest',
+): Product[] {
+  return products.slice().sort((a, b) => {
+    if (sort === 'name') {
+      const nameCmp = a.title.localeCompare(b.title, undefined, {
+        sensitivity: 'base',
+      });
+      if (nameCmp !== 0) return nameCmp;
+      return b.id - a.id;
+    }
+    const createdDiff = timestampMs(a.created_at) - timestampMs(b.created_at);
+    if (sort === 'oldest') {
+      if (createdDiff !== 0) return createdDiff;
+      return a.id - b.id;
+    }
+    if (createdDiff !== 0) return -createdDiff;
+    return b.id - a.id;
+  });
+}
+
 export function getRecentSellerProducts(
   products: readonly Product[],
   limit: number = RECENT_SELLER_PRODUCTS_LIMIT,
 ): Product[] {
-  return products
-    .slice()
-    .sort((a, b) => {
-      const createdDiff = timestampMs(b.created_at) - timestampMs(a.created_at);
-      if (createdDiff !== 0) return createdDiff;
-      return b.id - a.id;
-    })
-    .slice(0, Math.max(0, limit));
+  return sortSellerProducts(products, 'newest').slice(0, Math.max(0, limit));
+}
+
+export function filterSellerProducts(
+  products: readonly Product[],
+  query: string,
+): Product[] {
+  const normalized = query.trim().toLowerCase();
+  if (!normalized) return products.slice();
+  return products.filter((product) => {
+    const title = product.title.toLowerCase();
+    const description = (product.description ?? '').toLowerCase();
+    return title.includes(normalized) || description.includes(normalized);
+  });
+}
+
+/**
+ * UX ownership check only — backend remains authoritative for writes.
+ * Missing seller id fails closed.
+ */
+export function isProductOwnedByUser(
+  product: Product | null | undefined,
+  user: Pick<AuthUser, 'id'> | null | undefined,
+): boolean {
+  if (!product || !user) return false;
+  if (product.seller == null || product.seller === '') return false;
+  return Number(product.seller) === Number(user.id);
+}
+
+export function formatSellerProductCondition(value: string | undefined): string {
+  switch (value) {
+    case 'NEW':
+      return 'Brand New';
+    case 'USED_LIKE_NEW':
+      return 'Used - Like New';
+    case 'USED_GOOD':
+      return 'Used - Good';
+    case 'FAIR':
+      return 'Fair Condition';
+    default:
+      return value?.trim() ? value : '—';
+  }
 }
 
 export type SellerDashboardMetrics = {

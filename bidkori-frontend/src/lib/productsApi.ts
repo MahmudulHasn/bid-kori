@@ -23,6 +23,21 @@ export async function fetchMyProducts(): Promise<Product[]> {
   return unwrapProductList(data);
 }
 
+export function buildProductDetailApiPath(id: string | number): string {
+  return `/products/${id}/`;
+}
+
+export async function fetchProduct(id: string | number): Promise<Product> {
+  const { data } = await api.get<Product>(buildProductDetailApiPath(id));
+  return data;
+}
+
+/** SWR-compatible fetcher for a product detail URL. */
+export async function productDetailFetcher(url: string): Promise<Product> {
+  const { data } = await api.get<Product>(url);
+  return data;
+}
+
 /** SWR-compatible fetcher for `/products/my-listings/`. */
 export async function myListingsFetcher(url: string): Promise<Product[]> {
   const { data } = await api.get<unknown>(url);

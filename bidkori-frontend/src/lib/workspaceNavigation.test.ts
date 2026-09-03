@@ -5,6 +5,7 @@ import { getRoleHome } from './authRouting.ts';
 import {
   BUYER_PROFILE_PATH,
   BUYER_SETTINGS_PATH,
+  SELLER_PRODUCTS_PATH,
   WORKSPACE_CONFIGS,
   getRoleDisplayLabel,
   getWorkspaceAccountPaths,
@@ -12,6 +13,7 @@ import {
   getWorkspaceNavLabel,
   isNavItemActive,
   isNavItemNavigable,
+  sellerProductDetailPath,
 } from './workspaceNavigation.ts';
 import type { UserRole } from './types.ts';
 
@@ -99,7 +101,10 @@ test('seller config does not contain buyer/admin-only items', () => {
   assert.equal(sellerDashboard?.enabled, true);
   assert.equal(sellerDashboard?.href, '/seller');
   const sellerProducts = WORKSPACE_CONFIGS.SELLER.navItems.find((item) => item.id === 'products');
-  assert.equal(sellerProducts?.enabled, false);
+  assert.equal(sellerProducts?.enabled, true);
+  assert.equal(sellerProducts?.href, SELLER_PRODUCTS_PATH);
+  assert.equal(SELLER_PRODUCTS_PATH, '/seller/products');
+  assert.equal(sellerProductDetailPath(42), '/seller/products/42');
   const sellerAuctions = WORKSPACE_CONFIGS.SELLER.navItems.find((item) => item.id === 'auctions');
   assert.equal(sellerAuctions?.enabled, false);
   const sellerAnalytics = WORKSPACE_CONFIGS.SELLER.navItems.find((item) => item.id === 'analytics');
@@ -124,6 +129,8 @@ test('admin config does not contain buyer/seller-only items', () => {
   assert.ok(ids.has('bids'));
   assert.ok(ids.has('categories'));
   assert.ok(ids.has('reports'));
+  const adminProducts = WORKSPACE_CONFIGS.ADMIN.navItems.find((item) => item.id === 'products');
+  assert.equal(adminProducts?.enabled, false);
   assert.equal(WORKSPACE_CONFIGS.ADMIN.brandTitle, 'BidKori Admin');
   const adminSettings = WORKSPACE_CONFIGS.ADMIN.navItems.find((item) => item.id === 'settings');
   assert.equal(adminSettings?.enabled, false);

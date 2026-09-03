@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  filterSellerProducts,
   getRecentSellerAuctions,
   getRecentSellerProducts,
   getSellerActiveAuctions,
@@ -9,7 +10,9 @@ import {
   getSellerCancelledAuctions,
   getSellerClosedAuctions,
   getSellerDashboardMetrics,
+  isProductOwnedByUser,
   isSellerAuctionAwaitingFinalization,
+  sortSellerProducts,
 } from './seller.ts';
 import type { Auction, Product } from './types.ts';
 
@@ -160,6 +163,67 @@ test('recent seller products order by created_at then id, without mutating sourc
     products.map((item) => item.id),
     snapshot,
   );
+});
+
+test('sortSellerProducts puts newest created_at first with id fallback', () => {
+  const products = [
+    product({ id: 1, title: 'A', created_at: '2026-01-01T00:00:00Z' }),
+    product({ id: 3, title: 'C', created_at: '2026-03-01T00:00:00Z' }),
+    product({ id: 2, title: 'B', created_at: '2026-03-01T00:00:00Z' }),
+  ];
+  assert.deepEqual(
+    sortSellerProducts(products, 'newest').map((item) => item.id),
+    [3, 2, 1],
+  );
+  assert.deepEqual(
+    sortSellerProducts(products, 'oldest').map((item) => item.id),
+    [1, 2, 3],
+  );
+});
+
+test('sortSellerProducts does not mutate the source array', () => {
+  const products = [
+    product({ id: 1, title: 'A', created_at: '2026-01-01T00:00:00Z' }),
+    product({ id: 2, title: 'B', created_at: '2026-02-01T00:00:00Z' }),
+  ];
+  const snapshot = products.map((item) => item.id);
+  sortSellerProducts(products, 'newest');
+  assert.deepEqual(
+    products.map((item) => item.id),
+    snapshot,
+  );
+});
+
+test('filterSellerProducts matches title and description case-insensitively', () => {
+  const products = [
+    product({ id: 1, title: 'Oak Chair', description: 'Vintage wood' }),
+    product({ id: 2, title: 'Steel Lamp', description: 'Modern brass' }),
+  ];
+  const snapshot = products.map((item) => item.id);
+  assert.deepEqual(
+    filterSellerProducts(products, 'CHAIR').map((item) => item.id),
+    [1],
+  );
+  assert.deepEqual(
+    filterSellerProducts(products, 'brass').map((item) => item.id),
+    [2],
+  );
+  assert.deepEqual(
+    products.map((item) => item.id),
+    snapshot,
+  );
+});
+
+test('isProductOwnedByUser allows the current seller and fails closed otherwise', () => {
+  const owned = product({ id: 1, title: 'Mine', seller: 7 });
+  const ownedStringSeller = product({ id: 4, title: 'Mine string', seller: '7' });
+  const other = product({ id: 2, title: 'Theirs', seller: 8 });
+  const missing = product({ id: 3, title: 'Unknown' });
+  assert.equal(isProductOwnedByUser(owned, { id: 7 }), true);
+  assert.equal(isProductOwnedByUser(ownedStringSeller, { id: 7 }), true);
+  assert.equal(isProductOwnedByUser(other, { id: 7 }), false);
+  assert.equal(isProductOwnedByUser(missing, { id: 7 }), false);
+  assert.equal(isProductOwnedByUser(owned, null), false);
 });
 
 test('nested product PK without seller is not treated as owned', () => {

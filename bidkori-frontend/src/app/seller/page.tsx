@@ -17,8 +17,13 @@ import {
   getRecentSellerProducts,
   getSellerDashboardMetrics,
   isSellerAuctionAwaitingFinalization,
+  formatSellerProductCondition,
 } from '@/lib/seller';
 import type { Auction, Product } from '@/lib/types';
+import {
+  SELLER_PRODUCTS_PATH,
+  sellerProductDetailPath,
+} from '@/lib/workspaceNavigation';
 
 function MetricCard({
   label,
@@ -88,32 +93,25 @@ function formatEndedAt(
   return { iso: date.toISOString(), label: format(date, 'MMM d, yyyy, h:mm a') };
 }
 
-function formatCondition(value: string | undefined): string {
-  switch (value) {
-    case 'NEW':
-      return 'Brand New';
-    case 'USED_LIKE_NEW':
-      return 'Used - Like New';
-    case 'USED_GOOD':
-      return 'Used - Good';
-    case 'FAIR':
-      return 'Fair Condition';
-    default:
-      return value?.trim() ? value : '—';
-  }
-}
-
 function ProductPreview({ item }: { item: Product }) {
   const created = formatCreatedAt(item.created_at);
+  const title = item.title.trim() ? item.title : 'Untitled product';
   return (
     <article className="rounded-xl border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-950">
       <h3 className="truncate text-sm font-semibold text-zinc-900 dark:text-white">
-        {item.title.trim() ? item.title : 'Untitled product'}
+        <Link
+          href={sellerProductDetailPath(item.id)}
+          className="hover:text-sky-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:hover:text-sky-300"
+        >
+          {title}
+        </Link>
       </h3>
       <dl className="mt-2 space-y-1 text-xs text-zinc-500 dark:text-zinc-400">
         <div className="flex justify-between gap-3">
           <dt>Condition</dt>
-          <dd className="text-zinc-800 dark:text-zinc-200">{formatCondition(item.condition)}</dd>
+          <dd className="text-zinc-800 dark:text-zinc-200">
+            {formatSellerProductCondition(item.condition)}
+          </dd>
         </div>
         <div className="flex justify-between gap-3">
           <dt>Created</dt>
@@ -259,6 +257,12 @@ export default function SellerHomePage() {
             You haven&apos;t created any products yet. Product and auction
             creation will be available from your Seller workspace.
           </p>
+          <Link
+            href={SELLER_PRODUCTS_PATH}
+            className="mt-4 inline-flex text-sm font-medium text-sky-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:text-sky-300"
+          >
+            View all products
+          </Link>
         </section>
       ) : null}
 
@@ -295,15 +299,25 @@ export default function SellerHomePage() {
 
           <div className="grid gap-8 lg:grid-cols-2">
             <section aria-labelledby="recent-products-heading">
-              <h2
-                id="recent-products-heading"
-                className="text-xl font-semibold text-zinc-900 dark:text-white"
-              >
-                Recent Products
-              </h2>
-              <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-                Catalog items you own. These are not auctions.
-              </p>
+              <div className="flex flex-wrap items-end justify-between gap-3">
+                <div>
+                  <h2
+                    id="recent-products-heading"
+                    className="text-xl font-semibold text-zinc-900 dark:text-white"
+                  >
+                    Recent Products
+                  </h2>
+                  <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+                    Catalog items you own. These are not auctions.
+                  </p>
+                </div>
+                <Link
+                  href={SELLER_PRODUCTS_PATH}
+                  className="text-sm font-medium text-sky-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:text-sky-300"
+                >
+                  View all products
+                </Link>
+              </div>
               <div className="mt-4 space-y-3">
                 {recentProducts.length > 0 ? (
                   recentProducts.map((item) => (

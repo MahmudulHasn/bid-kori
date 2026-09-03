@@ -30,6 +30,7 @@ const MARKETPLACE_LABEL = 'Browse Marketplace';
 /** Canonical Buyer account routes (Seller/Admin account pages do not exist yet). */
 export const BUYER_PROFILE_PATH = '/buyer/profile';
 export const BUYER_SETTINGS_PATH = '/buyer/settings';
+export const SELLER_PRODUCTS_PATH = '/seller/products';
 
 const BUYER_NAV: readonly WorkspaceNavItem[] = [
   { id: 'dashboard', label: 'Dashboard', href: '/buyer', enabled: true },
@@ -42,7 +43,7 @@ const BUYER_NAV: readonly WorkspaceNavItem[] = [
 
 const SELLER_NAV: readonly WorkspaceNavItem[] = [
   { id: 'dashboard', label: 'Dashboard', href: '/seller', enabled: true },
-  { id: 'products', label: 'Products', enabled: false },
+  { id: 'products', label: 'Products', href: SELLER_PRODUCTS_PATH, enabled: true },
   { id: 'auctions', label: 'Auctions', enabled: false },
   { id: 'analytics', label: 'Analytics', enabled: false },
   { id: 'profile', label: 'Profile', enabled: false },
@@ -123,6 +124,10 @@ export function getWorkspaceAccountPaths(role: UserRole): {
     };
   }
   return {};
+}
+
+export function sellerProductDetailPath(id: string | number): string {
+  return `${SELLER_PRODUCTS_PATH}/${id}`;
 }
 
 /** True when an item is safe to navigate (enabled + href). */
