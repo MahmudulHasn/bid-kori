@@ -94,6 +94,16 @@ test('seller config does not contain buyer/admin-only items', () => {
   assert.ok(ids.has('auctions'));
   assert.ok(ids.has('analytics'));
   assert.equal(WORKSPACE_CONFIGS.SELLER.brandTitle, 'BidKori Seller');
+  assert.equal(WORKSPACE_CONFIGS.SELLER.homePath, '/seller');
+  const sellerDashboard = WORKSPACE_CONFIGS.SELLER.navItems.find((item) => item.id === 'dashboard');
+  assert.equal(sellerDashboard?.enabled, true);
+  assert.equal(sellerDashboard?.href, '/seller');
+  const sellerProducts = WORKSPACE_CONFIGS.SELLER.navItems.find((item) => item.id === 'products');
+  assert.equal(sellerProducts?.enabled, false);
+  const sellerAuctions = WORKSPACE_CONFIGS.SELLER.navItems.find((item) => item.id === 'auctions');
+  assert.equal(sellerAuctions?.enabled, false);
+  const sellerAnalytics = WORKSPACE_CONFIGS.SELLER.navItems.find((item) => item.id === 'analytics');
+  assert.equal(sellerAnalytics?.enabled, false);
   const sellerProfile = WORKSPACE_CONFIGS.SELLER.navItems.find((item) => item.id === 'profile');
   assert.equal(sellerProfile?.enabled, false);
   const sellerSettings = WORKSPACE_CONFIGS.SELLER.navItems.find((item) => item.id === 'settings');

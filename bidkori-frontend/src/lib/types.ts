@@ -29,6 +29,18 @@ export type AuctionProduct = {
   seller?: number | string | null;
 };
 
+/** Catalog product from GET /products/ and GET /products/my-listings/. */
+export type Product = {
+  id: number;
+  title: string;
+  description?: string;
+  condition?: string;
+  category?: number | null;
+  seller?: number | string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
 export type Auction = {
   id: number;
   /**
