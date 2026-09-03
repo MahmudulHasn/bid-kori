@@ -1,5 +1,9 @@
 import api from '@/lib/api';
 import type { ExistingProductAuctionCreatePayload } from '@/lib/auctionCreateContract';
+import {
+  buildAuctionCancelTransitionPayload,
+  buildAuctionTransitionApiPath,
+} from '@/lib/auctionManagementSafety';
 import { MY_BIDS_API_PATH } from '@/lib/buyer';
 import {
   AUCTIONS_LIST_API_PATH,
@@ -113,3 +117,19 @@ export async function createAuction(
   const { data } = await api.post<Auction>(AUCTIONS_LIST_API_PATH, payload);
   return data;
 }
+
+/**
+ * Cancel an ACTIVE auction via the lifecycle transition endpoint.
+ * Do not PATCH `status` — transitions stay centralized in AuctionLifecycleService.
+ */
+export async function cancelAuction(
+  auctionId: string | number,
+): Promise<Auction> {
+  const { data } = await api.post<Auction>(
+    buildAuctionTransitionApiPath(auctionId),
+    buildAuctionCancelTransitionPayload(),
+  );
+  return data;
+}
+
+export { buildAuctionTransitionApiPath } from '@/lib/auctionManagementSafety';

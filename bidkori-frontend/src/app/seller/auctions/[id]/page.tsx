@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { format } from 'date-fns';
-import useSWR from 'swr';
+import toast from 'react-hot-toast';
+import useSWR, { useSWRConfig } from 'swr';
 
 import { useAuth } from '@/context/AuthContext';
 import { getApiErrorMessage, getApiStatus } from '@/lib/apiErrors';
@@ -17,9 +18,12 @@ import {
   getAuctionTitle,
 } from '@/lib/auctionDisplay';
 import {
+  AUCTIONS_LIST_API_PATH,
   auctionDetailFetcher,
   buildAuctionDetailApiPath,
+  cancelAuction,
 } from '@/lib/auctionsApi';
+import { canSellerCancelAuction } from '@/lib/auctionManagementSafety';
 import { resolveMediaUrl } from '@/lib/media';
 import {
   getSellerAuctionDisplayStatus,
@@ -30,7 +34,7 @@ import {
   SELLER_AUCTIONS_PATH,
   sellerProductDetailPath,
 } from '@/lib/workspaceNavigation';
-import type { Auction } from '@/lib/types';
+import type { Auction, AuthUser } from '@/lib/types';
 
 function formatWhen(
   value: string | undefined,
@@ -50,7 +54,15 @@ function money(value: string | number | undefined): string | null {
   return formatAuctionMoney(amount);
 }
 
-function OwnedAuctionDetail({ auction }: { auction: Auction }) {
+function OwnedAuctionDetail({
+  auction,
+  user,
+  onCancelled,
+}: {
+  auction: Auction;
+  user: AuthUser;
+  onCancelled: (next: Auction) => Promise<void>;
+}) {
   const title = getAuctionTitle(auction);
   const product = getAuctionProduct(auction);
   const starts = formatWhen(auction.start_time);
@@ -62,6 +74,12 @@ function OwnedAuctionDetail({ auction }: { auction: Auction }) {
   const starting = money(auction.starting_bid);
   const increment = money(auction.min_increment);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [cancelPhase, setCancelPhase] = useState<
+    'idle' | 'confirming' | 'submitting'
+  >('idle');
+  const [cancelError, setCancelError] = useState<string>();
+
+  const showCancel = canSellerCancelAuction(auction, user);
 
   const imageUrls = useMemo(() => {
     return (auction.images ?? [])
@@ -71,6 +89,27 @@ function OwnedAuctionDetail({ auction }: { auction: Auction }) {
 
   const activeImage = imageUrls[activeIndex] ?? imageUrls[0] ?? null;
 
+  const handleCancel = async () => {
+    if (cancelPhase === 'submitting') return;
+    setCancelPhase('submitting');
+    setCancelError(undefined);
+    try {
+      const next = await cancelAuction(auction.id);
+      await onCancelled(next);
+      toast.success('Auction cancelled.');
+      setCancelPhase('idle');
+    } catch (error: unknown) {
+      setCancelError(
+        getApiErrorMessage(
+          error,
+          'We could not cancel this auction. It may already be closed.',
+        ),
+      );
+      setCancelPhase('confirming');
+      await onCancelled(auction);
+    }
+  };
+
   return (
     <>
       <header>
@@ -78,8 +117,73 @@ function OwnedAuctionDetail({ auction }: { auction: Auction }) {
           {title}
         </h1>
         <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-          Read-only auction summary for a listing you own.
+          Auction summary for a listing you own.
         </p>
+        {showCancel ? (
+          <div className="mt-4 space-y-3">
+            {cancelPhase === 'idle' ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setCancelError(undefined);
+                  setCancelPhase('confirming');
+                }}
+                className="inline-flex items-center justify-center rounded-lg border border-red-300 px-3 py-1.5 text-sm font-semibold text-red-700 transition hover:bg-red-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500 dark:border-red-800 dark:text-red-300 dark:hover:bg-red-950"
+              >
+                Cancel Auction
+              </button>
+            ) : (
+              <div
+                role="group"
+                aria-labelledby="cancel-auction-confirm-heading"
+                className="rounded-2xl border border-red-200 bg-red-50 px-4 py-4 dark:border-red-900 dark:bg-red-950/40"
+              >
+                <h2
+                  id="cancel-auction-confirm-heading"
+                  className="text-sm font-semibold text-red-900 dark:text-red-200"
+                >
+                  Cancel auction?
+                </h2>
+                <p className="mt-2 text-sm text-red-800 dark:text-red-300">
+                  This action changes the auction lifecycle and cannot be undone
+                  from this page. Bidding stops and checkout remains blocked.
+                </p>
+                {cancelError ? (
+                  <p
+                    role="alert"
+                    className="mt-3 text-sm font-medium text-red-900 dark:text-red-200"
+                  >
+                    {cancelError}
+                  </p>
+                ) : null}
+                <div className="mt-4 flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    disabled={cancelPhase === 'submitting'}
+                    onClick={() => {
+                      setCancelPhase('idle');
+                      setCancelError(undefined);
+                    }}
+                    className="inline-flex rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-800 transition hover:bg-zinc-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+                  >
+                    Keep Auction
+                  </button>
+                  <button
+                    type="button"
+                    disabled={cancelPhase === 'submitting'}
+                    aria-busy={cancelPhase === 'submitting'}
+                    onClick={() => void handleCancel()}
+                    className="inline-flex rounded-lg bg-red-700 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-red-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {cancelPhase === 'submitting'
+                      ? 'Cancelling…'
+                      : 'Cancel Auction'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : null}
       </header>
 
       {activeImage ? (
@@ -229,21 +333,29 @@ export default function SellerAuctionDetailPage() {
   const params = useParams<{ id: string }>();
   const auctionId = params?.id;
   const { user } = useAuth();
+  const { mutate: mutateGlobal } = useSWRConfig();
 
+  const detailKey = auctionId ? buildAuctionDetailApiPath(auctionId) : null;
   const {
     data: auction,
     error,
     isLoading,
     mutate,
-  } = useSWR(
-    auctionId ? buildAuctionDetailApiPath(auctionId) : null,
-    auctionDetailFetcher,
-  );
+  } = useSWR(detailKey, auctionDetailFetcher);
 
   const owned = isAuctionOwnedByUser(auction, user);
   const status = getApiStatus(error);
   const unavailable = Boolean(error) && (status === 404 || status === 403);
   const waiting = isLoading || (!error && !auction) || (!error && auction && !user);
+
+  const handleCancelled = async (next: Auction) => {
+    if (next?.id != null && (next.status ?? '').toUpperCase() === 'CANCELLED') {
+      await mutate(next, { revalidate: false });
+    } else {
+      await mutate();
+    }
+    await mutateGlobal(AUCTIONS_LIST_API_PATH);
+  };
 
   return (
     <div className="space-y-8">
@@ -308,8 +420,12 @@ export default function SellerAuctionDetailPage() {
         </section>
       ) : null}
 
-      {!waiting && !error && auction && owned ? (
-        <OwnedAuctionDetail auction={auction} />
+      {!waiting && !error && auction && owned && user ? (
+        <OwnedAuctionDetail
+          auction={auction}
+          user={user}
+          onCancelled={handleCancelled}
+        />
       ) : null}
     </div>
   );
