@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { format } from 'date-fns';
 
 import { formatSellerProductCondition } from '@/lib/seller';
-import { sellerProductDetailPath } from '@/lib/workspaceNavigation';
+import { sellerProductDetailPath, sellerProductEditPath } from '@/lib/workspaceNavigation';
 import type { Product } from '@/lib/types';
 
 function formatCreatedAt(
@@ -50,13 +50,22 @@ export default function SellerProductItem({ product }: { product: Product }) {
             </div>
           </dl>
         </div>
-        <Link
-          href={href}
-          className="inline-flex shrink-0 items-center justify-center rounded-lg bg-zinc-900 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-zinc-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-400 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
-        >
-          View details
-          <span className="sr-only"> for {title}</span>
-        </Link>
+        <div className="flex shrink-0 flex-col gap-2 sm:items-end">
+          <Link
+            href={href}
+            className="inline-flex items-center justify-center rounded-lg bg-zinc-900 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-zinc-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-400 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+          >
+            View
+            <span className="sr-only"> details for {title}</span>
+          </Link>
+          <Link
+            href={sellerProductEditPath(product.id)}
+            className="inline-flex items-center justify-center rounded-lg border border-zinc-300 px-3 py-1.5 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:border-zinc-700 dark:text-zinc-100 dark:hover:bg-zinc-800"
+          >
+            Edit
+            <span className="sr-only"> {title}</span>
+          </Link>
+        </div>
       </div>
     </article>
   );
@@ -84,13 +93,22 @@ export function SellerProductTableRow({ product }: { product: Product }) {
         {created ? <time dateTime={created.iso}>{created.label}</time> : '—'}
       </td>
       <td className="px-4 py-3 text-right">
-        <Link
-          href={href}
-          className="inline-flex rounded-lg bg-zinc-900 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-zinc-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-400 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
-        >
-          View details
-          <span className="sr-only"> for {title}</span>
-        </Link>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <Link
+            href={href}
+            className="inline-flex rounded-lg bg-zinc-900 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-zinc-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-400 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+          >
+            View
+            <span className="sr-only"> details for {title}</span>
+          </Link>
+          <Link
+            href={sellerProductEditPath(product.id)}
+            className="inline-flex rounded-lg border border-zinc-300 px-3 py-1.5 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:border-zinc-700 dark:text-zinc-100 dark:hover:bg-zinc-800"
+          >
+            Edit
+            <span className="sr-only"> {title}</span>
+          </Link>
+        </div>
       </td>
     </tr>
   );

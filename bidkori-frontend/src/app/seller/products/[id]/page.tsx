@@ -15,7 +15,10 @@ import {
   formatSellerProductCondition,
   isProductOwnedByUser,
 } from '@/lib/seller';
-import { SELLER_PRODUCTS_PATH } from '@/lib/workspaceNavigation';
+import {
+  SELLER_PRODUCTS_PATH,
+  sellerProductEditPath,
+} from '@/lib/workspaceNavigation';
 import type { Product } from '@/lib/types';
 
 function formatTimestamp(
@@ -39,7 +42,18 @@ function OwnedProductDetail({ product }: { product: Product }) {
           {product.title.trim() ? product.title : 'Untitled product'}
         </h1>
         <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-          Product details from your catalog. Editing will be available later.
+          Product details from your catalog.
+        </p>
+        <div className="mt-4 flex flex-wrap gap-3">
+          <Link
+            href={sellerProductEditPath(product.id)}
+            className="inline-flex items-center justify-center rounded-lg bg-sky-700 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-sky-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500"
+          >
+            Edit Product
+          </Link>
+        </div>
+        <p className="mt-3 text-sm text-zinc-500 dark:text-zinc-400">
+          Delete unavailable while auction-history safeguards are pending.
         </p>
       </header>
 

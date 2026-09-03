@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import useSWR from 'swr';
 
@@ -13,6 +14,7 @@ import {
   sortSellerProducts,
   type SellerProductSort,
 } from '@/lib/seller';
+import { SELLER_PRODUCT_CREATE_PATH } from '@/lib/workspaceNavigation';
 
 const SORTS: { id: SellerProductSort; label: string }[] = [
   { id: 'newest', label: 'Newest' },
@@ -38,13 +40,21 @@ export default function SellerProductsPage() {
 
   return (
     <div className="space-y-8">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-white sm:text-3xl">
-          My Products
-        </h1>
-        <p className="mt-2 max-w-2xl text-sm text-zinc-600 dark:text-zinc-400">
-          Catalog items you own. These are not auctions.
-        </p>
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-white sm:text-3xl">
+            My Products
+          </h1>
+          <p className="mt-2 max-w-2xl text-sm text-zinc-600 dark:text-zinc-400">
+            Catalog items you own. These are not auctions.
+          </p>
+        </div>
+        <Link
+          href={SELLER_PRODUCT_CREATE_PATH}
+          className="inline-flex items-center justify-center rounded-lg bg-sky-700 px-3 py-2 text-sm font-semibold text-white transition hover:bg-sky-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500"
+        >
+          Create Product
+        </Link>
       </header>
 
       {isLoading ? (
@@ -84,8 +94,14 @@ export default function SellerProductsPage() {
             You haven&apos;t created any products yet.
           </h2>
           <p className="mx-auto mt-2 max-w-md text-sm text-zinc-600 dark:text-zinc-400">
-            Product creation will be available from your Seller workspace.
+            Create a catalog item first. Listing it as an auction comes later.
           </p>
+          <Link
+            href={SELLER_PRODUCT_CREATE_PATH}
+            className="mt-4 inline-flex items-center justify-center rounded-lg bg-sky-700 px-3 py-2 text-sm font-semibold text-white transition hover:bg-sky-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500"
+          >
+            Create Product
+          </Link>
         </section>
       ) : null}
 

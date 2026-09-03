@@ -139,6 +139,114 @@ export function isProductOwnedByUser(
   return Number(product.seller) === Number(user.id);
 }
 
+/**
+ * Product DELETE is not exposed in Seller UI.
+ * Auction.product uses on_delete=CASCADE and Bid/Payment/images cascade from Auction.
+ * ProductDetailView has no destroy guard.
+ */
+export const SELLER_PRODUCT_DELETE_ENABLED = false;
+
+export const PRODUCT_WRITE_FIELDS = ['title', 'description', 'condition'] as const;
+
+/** POST create lives on the product collection. PATCH update uses the detail path. */
+export const PRODUCT_CREATE_API_PATH = '/products/';
+export const PRODUCT_CREATE_METHOD = 'POST';
+export const PRODUCT_UPDATE_METHOD = 'PATCH';
+
+export function productUpdateApiPath(id: string | number): string {
+  return `/products/${id}/`;
+}
+
+export const PRODUCT_CONDITION_VALUES = [
+  'NEW',
+  'USED_LIKE_NEW',
+  'USED_GOOD',
+  'FAIR',
+] as const;
+
+export type ProductCondition = (typeof PRODUCT_CONDITION_VALUES)[number];
+
+export type ProductFormValues = {
+  title: string;
+  description: string;
+  condition: ProductCondition;
+};
+
+export type ProductWritePayload = {
+  title: string;
+  description: string;
+  condition: ProductCondition;
+};
+
+export const PRODUCT_CONDITION_OPTIONS: {
+  value: ProductCondition;
+  label: string;
+}[] = [
+  { value: 'NEW', label: 'Brand New' },
+  { value: 'USED_LIKE_NEW', label: 'Used - Like New' },
+  { value: 'USED_GOOD', label: 'Used - Good' },
+  { value: 'FAIR', label: 'Fair Condition' },
+];
+
+export const DEFAULT_PRODUCT_CONDITION: ProductCondition = 'USED_GOOD';
+
+export function isProductCondition(value: string | undefined): value is ProductCondition {
+  return PRODUCT_CONDITION_VALUES.some((item) => item === value);
+}
+
+export function emptyProductFormValues(): ProductFormValues {
+  return {
+    title: '',
+    description: '',
+    condition: DEFAULT_PRODUCT_CONDITION,
+  };
+}
+
+export function productFormValuesFromProduct(product: Product): ProductFormValues {
+  return {
+    title: product.title ?? '',
+    description: product.description ?? '',
+    condition: isProductCondition(product.condition)
+      ? product.condition
+      : DEFAULT_PRODUCT_CONDITION,
+  };
+}
+
+export function validateProductForm(
+  values: ProductFormValues,
+): Partial<Record<keyof ProductFormValues, string>> {
+  const errors: Partial<Record<keyof ProductFormValues, string>> = {};
+  if (!values.title.trim()) {
+    errors.title = 'Title is required.';
+  } else if (values.title.trim().length > 255) {
+    errors.title = 'Title must be 255 characters or fewer.';
+  }
+  if (!isProductCondition(values.condition)) {
+    errors.condition = 'Select a valid condition.';
+  }
+  return errors;
+}
+
+/**
+ * Catalog write payload only. Drops seller, category, and auction pricing.
+ * Does not mutate the source object.
+ */
+export function serializeProductWritePayload(
+  values: ProductFormValues,
+): ProductWritePayload {
+  return {
+    title: values.title.trim(),
+    description: values.description.trim(),
+    condition: values.condition,
+  };
+}
+
+export function productWritePayloadKeys(
+  payload: ProductWritePayload,
+): string[] {
+  return Object.keys(payload);
+}
+
 export function formatSellerProductCondition(value: string | undefined): string {
   switch (value) {
     case 'NEW':

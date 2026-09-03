@@ -31,6 +31,7 @@ const MARKETPLACE_LABEL = 'Browse Marketplace';
 export const BUYER_PROFILE_PATH = '/buyer/profile';
 export const BUYER_SETTINGS_PATH = '/buyer/settings';
 export const SELLER_PRODUCTS_PATH = '/seller/products';
+export const SELLER_PRODUCT_CREATE_PATH = '/seller/products/create';
 
 const BUYER_NAV: readonly WorkspaceNavItem[] = [
   { id: 'dashboard', label: 'Dashboard', href: '/buyer', enabled: true },
@@ -128,6 +129,10 @@ export function getWorkspaceAccountPaths(role: UserRole): {
 
 export function sellerProductDetailPath(id: string | number): string {
   return `${SELLER_PRODUCTS_PATH}/${id}`;
+}
+
+export function sellerProductEditPath(id: string | number): string {
+  return `${SELLER_PRODUCTS_PATH}/${id}/edit`;
 }
 
 /** True when an item is safe to navigate (enabled + href). */

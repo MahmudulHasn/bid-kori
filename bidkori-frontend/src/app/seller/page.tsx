@@ -22,6 +22,7 @@ import {
 import type { Auction, Product } from '@/lib/types';
 import {
   SELLER_PRODUCTS_PATH,
+  SELLER_PRODUCT_CREATE_PATH,
   sellerProductDetailPath,
 } from '@/lib/workspaceNavigation';
 
@@ -254,15 +255,23 @@ export default function SellerHomePage() {
             Your seller workspace is ready.
           </h2>
           <p className="mx-auto mt-2 max-w-md text-sm text-zinc-600 dark:text-zinc-400">
-            You haven&apos;t created any products yet. Product and auction
-            creation will be available from your Seller workspace.
+            Create a catalog product from your Seller workspace. Auction
+            creation will be available later.
           </p>
-          <Link
-            href={SELLER_PRODUCTS_PATH}
-            className="mt-4 inline-flex text-sm font-medium text-sky-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:text-sky-300"
-          >
-            View all products
-          </Link>
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
+            <Link
+              href={SELLER_PRODUCT_CREATE_PATH}
+              className="inline-flex rounded-lg bg-sky-700 px-3 py-2 text-sm font-semibold text-white transition hover:bg-sky-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500"
+            >
+              Create Product
+            </Link>
+            <Link
+              href={SELLER_PRODUCTS_PATH}
+              className="inline-flex text-sm font-medium text-sky-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:text-sky-300"
+            >
+              View all products
+            </Link>
+          </div>
         </section>
       ) : null}
 
@@ -311,12 +320,20 @@ export default function SellerHomePage() {
                     Catalog items you own. These are not auctions.
                   </p>
                 </div>
-                <Link
-                  href={SELLER_PRODUCTS_PATH}
-                  className="text-sm font-medium text-sky-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:text-sky-300"
-                >
-                  View all products
-                </Link>
+                <div className="flex flex-wrap items-center gap-3">
+                  <Link
+                    href={SELLER_PRODUCT_CREATE_PATH}
+                    className="text-sm font-medium text-sky-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:text-sky-300"
+                  >
+                    Create Product
+                  </Link>
+                  <Link
+                    href={SELLER_PRODUCTS_PATH}
+                    className="text-sm font-medium text-sky-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:text-sky-300"
+                  >
+                    View all products
+                  </Link>
+                </div>
               </div>
               <div className="mt-4 space-y-3">
                 {recentProducts.length > 0 ? (

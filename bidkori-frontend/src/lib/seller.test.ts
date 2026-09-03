@@ -2,6 +2,12 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  PRODUCT_CREATE_API_PATH,
+  PRODUCT_CREATE_METHOD,
+  PRODUCT_UPDATE_METHOD,
+  PRODUCT_WRITE_FIELDS,
+  SELLER_PRODUCT_DELETE_ENABLED,
+  emptyProductFormValues,
   filterSellerProducts,
   getRecentSellerAuctions,
   getRecentSellerProducts,
@@ -12,7 +18,12 @@ import {
   getSellerDashboardMetrics,
   isProductOwnedByUser,
   isSellerAuctionAwaitingFinalization,
+  productFormValuesFromProduct,
+  productUpdateApiPath,
+  productWritePayloadKeys,
+  serializeProductWritePayload,
   sortSellerProducts,
+  validateProductForm,
 } from './seller.ts';
 import type { Auction, Product } from './types.ts';
 
@@ -231,4 +242,73 @@ test('nested product PK without seller is not treated as owned', () => {
     auction({ id: 1, product: 44, product_title: 'Nested pk only' }),
   ];
   assert.equal(getSellerAuctions(auctions, 7).length, 0);
+});
+
+test('product create and update API paths and methods are catalog-only', () => {
+  assert.equal(PRODUCT_CREATE_API_PATH, '/products/');
+  assert.equal(PRODUCT_CREATE_METHOD, 'POST');
+  assert.equal(productUpdateApiPath(9), '/products/9/');
+  assert.equal(PRODUCT_UPDATE_METHOD, 'PATCH');
+});
+
+test('serializeProductWritePayload includes only allowed product fields', () => {
+  const source = {
+    title: '  Oak Chair  ',
+    description: ' Vintage wood ',
+    condition: 'USED_GOOD' as const,
+    seller: 7,
+    starting_bid: '100.00',
+    current_highest_bid: '150.00',
+    reserve_price: '200.00',
+    min_increment: '10.00',
+    category: 3,
+  };
+  const snapshot = { ...source };
+  const payload = serializeProductWritePayload(source);
+  assert.deepEqual(payload, {
+    title: 'Oak Chair',
+    description: 'Vintage wood',
+    condition: 'USED_GOOD',
+  });
+  assert.deepEqual(productWritePayloadKeys(payload).sort(), [
+    ...PRODUCT_WRITE_FIELDS,
+  ].sort());
+  assert.equal('seller' in payload, false);
+  assert.equal('starting_bid' in payload, false);
+  assert.equal('current_highest_bid' in payload, false);
+  assert.equal('reserve_price' in payload, false);
+  assert.equal('min_increment' in payload, false);
+  assert.equal('category' in payload, false);
+  assert.deepEqual(source, snapshot);
+});
+
+test('product form helpers do not mutate source product data', () => {
+  const item = product({
+    id: 4,
+    title: 'Lamp',
+    description: 'Brass',
+    condition: 'NEW',
+  });
+  const snapshot = { ...item };
+  const values = productFormValuesFromProduct(item);
+  values.title = 'Changed';
+  assert.equal(item.title, 'Lamp');
+  assert.deepEqual(item, snapshot);
+  const empty = emptyProductFormValues();
+  empty.title = 'X';
+  assert.equal(emptyProductFormValues().title, '');
+});
+
+test('validateProductForm requires a title and a known condition', () => {
+  const errors = validateProductForm({
+    title: '   ',
+    description: '',
+    condition: 'USED_GOOD',
+  });
+  assert.equal(errors.title, 'Title is required.');
+  assert.equal(errors.description, undefined);
+});
+
+test('product delete remains deferred because cascade is unsafe', () => {
+  assert.equal(SELLER_PRODUCT_DELETE_ENABLED, false);
 });

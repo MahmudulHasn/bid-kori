@@ -1,8 +1,16 @@
 import api from '@/lib/api';
+import {
+  PRODUCT_CREATE_API_PATH,
+  productUpdateApiPath,
+  type ProductWritePayload,
+} from '@/lib/seller';
 import type { Product } from '@/lib/types';
 
 /** SWR key / path for GET /api/products/my-listings/. */
 export const MY_LISTINGS_API_PATH = '/products/my-listings/';
+
+/** Collection path for GET list / POST create. */
+export const PRODUCTS_COLLECTION_API_PATH = PRODUCT_CREATE_API_PATH;
 
 export function unwrapProductList(data: unknown): Product[] {
   if (Array.isArray(data)) {
@@ -24,7 +32,11 @@ export async function fetchMyProducts(): Promise<Product[]> {
 }
 
 export function buildProductDetailApiPath(id: string | number): string {
-  return `/products/${id}/`;
+  return productUpdateApiPath(id);
+}
+
+export function buildProductUpdateApiPath(id: string | number): string {
+  return buildProductDetailApiPath(id);
 }
 
 export async function fetchProduct(id: string | number): Promise<Product> {
@@ -42,4 +54,19 @@ export async function productDetailFetcher(url: string): Promise<Product> {
 export async function myListingsFetcher(url: string): Promise<Product[]> {
   const { data } = await api.get<unknown>(url);
   return unwrapProductList(data);
+}
+
+export async function createProduct(
+  payload: ProductWritePayload,
+): Promise<Product> {
+  const { data } = await api.post<Product>(PRODUCT_CREATE_API_PATH, payload);
+  return data;
+}
+
+export async function updateProduct(
+  id: string | number,
+  payload: ProductWritePayload,
+): Promise<Product> {
+  const { data } = await api.patch<Product>(productUpdateApiPath(id), payload);
+  return data;
 }

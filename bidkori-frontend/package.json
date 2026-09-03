@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types --test src/lib/authRouting.test.ts src/lib/config.test.ts src/lib/auctionOwnership.test.ts src/lib/workspaceNavigation.test.ts src/lib/marketplace.test.ts src/lib/buyer.test.ts src/lib/auctionsApi.test.ts src/lib/seller.test.ts"
+    "test": "node --experimental-strip-types --test src/lib/authRouting.test.ts src/lib/config.test.ts src/lib/auctionOwnership.test.ts src/lib/workspaceNavigation.test.ts src/lib/marketplace.test.ts src/lib/buyer.test.ts src/lib/auctionsApi.test.ts src/lib/seller.test.ts src/lib/apiErrors.test.ts"
   },
   "dependencies": {
     "axios": "^1.20.0",
