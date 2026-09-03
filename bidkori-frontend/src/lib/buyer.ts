@@ -138,3 +138,210 @@ export function getBuyerDashboardMetrics(
     pendingCheckout: getPendingCheckoutAuctions(auctions, userId).length,
   };
 }
+
+export function parseBidAmount(value: string | number | undefined): number {
+  const amount = Number(value);
+  return Number.isFinite(amount) ? amount : 0;
+}
+
+/** Groups the buyer's bids by auction id without mutating the source list. */
+export function groupBuyerBidsByAuction(
+  bids: readonly UserBid[],
+): Map<number, UserBid[]> {
+  const groups = new Map<number, UserBid[]>();
+  for (const bid of bids) {
+    const auctionId = getBidAuctionId(bid);
+    if (auctionId == null) continue;
+    const existing = groups.get(auctionId);
+    if (existing) {
+      existing.push(bid);
+    } else {
+      groups.set(auctionId, [bid]);
+    }
+  }
+  return groups;
+}
+
+export function getBuyerHighestBid(bids: readonly UserBid[]): UserBid | null {
+  if (bids.length === 0) return null;
+  return bids.reduce((highest, bid) => {
+    const highestAmount = parseBidAmount(highest.amount);
+    const amount = parseBidAmount(bid.amount);
+    if (amount > highestAmount) return bid;
+    if (amount === highestAmount && bid.id > highest.id) return bid;
+    return highest;
+  });
+}
+
+export function getBuyerLatestBid(bids: readonly UserBid[]): UserBid | null {
+  if (bids.length === 0) return null;
+  return bids.reduce((latest, bid) => {
+    const recency = bidRecencyValue(bid) - bidRecencyValue(latest);
+    if (recency > 0) return bid;
+    if (recency === 0 && bid.id > latest.id) return bid;
+    return latest;
+  });
+}
+
+export type BuyerBidActivityStatus =
+  | 'currently_highest'
+  | 'outbid'
+  | 'awaiting_finalization'
+  | 'won'
+  | 'lost'
+  | 'cancelled'
+  | 'unresolved';
+
+export type BuyerMyBidsFilter = 'all' | 'active' | 'won' | 'ended';
+
+export type BuyerAuctionBidActivity = {
+  auctionId: number;
+  auction: Auction | null;
+  bids: UserBid[];
+  bidCount: number;
+  highestBid: UserBid;
+  latestBid: UserBid;
+  myHighestAmount: number;
+  currentHighestAmount: number | null;
+  latestBidAt: string | null;
+  status: BuyerBidActivityStatus;
+  statusLabel: string;
+};
+
+export function getBuyerBidActivityStatusLabel(
+  status: BuyerBidActivityStatus,
+): string {
+  switch (status) {
+    case 'currently_highest':
+      return 'Currently Highest';
+    case 'outbid':
+      return 'Outbid';
+    case 'awaiting_finalization':
+      return 'Awaiting finalization';
+    case 'won':
+      return 'Won';
+    case 'lost':
+      return 'Lost';
+    case 'cancelled':
+      return 'Cancelled';
+    case 'unresolved':
+      return 'Auction unavailable';
+  }
+}
+
+function isPastEndTime(auction: Auction, nowMs: number): boolean {
+  if (!auction.end_time) return false;
+  const endMs = new Date(auction.end_time).getTime();
+  return !Number.isNaN(endMs) && endMs <= nowMs;
+}
+
+/**
+ * Display status for one auction the buyer bid on.
+ * ACTIVE never uses winning_bidder. CLOSED uses winning_bidder only.
+ */
+export function getBuyerAuctionBidStatus(
+  auction: Auction | null,
+  myHighestAmount: number,
+  userId: number,
+  nowMs: number = Date.now(),
+): BuyerBidActivityStatus {
+  if (!auction) return 'unresolved';
+
+  const status = auction.status?.toUpperCase();
+
+  if (status === 'CANCELLED') return 'cancelled';
+
+  if (status === 'CLOSED') {
+    return winningBidderId(auction) === userId ? 'won' : 'lost';
+  }
+
+  if (status === 'ACTIVE' || !status) {
+    if (isPastEndTime(auction, nowMs)) {
+      return 'awaiting_finalization';
+    }
+    const current = parseBidAmount(auction.current_highest_bid);
+    if (!Number.isFinite(Number(auction.current_highest_bid))) {
+      return 'currently_highest';
+    }
+    if (myHighestAmount >= current) return 'currently_highest';
+    if (myHighestAmount < current) return 'outbid';
+  }
+
+  return 'unresolved';
+}
+
+export function matchesBuyerMyBidsFilter(
+  activity: Pick<BuyerAuctionBidActivity, 'status'>,
+  filter: BuyerMyBidsFilter,
+): boolean {
+  switch (filter) {
+    case 'all':
+      return true;
+    case 'active':
+      return (
+        activity.status === 'currently_highest' ||
+        activity.status === 'outbid' ||
+        activity.status === 'awaiting_finalization'
+      );
+    case 'won':
+      return activity.status === 'won';
+    case 'ended':
+      return activity.status === 'lost' || activity.status === 'cancelled';
+  }
+}
+
+/**
+ * One activity row per auction the buyer bid on, newest buyer activity first.
+ */
+export function buildBuyerBidActivity(
+  bids: readonly UserBid[],
+  auctionsById: ReadonlyMap<number, Auction>,
+  userId: number,
+  nowMs: number = Date.now(),
+): BuyerAuctionBidActivity[] {
+  const groups = groupBuyerBidsByAuction(bids);
+  const rows: BuyerAuctionBidActivity[] = [];
+
+  for (const [auctionId, groupedBids] of groups) {
+    const highestBid = getBuyerHighestBid(groupedBids);
+    const latestBid = getBuyerLatestBid(groupedBids);
+    if (!highestBid || !latestBid) continue;
+
+    const auction = auctionsById.get(auctionId) ?? null;
+    const myHighestAmount = parseBidAmount(highestBid.amount);
+    const currentHighestAmount = auction
+      ? parseBidAmount(auction.current_highest_bid)
+      : null;
+    const status = getBuyerAuctionBidStatus(
+      auction,
+      myHighestAmount,
+      userId,
+      nowMs,
+    );
+
+    rows.push({
+      auctionId,
+      auction,
+      bids: groupedBids.slice().sort((a, b) => {
+        const recency = bidRecencyValue(b) - bidRecencyValue(a);
+        if (recency !== 0) return recency;
+        return b.id - a.id;
+      }),
+      bidCount: groupedBids.length,
+      highestBid,
+      latestBid,
+      myHighestAmount,
+      currentHighestAmount,
+      latestBidAt: latestBid.timestamp ?? null,
+      status,
+      statusLabel: getBuyerBidActivityStatusLabel(status),
+    });
+  }
+
+  return rows.sort((a, b) => {
+    const recency = bidRecencyValue(b.latestBid) - bidRecencyValue(a.latestBid);
+    if (recency !== 0) return recency;
+    if (b.latestBid.id !== a.latestBid.id) return b.latestBid.id - a.latestBid.id;
+    return b.auctionId - a.auctionId;
+  });
+}

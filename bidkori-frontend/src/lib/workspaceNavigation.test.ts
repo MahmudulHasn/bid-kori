@@ -60,6 +60,11 @@ test('buyer config does not contain seller/admin-only items', () => {
   assert.ok(ids.has('won-auctions'));
   assert.ok(ids.has('watchlist'));
   assert.equal(WORKSPACE_CONFIGS.BUYER.brandTitle, 'BidKori Buyer');
+  const myBids = WORKSPACE_CONFIGS.BUYER.navItems.find((item) => item.id === 'my-bids');
+  assert.equal(myBids?.enabled, true);
+  assert.equal(myBids?.href, '/buyer/my-bids');
+  const won = WORKSPACE_CONFIGS.BUYER.navItems.find((item) => item.id === 'won-auctions');
+  assert.equal(won?.enabled, false);
 });
 
 test('seller config does not contain buyer/admin-only items', () => {
@@ -97,6 +102,8 @@ test('active-route detection handles nested paths', () => {
   const sellerHome = getRoleHome('SELLER');
   const dashboard = { href: '/seller', enabled: true as const };
   const products = { href: '/seller/products', enabled: true as const };
+  const buyerHome = getRoleHome('BUYER');
+  const myBids = { href: '/buyer/my-bids', enabled: true as const };
 
   assert.equal(isNavItemActive('/seller', dashboard, sellerHome), true);
   assert.equal(isNavItemActive('/seller/', dashboard, sellerHome), true);
@@ -117,6 +124,11 @@ test('active-route detection handles nested paths', () => {
     true,
   );
   assert.equal(isNavItemActive('/seller', products, sellerHome), false);
+  assert.equal(isNavItemActive('/buyer/my-bids', myBids, buyerHome), true);
+  assert.equal(
+    isNavItemActive('/buyer/my-bids', { href: '/buyer', enabled: true }, buyerHome),
+    false,
+  );
 });
 
 test('disabled items cannot be treated as navigable', () => {

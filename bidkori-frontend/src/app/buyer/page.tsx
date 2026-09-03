@@ -218,10 +218,10 @@ export default function BuyerHomePage() {
                 </p>
               </div>
               <Link
-                href={MARKETPLACE_ROUTES.auctions}
+                href="/buyer/my-bids"
                 className="text-sm font-medium text-amber-700 hover:underline dark:text-amber-300"
               >
-                Explore Marketplace
+                View my bids
               </Link>
             </div>
             {recentAuctions.length > 0 ? (
