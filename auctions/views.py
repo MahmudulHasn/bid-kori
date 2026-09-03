@@ -17,6 +17,10 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .models import Auction, AuctionImage, Bid, Payment
+from .mutation_policy import (
+    IMAGE_UPLOAD_FROZEN_MESSAGE,
+    AuctionMutationPolicy,
+)
 from .permissions import (
     IsAuctionSellerOrReadOnly,
     IsNotSeller,
@@ -454,17 +458,26 @@ class AuctionImageUploadView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Validate via schema serializer (keeps Swagger + runtime aligned).
-        upload_serializer = AuctionImageUploadSerializer(
-            data={'images': files},
-            context={'request': request, 'auction': auction},
-        )
-        upload_serializer.is_valid(raise_exception=True)
+        with transaction.atomic():
+            auction = AuctionMutationPolicy.lock_auction(auction.pk)
+            self.check_object_permissions(request, auction)
+            if not AuctionMutationPolicy.is_configuration_mutable(auction):
+                return Response(
+                    {'error': IMAGE_UPLOAD_FROZEN_MESSAGE},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
-        created = [
-            AuctionImage.objects.create(auction=auction, image=image_file)
-            for image_file in upload_serializer.validated_data['images']
-        ]
+            upload_serializer = AuctionImageUploadSerializer(
+                data={'images': files},
+                context={'request': request, 'auction': auction},
+            )
+            upload_serializer.is_valid(raise_exception=True)
+
+            created = [
+                AuctionImage.objects.create(auction=auction, image=image_file)
+                for image_file in upload_serializer.validated_data['images']
+            ]
+
         serializer = AuctionImageSerializer(
             created,
             many=True,

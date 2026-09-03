@@ -60,7 +60,7 @@ class AuctionAuthorizationTests(APITestCase):
             starting_bid=100,
             current_highest_bid=100,
             min_increment=10,
-            start_time=now,
+            start_time=now + timedelta(hours=1),
             end_time=now + timedelta(days=1),
             status=Auction.Status.ACTIVE,
         )
@@ -69,14 +69,29 @@ class AuctionAuthorizationTests(APITestCase):
         self.client.credentials(HTTP_AUTHORIZATION=f'Token {token.key}')
 
     def test_owner_can_patch_own_auction(self):
-        auction = self._create_auction()
+        now = timezone.now()
+        seller = self.owner
+        product = Product.objects.create(
+            seller=seller,
+            title='Editable Item',
+            description='Desc',
+        )
+        auction = Auction.objects.create(
+            product=product,
+            starting_bid=100,
+            current_highest_bid=100,
+            min_increment=10,
+            start_time=now + timedelta(days=1),
+            end_time=now + timedelta(days=2),
+            status=Auction.Status.ACTIVE,
+        )
         self._auth(self.owner_token)
         response = self.client.patch(
             f'/api/auctions/{auction.pk}/',
             {'min_increment': '15.00'},
             format='json',
         )
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 200, response.data)
         auction.refresh_from_db()
         self.assertEqual(float(auction.min_increment), 15.0)
 
@@ -1073,8 +1088,8 @@ class AuctionImageUploadHardeningTests(APITestCase):
             starting_bid=100,
             current_highest_bid=100,
             min_increment=10,
-            start_time=now - timedelta(hours=1),
-            end_time=now + timedelta(days=1),
+            start_time=now + timedelta(days=1),
+            end_time=now + timedelta(days=2),
             status=Auction.Status.ACTIVE,
         )
 
@@ -1656,3 +1671,281 @@ class ExistingProductAuctionCreateTests(APITestCase):
         self.assertEqual(detail.status_code, 200)
         self.assertIsInstance(detail.data['product'], dict)
         self.assertEqual(detail.data['product']['id'], self.product.pk)
+
+
+@override_settings(
+    STORAGES={
+        'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
+        'staticfiles': {
+            'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
+        },
+    }
+)
+class AuctionMutationFreezeTests(APITestCase):
+    """Economic + image mutation freeze after start or bids (BE-A02)."""
+
+    def setUp(self):
+        from users.models import UserProfile, ensure_user_profile
+
+        from .models import Bid
+
+        self.Bid = Bid
+        self.seller = User.objects.create_user(
+            username='freeze_seller',
+            email='freeze_seller@test.com',
+            password='pass12345',
+        )
+        self.other = User.objects.create_user(
+            username='freeze_other',
+            email='freeze_other@test.com',
+            password='pass12345',
+        )
+        self.buyer = User.objects.create_user(
+            username='freeze_buyer',
+            email='freeze_buyer@test.com',
+            password='pass12345',
+        )
+        self.admin = User.objects.create_user(
+            username='freeze_admin',
+            email='freeze_admin@test.com',
+            password='pass12345',
+            is_staff=True,
+        )
+        ensure_user_profile(self.seller, role=UserProfile.Role.SELLER)
+        ensure_user_profile(self.other, role=UserProfile.Role.SELLER)
+        ensure_user_profile(self.buyer, role=UserProfile.Role.BUYER)
+        # Staff/ADMIN is derived from is_staff; profile role stays a public role.
+        ensure_user_profile(self.admin, role=UserProfile.Role.SELLER)
+
+        self.seller_token = Token.objects.create(user=self.seller)
+        self.other_token = Token.objects.create(user=self.other)
+        self.admin_token = Token.objects.create(user=self.admin)
+        self.now = timezone.now()
+
+    def _auth(self, token):
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {token.key}')
+
+    def _create_auction(
+        self,
+        *,
+        seller=None,
+        start_offset=timedelta(days=1),
+        end_offset=timedelta(days=2),
+        status=Auction.Status.ACTIVE,
+        with_bid=False,
+    ):
+        seller = seller or self.seller
+        product = Product.objects.create(
+            seller=seller,
+            title='Freeze Item',
+            description='Desc',
+        )
+        auction = Auction.objects.create(
+            product=product,
+            starting_bid=100,
+            current_highest_bid=100,
+            min_increment=10,
+            reserve_price=150,
+            start_time=self.now + start_offset,
+            end_time=self.now + end_offset,
+            status=status,
+        )
+        if with_bid:
+            self.Bid.objects.create(
+                auction=auction,
+                bidder=self.buyer,
+                amount=110,
+            )
+        return auction
+
+    def _assert_frozen_patch(self, auction, payload):
+        self._auth(self.seller_token)
+        before = {
+            'starting_bid': auction.starting_bid,
+            'min_increment': auction.min_increment,
+            'reserve_price': auction.reserve_price,
+            'start_time': auction.start_time,
+            'end_time': auction.end_time,
+        }
+        response = self.client.patch(
+            f'/api/auctions/{auction.pk}/',
+            payload,
+            format='json',
+        )
+        self.assertEqual(response.status_code, 400, response.data)
+        body = str(response.data).lower()
+        self.assertIn('no longer be edited', body)
+        auction.refresh_from_db()
+        self.assertEqual(auction.starting_bid, before['starting_bid'])
+        self.assertEqual(auction.min_increment, before['min_increment'])
+        self.assertEqual(auction.reserve_price, before['reserve_price'])
+        self.assertEqual(auction.start_time, before['start_time'])
+        self.assertEqual(auction.end_time, before['end_time'])
+
+    def test_owner_can_patch_before_start_without_bids(self):
+        auction = self._create_auction()
+        self._auth(self.seller_token)
+        response = self.client.patch(
+            f'/api/auctions/{auction.pk}/',
+            {
+                'starting_bid': '120.00',
+                'min_increment': '20.00',
+                'reserve_price': '200.00',
+                'start_time': (self.now + timedelta(days=1, hours=2)).isoformat(),
+                'end_time': (self.now + timedelta(days=3)).isoformat(),
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        auction.refresh_from_db()
+        self.assertEqual(str(auction.starting_bid), '120.00')
+        self.assertEqual(str(auction.min_increment), '20.00')
+        self.assertEqual(str(auction.reserve_price), '200.00')
+
+    def test_product_cannot_be_rebound_on_patch(self):
+        auction = self._create_auction()
+        other_product = Product.objects.create(
+            seller=self.seller,
+            title='Other',
+            description='x',
+        )
+        self._auth(self.seller_token)
+        response = self.client.patch(
+            f'/api/auctions/{auction.pk}/',
+            {'product': other_product.pk},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 400)
+        auction.refresh_from_db()
+        self.assertNotEqual(auction.product_id, other_product.pk)
+
+    def test_other_seller_cannot_edit(self):
+        auction = self._create_auction()
+        self._auth(self.other_token)
+        response = self.client.patch(
+            f'/api/auctions/{auction.pk}/',
+            {'min_increment': '99.00'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_started_auction_rejects_economic_and_timing_edits(self):
+        auction = self._create_auction(start_offset=timedelta(hours=-1))
+        for payload in (
+            {'starting_bid': '999.00'},
+            {'min_increment': '99.00'},
+            {'reserve_price': '999.00'},
+            {'start_time': (self.now + timedelta(days=5)).isoformat()},
+            {'end_time': (self.now + timedelta(days=10)).isoformat()},
+        ):
+            with self.subTest(payload=payload):
+                self._assert_frozen_patch(auction, payload)
+
+    def test_future_start_with_bid_rejects_patch(self):
+        auction = self._create_auction(
+            start_offset=timedelta(days=2),
+            end_offset=timedelta(days=3),
+            with_bid=True,
+        )
+        self.assertEqual(self.Bid.objects.filter(auction=auction).count(), 1)
+        self._assert_frozen_patch(auction, {'starting_bid': '250.00'})
+        self.assertEqual(self.Bid.objects.filter(auction=auction).count(), 1)
+
+    def test_closed_and_cancelled_reject_economic_edit(self):
+        closed = self._create_auction(
+            start_offset=timedelta(hours=-2),
+            end_offset=timedelta(hours=-1),
+            status=Auction.Status.CLOSED,
+        )
+        cancelled = self._create_auction(
+            start_offset=timedelta(days=1),
+            status=Auction.Status.CANCELLED,
+        )
+        self._assert_frozen_patch(closed, {'min_increment': '50.00'})
+        self._assert_frozen_patch(cancelled, {'min_increment': '50.00'})
+
+    def test_admin_also_cannot_bypass_freeze_via_api(self):
+        auction = self._create_auction(start_offset=timedelta(hours=-1))
+        self._auth(self.admin_token)
+        # Admin is not the product seller — ownership still applies.
+        denied = self.client.patch(
+            f'/api/auctions/{auction.pk}/',
+            {'min_increment': '50.00'},
+            format='json',
+        )
+        self.assertEqual(denied.status_code, 403)
+
+        # Even if staff owns the auction, lifecycle freeze still applies.
+        owned = self._create_auction(
+            seller=self.admin,
+            start_offset=timedelta(hours=-1),
+        )
+        self._auth(self.admin_token)
+        frozen = self.client.patch(
+            f'/api/auctions/{owned.pk}/',
+            {'min_increment': '50.00'},
+            format='json',
+        )
+        self.assertEqual(frozen.status_code, 400, frozen.data)
+        self.assertIn('no longer be edited', str(frozen.data).lower())
+
+    def test_owner_can_upload_image_before_start_without_bids(self):
+        auction = self._create_auction()
+        self._auth(self.seller_token)
+        response = self.client.post(
+            f'/api/auctions/{auction.pk}/images/',
+            {'images': _make_test_image()},
+            format='multipart',
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(auction.images.count(), 1)
+
+    def test_image_upload_frozen_when_started_or_has_bids(self):
+        started = self._create_auction(start_offset=timedelta(hours=-1))
+        with_bids = self._create_auction(
+            start_offset=timedelta(days=2),
+            with_bid=True,
+        )
+        closed = self._create_auction(
+            start_offset=timedelta(hours=-2),
+            status=Auction.Status.CLOSED,
+        )
+        cancelled = self._create_auction(
+            start_offset=timedelta(days=1),
+            status=Auction.Status.CANCELLED,
+        )
+        self._auth(self.seller_token)
+        for auction in (started, with_bids, closed, cancelled):
+            with self.subTest(auction_id=auction.pk, status=auction.status):
+                before = auction.images.count()
+                response = self.client.post(
+                    f'/api/auctions/{auction.pk}/images/',
+                    {'images': _make_test_image()},
+                    format='multipart',
+                )
+                self.assertEqual(response.status_code, 400, response.data)
+                self.assertIn('images cannot be changed', str(response.data).lower())
+                self.assertEqual(auction.images.count(), before)
+
+    def test_other_seller_still_cannot_upload_images(self):
+        auction = self._create_auction()
+        self._auth(self.other_token)
+        response = self.client.post(
+            f'/api/auctions/{auction.pk}/images/',
+            {'images': _make_test_image()},
+            format='multipart',
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(auction.images.count(), 0)
+
+    def test_cancel_transition_still_works_after_freeze_rules(self):
+        auction = self._create_auction(start_offset=timedelta(hours=-1))
+        self._auth(self.seller_token)
+        response = self.client.post(
+            f'/api/auctions/{auction.pk}/transition/',
+            {'status': 'CANCELLED'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        auction.refresh_from_db()
+        self.assertEqual(auction.status, Auction.Status.CANCELLED)

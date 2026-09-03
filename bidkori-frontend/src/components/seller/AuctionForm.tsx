@@ -5,15 +5,23 @@ import { useState, type FormEvent } from 'react';
 import {
   validateAuctionForm,
   type AuctionFormField,
+  type AuctionFormMode,
   type AuctionFormValues,
 } from '@/lib/auctionCreateContract';
 import { formatSellerProductCondition } from '@/lib/seller';
-import type { Product } from '@/lib/types';
+
+/** Minimal product context — create passes full Product; edit uses nested Auction product. */
+export type AuctionFormProductContext = {
+  id: number;
+  title: string;
+  condition?: string;
+};
 
 const fieldClassName =
   'w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm outline-none ring-sky-500/40 focus:ring-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900';
 
 export default function AuctionForm({
+  mode = 'create',
   selectedProduct,
   initialValues,
   submitting,
@@ -23,16 +31,21 @@ export default function AuctionForm({
   fieldErrors,
   onSubmit,
 }: {
-  selectedProduct: Product | null;
+  mode?: AuctionFormMode;
+  selectedProduct: AuctionFormProductContext | null;
   initialValues: AuctionFormValues;
   submitting: boolean;
   submitLabel: string;
   submittingLabel: string;
   formError?: string;
   fieldErrors?: Partial<Record<AuctionFormField, string>>;
-  onSubmit: (values: AuctionFormValues) => void;
+  onSubmit: (
+    values: AuctionFormValues,
+    options: { changeReserve: boolean },
+  ) => void;
 }) {
   const [values, setValues] = useState<AuctionFormValues>(initialValues);
+  const [changeReserve, setChangeReserve] = useState(false);
   const [clientErrors, setClientErrors] = useState<
     Partial<Record<AuctionFormField, string>>
   >({});
@@ -46,11 +59,15 @@ export default function AuctionForm({
     const nextErrors = validateAuctionForm(
       values,
       selectedProduct?.id ?? null,
+      { mode, changeReserve },
     );
     setClientErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
-    onSubmit(values);
+    onSubmit(values, { changeReserve: mode === 'edit' ? changeReserve : false });
   };
+
+  const canSubmit =
+    mode === 'edit' ? Boolean(selectedProduct) : Boolean(selectedProduct);
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5" noValidate>
@@ -71,7 +88,7 @@ export default function AuctionForm({
           id="auction-product-context-heading"
           className="text-sm font-semibold text-zinc-900 dark:text-white"
         >
-          Selected product
+          {mode === 'edit' ? 'Product (fixed)' : 'Selected product'}
         </h2>
         {selectedProduct ? (
           <dl className="mt-2 space-y-1 text-sm text-zinc-600 dark:text-zinc-400">
@@ -92,9 +109,16 @@ export default function AuctionForm({
           </dl>
         ) : (
           <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
-            Choose a product above before configuring auction terms.
+            {mode === 'edit'
+              ? 'Product context is unavailable for this auction.'
+              : 'Choose a product above before configuring auction terms.'}
           </p>
         )}
+        {mode === 'edit' ? (
+          <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+            The product cannot be changed after the auction is created.
+          </p>
+        ) : null}
         {errorFor('product') ? (
           <p
             id="auction-product-error"
@@ -173,56 +197,125 @@ export default function AuctionForm({
           >
             {errorFor('min_increment')}
           </p>
-        ) : (
+        ) : mode === 'create' ? (
           <p className="text-xs text-zinc-500 dark:text-zinc-400">
             Prefills the platform default of 100.00.
           </p>
-        )}
+        ) : null}
       </label>
 
-      <label className="block space-y-1.5">
-        <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-          Reserve Price{' '}
-          <span className="font-normal text-zinc-500">(optional)</span>
-        </span>
-        <input
-          type="text"
-          name="reserve_price"
-          inputMode="decimal"
-          autoComplete="off"
-          value={values.reserve_price}
-          disabled={submitting}
-          aria-invalid={Boolean(errorFor('reserve_price'))}
-          aria-describedby={
-            errorFor('reserve_price')
-              ? 'auction-reserve-error'
-              : 'auction-reserve-help'
-          }
-          onChange={(event) =>
-            setValues((current) => ({
-              ...current,
-              reserve_price: event.target.value,
-            }))
-          }
-          className={fieldClassName}
-        />
-        {errorFor('reserve_price') ? (
+      {mode === 'edit' ? (
+        <fieldset className="space-y-3 rounded-xl border border-zinc-200 px-4 py-3 dark:border-zinc-800">
+          <legend className="px-1 text-sm font-medium text-zinc-700 dark:text-zinc-300">
+            Reserve Price
+          </legend>
           <p
-            id="auction-reserve-error"
-            className="text-sm text-red-700 dark:text-red-300"
-          >
-            {errorFor('reserve_price')}
-          </p>
-        ) : (
-          <p
-            id="auction-reserve-help"
+            id="auction-reserve-hidden-help"
             className="text-xs text-zinc-500 dark:text-zinc-400"
           >
-            Optional minimum final bid required for the auction to result in a
-            winner. Not shown on public marketplace pages.
+            Current reserve is hidden by the API. Leave unchanged unless you
+            explicitly set a new reserve.
           </p>
-        )}
-      </label>
+          <label className="flex items-start gap-2 text-sm text-zinc-800 dark:text-zinc-200">
+            <input
+              type="checkbox"
+              name="change_reserve"
+              checked={changeReserve}
+              disabled={submitting}
+              aria-describedby="auction-reserve-hidden-help"
+              onChange={(event) => {
+                const checked = event.target.checked;
+                setChangeReserve(checked);
+                if (!checked) {
+                  setValues((current) => ({ ...current, reserve_price: '' }));
+                }
+              }}
+              className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-sky-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500"
+            />
+            <span>Change reserve price</span>
+          </label>
+          {changeReserve ? (
+            <label className="block space-y-1.5">
+              <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                New reserve price
+              </span>
+              <input
+                type="text"
+                name="reserve_price"
+                inputMode="decimal"
+                autoComplete="off"
+                value={values.reserve_price}
+                disabled={submitting}
+                aria-invalid={Boolean(errorFor('reserve_price'))}
+                aria-describedby={
+                  errorFor('reserve_price')
+                    ? 'auction-reserve-error'
+                    : undefined
+                }
+                onChange={(event) =>
+                  setValues((current) => ({
+                    ...current,
+                    reserve_price: event.target.value,
+                  }))
+                }
+                className={fieldClassName}
+              />
+              {errorFor('reserve_price') ? (
+                <p
+                  id="auction-reserve-error"
+                  className="text-sm text-red-700 dark:text-red-300"
+                >
+                  {errorFor('reserve_price')}
+                </p>
+              ) : null}
+            </label>
+          ) : null}
+        </fieldset>
+      ) : (
+        <label className="block space-y-1.5">
+          <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+            Reserve Price{' '}
+            <span className="font-normal text-zinc-500">(optional)</span>
+          </span>
+          <input
+            type="text"
+            name="reserve_price"
+            inputMode="decimal"
+            autoComplete="off"
+            value={values.reserve_price}
+            disabled={submitting}
+            aria-invalid={Boolean(errorFor('reserve_price'))}
+            aria-describedby={
+              errorFor('reserve_price')
+                ? 'auction-reserve-error'
+                : 'auction-reserve-help'
+            }
+            onChange={(event) =>
+              setValues((current) => ({
+                ...current,
+                reserve_price: event.target.value,
+              }))
+            }
+            className={fieldClassName}
+          />
+          {errorFor('reserve_price') ? (
+            <p
+              id="auction-reserve-error"
+              className="text-sm text-red-700 dark:text-red-300"
+            >
+              {errorFor('reserve_price')}
+            </p>
+          ) : (
+            <p
+              id="auction-reserve-help"
+              className="text-xs text-zinc-500 dark:text-zinc-400"
+            >
+              Optional minimum final bid required for the auction to result in a
+              winner. Not shown on public marketplace pages.
+            </p>
+          )}
+        </label>
+      )}
 
       <div className="grid gap-5 sm:grid-cols-2">
         <label className="block space-y-1.5">
@@ -290,7 +383,7 @@ export default function AuctionForm({
 
       <button
         type="submit"
-        disabled={submitting || !selectedProduct}
+        disabled={submitting || !canSubmit}
         aria-busy={submitting}
         className="inline-flex items-center justify-center rounded-lg bg-sky-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 disabled:cursor-not-allowed disabled:opacity-60"
       >

@@ -144,6 +144,10 @@ export function sellerAuctionDetailPath(id: string | number): string {
   return `${SELLER_AUCTIONS_PATH}/${id}`;
 }
 
+export function sellerAuctionEditPath(id: string | number): string {
+  return `${SELLER_AUCTIONS_PATH}/${id}/edit`;
+}
+
 /**
  * Seller existing-product auction create route.
  * Optional `product` query is a UX hint validated on the create page.

@@ -17,17 +17,17 @@ import {
   getAuctionProduct,
   getAuctionTitle,
 } from '@/lib/auctionDisplay';
+import AuctionImageUploadSection from '@/components/seller/AuctionImageUploadSection';
 import {
   AUCTIONS_LIST_API_PATH,
   auctionDetailFetcher,
   buildAuctionDetailApiPath,
   cancelAuction,
 } from '@/lib/auctionsApi';
-import { canSellerCancelAuction } from '@/lib/auctionManagementSafety';
 import {
-  SELLER_AUCTION_IMAGE_DELETE_ENABLED,
-  SELLER_AUCTION_IMAGE_UPLOAD_ENABLED,
-} from '@/lib/auctionImageSafety';
+  canSellerCancelAuction,
+  canSellerEditAuction,
+} from '@/lib/auctionManagementSafety';
 import { resolveMediaUrl } from '@/lib/media';
 import {
   getSellerAuctionDisplayStatus,
@@ -36,6 +36,7 @@ import {
 } from '@/lib/seller';
 import {
   SELLER_AUCTIONS_PATH,
+  sellerAuctionEditPath,
   sellerProductDetailPath,
 } from '@/lib/workspaceNavigation';
 import type { Auction, AuthUser } from '@/lib/types';
@@ -62,10 +63,12 @@ function OwnedAuctionDetail({
   auction,
   user,
   onCancelled,
+  onImagesUpdated,
 }: {
   auction: Auction;
   user: AuthUser;
   onCancelled: (next: Auction) => Promise<void>;
+  onImagesUpdated: (next: Auction) => Promise<void>;
 }) {
   const title = getAuctionTitle(auction);
   const product = getAuctionProduct(auction);
@@ -84,6 +87,7 @@ function OwnedAuctionDetail({
   const [cancelError, setCancelError] = useState<string>();
 
   const showCancel = canSellerCancelAuction(auction, user);
+  const showEdit = canSellerEditAuction(auction, user);
 
   const imageUrls = useMemo(() => {
     return (auction.images ?? [])
@@ -123,69 +127,78 @@ function OwnedAuctionDetail({
         <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
           Auction summary for a listing you own.
         </p>
-        {showCancel ? (
+        <div className="mt-4 flex flex-wrap gap-3">
+          {showEdit ? (
+            <Link
+              href={sellerAuctionEditPath(auction.id)}
+              className="inline-flex items-center justify-center rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
+            >
+              Edit Auction
+            </Link>
+          ) : null}
+          {showCancel && cancelPhase === 'idle' ? (
+            <button
+              type="button"
+              onClick={() => {
+                setCancelError(undefined);
+                setCancelPhase('confirming');
+              }}
+              className="inline-flex items-center justify-center rounded-lg border border-red-300 px-3 py-1.5 text-sm font-semibold text-red-700 transition hover:bg-red-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500 dark:border-red-800 dark:text-red-300 dark:hover:bg-red-950"
+            >
+              Cancel Auction
+            </button>
+          ) : null}
+        </div>
+        {showCancel && cancelPhase !== 'idle' ? (
           <div className="mt-4 space-y-3">
-            {cancelPhase === 'idle' ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setCancelError(undefined);
-                  setCancelPhase('confirming');
-                }}
-                className="inline-flex items-center justify-center rounded-lg border border-red-300 px-3 py-1.5 text-sm font-semibold text-red-700 transition hover:bg-red-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500 dark:border-red-800 dark:text-red-300 dark:hover:bg-red-950"
+            <div
+              role="group"
+              aria-labelledby="cancel-auction-confirm-heading"
+              className="rounded-2xl border border-red-200 bg-red-50 px-4 py-4 dark:border-red-900 dark:bg-red-950/40"
+            >
+              <h2
+                id="cancel-auction-confirm-heading"
+                className="text-sm font-semibold text-red-900 dark:text-red-200"
               >
-                Cancel Auction
-              </button>
-            ) : (
-              <div
-                role="group"
-                aria-labelledby="cancel-auction-confirm-heading"
-                className="rounded-2xl border border-red-200 bg-red-50 px-4 py-4 dark:border-red-900 dark:bg-red-950/40"
-              >
-                <h2
-                  id="cancel-auction-confirm-heading"
-                  className="text-sm font-semibold text-red-900 dark:text-red-200"
+                Cancel auction?
+              </h2>
+              <p className="mt-2 text-sm text-red-800 dark:text-red-300">
+                This action changes the auction lifecycle and cannot be undone
+                from this page. Bidding stops and checkout remains blocked.
+              </p>
+              {cancelError ? (
+                <p
+                  role="alert"
+                  className="mt-3 text-sm font-medium text-red-900 dark:text-red-200"
                 >
-                  Cancel auction?
-                </h2>
-                <p className="mt-2 text-sm text-red-800 dark:text-red-300">
-                  This action changes the auction lifecycle and cannot be undone
-                  from this page. Bidding stops and checkout remains blocked.
+                  {cancelError}
                 </p>
-                {cancelError ? (
-                  <p
-                    role="alert"
-                    className="mt-3 text-sm font-medium text-red-900 dark:text-red-200"
-                  >
-                    {cancelError}
-                  </p>
-                ) : null}
-                <div className="mt-4 flex flex-wrap gap-3">
-                  <button
-                    type="button"
-                    disabled={cancelPhase === 'submitting'}
-                    onClick={() => {
-                      setCancelPhase('idle');
-                      setCancelError(undefined);
-                    }}
-                    className="inline-flex rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-800 transition hover:bg-zinc-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
-                  >
-                    Keep Auction
-                  </button>
-                  <button
-                    type="button"
-                    disabled={cancelPhase === 'submitting'}
-                    aria-busy={cancelPhase === 'submitting'}
-                    onClick={() => void handleCancel()}
-                    className="inline-flex rounded-lg bg-red-700 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-red-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {cancelPhase === 'submitting'
-                      ? 'Cancelling…'
-                      : 'Cancel Auction'}
-                  </button>
-                </div>
+              ) : null}
+              <div className="mt-4 flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  disabled={cancelPhase === 'submitting'}
+                  onClick={() => {
+                    setCancelPhase('idle');
+                    setCancelError(undefined);
+                  }}
+                  className="inline-flex rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-800 transition hover:bg-zinc-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+                >
+                  Keep Auction
+                </button>
+                <button
+                  type="button"
+                  disabled={cancelPhase === 'submitting'}
+                  aria-busy={cancelPhase === 'submitting'}
+                  onClick={() => void handleCancel()}
+                  className="inline-flex rounded-lg bg-red-700 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-red-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {cancelPhase === 'submitting'
+                    ? 'Cancelling…'
+                    : 'Cancel Auction'}
+                </button>
               </div>
-            )}
+            </div>
           </div>
         ) : null}
       </header>
@@ -233,13 +246,11 @@ function OwnedAuctionDetail({
         </div>
       )}
 
-      {!SELLER_AUCTION_IMAGE_UPLOAD_ENABLED &&
-      !SELLER_AUCTION_IMAGE_DELETE_ENABLED ? (
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">
-          Image upload and removal are unavailable until auction image
-          lifecycle guards exist. Existing photos remain view-only here.
-        </p>
-      ) : null}
+      <AuctionImageUploadSection
+        auction={auction}
+        user={user}
+        onUploaded={onImagesUpdated}
+      />
 
       <section
         aria-labelledby="auction-details-heading"
@@ -369,6 +380,15 @@ export default function SellerAuctionDetailPage() {
     await mutateGlobal(AUCTIONS_LIST_API_PATH);
   };
 
+  const handleImagesUpdated = async (next: Auction) => {
+    if (next?.id != null && next.images) {
+      await mutate(next, { revalidate: false });
+    } else {
+      await mutate();
+    }
+    await mutateGlobal(AUCTIONS_LIST_API_PATH);
+  };
+
   return (
     <div className="space-y-8">
       <p>
@@ -437,6 +457,7 @@ export default function SellerAuctionDetailPage() {
           auction={auction}
           user={user}
           onCancelled={handleCancelled}
+          onImagesUpdated={handleImagesUpdated}
         />
       ) : null}
     </div>

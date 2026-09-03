@@ -1,24 +1,19 @@
 /**
- * Seller Auction image management safety gates (S07).
- *
- * Backend contract (read-only audit):
+ * Seller Auction image management safety gates.
  *
  * UPLOAD — POST /api/auctions/<auction_id>/images/ (multipart field `images`).
- *   Ownership: IsAuctionSellerOrReadOnly + object check on product.seller.
- *   Validation: Pillow content inspection; size/dimension/format quotas.
- *   Caps: AUCTION_IMAGE_MAX_PER_AUCTION=10, AUCTION_IMAGE_MAX_PER_REQUEST=5.
- *   Lifecycle: NO freeze — owner may upload while ACTIVE (with bids), CLOSED,
- *   or CANCELLED. Same integrity class as economic edit after bidding starts.
+ * Allowed by backend only while pre-freeze (same rule as economic edit).
+ * Frontend mirrors status + start_time; Bid existence is backend-authoritative.
  *
- * DELETE IMAGE — no dedicated AuctionImage delete route. Only Auction DELETE
- *   cascades images (and bids/payments). Not safe to expose as image remove.
- *
- * REORDER / PRIMARY — AuctionImage has id, image, uploaded_at only (ordered by
- *   uploaded_at). No is_primary, display_order, or reorder endpoint.
+ * DELETE / REORDER / PRIMARY — still unsupported by the API.
  */
 
-/** Ownership is hardened, but live listing appearance can still change after bids. */
-export const SELLER_AUCTION_IMAGE_UPLOAD_ENABLED = false;
+import { isAuctionOwnedByUser } from './auctionOwnership.ts';
+import { isAuctionPreFreezeByClientClock } from './auctionManagementSafety.ts';
+import type { AuthUser, Auction } from './types.ts';
+
+/** Feature shipped; per-auction UX uses freeze helpers. */
+export const SELLER_AUCTION_IMAGE_UPLOAD_ENABLED = true;
 
 /** No ownership-scoped AuctionImage DELETE endpoint exists. */
 export const SELLER_AUCTION_IMAGE_DELETE_ENABLED = false;
@@ -29,9 +24,6 @@ export const SELLER_AUCTION_IMAGE_REORDER_ENABLED = false;
 /** No is_primary / cover field on AuctionImage. */
 export const SELLER_AUCTION_IMAGE_PRIMARY_ENABLED = false;
 
-export const SELLER_AUCTION_IMAGE_UPLOAD_BLOCK_REASON =
-  'UPLOAD DEFERRED — BACKEND GUARD REQUIRED';
-
 export const SELLER_AUCTION_IMAGE_DELETE_BLOCK_REASON =
   'IMAGE DELETE DEFERRED — BACKEND GUARD REQUIRED';
 
@@ -41,7 +33,6 @@ export const SELLER_AUCTION_IMAGE_REORDER_BLOCK_REASON =
 export const SELLER_AUCTION_IMAGE_PRIMARY_BLOCK_REASON =
   'PRIMARY IMAGE DEFERRED — BACKEND GUARD REQUIRED';
 
-/** Documented upload route (not wired into Seller UI while deferred). */
 export const AUCTION_IMAGE_UPLOAD_METHOD = 'POST';
 export const AUCTION_IMAGE_UPLOAD_FIELD = 'images';
 
@@ -52,15 +43,27 @@ export const AUCTION_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 export const AUCTION_IMAGE_ACCEPT =
   'image/jpeg,image/png,image/webp,image/gif';
 
+export const AUCTION_IMAGE_ALLOWED_MIME_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+] as const;
+
 export function buildAuctionImagesUploadApiPath(
   auctionId: string | number,
 ): string {
   return `/auctions/${auctionId}/images/`;
 }
 
-/** Always false until backend lifecycle freeze + (for delete) a real endpoint. */
-export function canSellerUploadAuctionImages(): boolean {
-  return SELLER_AUCTION_IMAGE_UPLOAD_ENABLED;
+export function canSellerUploadAuctionImages(
+  auction: Auction | null | undefined,
+  user: Pick<AuthUser, 'id'> | null | undefined,
+  nowMs: number = Date.now(),
+): boolean {
+  if (!SELLER_AUCTION_IMAGE_UPLOAD_ENABLED) return false;
+  if (!isAuctionOwnedByUser(auction, user)) return false;
+  return isAuctionPreFreezeByClientClock(auction, nowMs);
 }
 
 export function canSellerDeleteAuctionImages(): boolean {
@@ -73,4 +76,85 @@ export function canSellerReorderAuctionImages(): boolean {
 
 export function canSellerSetPrimaryAuctionImage(): boolean {
   return SELLER_AUCTION_IMAGE_PRIMARY_ENABLED;
+}
+
+export function auctionImageRemainingCapacity(auction: Auction): number {
+  const existing = auction.images?.length ?? 0;
+  return Math.max(0, AUCTION_IMAGE_MAX_PER_AUCTION - existing);
+}
+
+export type AuctionImageClientValidationResult = {
+  ok: boolean;
+  error?: string;
+};
+
+/**
+ * UX-only file checks before upload. Does not mutate `files`.
+ * Backend Pillow validation remains authoritative.
+ */
+export function validateAuctionImageSelection(
+  files: readonly File[],
+  auction: Auction,
+): AuctionImageClientValidationResult {
+  const selected = [...files];
+  if (selected.length === 0) {
+    return { ok: false, error: 'Choose at least one image to upload.' };
+  }
+  if (selected.length > AUCTION_IMAGE_MAX_PER_REQUEST) {
+    return {
+      ok: false,
+      error: `Upload at most ${AUCTION_IMAGE_MAX_PER_REQUEST} images per request.`,
+    };
+  }
+  const remaining = auctionImageRemainingCapacity(auction);
+  if (selected.length > remaining) {
+    return {
+      ok: false,
+      error: `This auction can accept ${remaining} more image${remaining === 1 ? '' : 's'} (max ${AUCTION_IMAGE_MAX_PER_AUCTION}).`,
+    };
+  }
+  for (const file of selected) {
+    if (file.size > AUCTION_IMAGE_MAX_BYTES) {
+      return {
+        ok: false,
+        error: `"${file.name}" exceeds the ${AUCTION_IMAGE_MAX_BYTES / (1024 * 1024)}MB size limit.`,
+      };
+    }
+    const mime = (file.type || '').toLowerCase();
+    if (
+      mime &&
+      !AUCTION_IMAGE_ALLOWED_MIME_TYPES.includes(
+        mime as (typeof AUCTION_IMAGE_ALLOWED_MIME_TYPES)[number],
+      )
+    ) {
+      return {
+        ok: false,
+        error: `"${file.name}" is not a supported image type (JPEG, PNG, WEBP, GIF).`,
+      };
+    }
+  }
+  return { ok: true };
+}
+
+export function buildAuctionImagesFormData(files: readonly File[]): FormData {
+  const formData = new FormData();
+  for (const file of files) {
+    formData.append(AUCTION_IMAGE_UPLOAD_FIELD, file);
+  }
+  return formData;
+}
+
+export function isAuctionImageFreezeError(error: unknown): boolean {
+  const data = (error as { response?: { data?: { error?: unknown } } })?.response
+    ?.data;
+  const raw = data?.error;
+  const message =
+    typeof raw === 'string'
+      ? raw
+      : Array.isArray(raw)
+        ? raw.join(' ')
+        : typeof raw === 'object' && raw
+          ? JSON.stringify(raw)
+          : '';
+  return message.toLowerCase().includes('images cannot be changed');
 }

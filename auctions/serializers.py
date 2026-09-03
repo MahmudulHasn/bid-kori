@@ -9,6 +9,11 @@ from .image_validation import (
     validate_auction_image_quota,
 )
 from .models import Auction, AuctionImage, Bid, Payment
+from .mutation_policy import (
+    CONFIGURATION_EDIT_FROZEN_MESSAGE,
+    PROTECTED_CONFIGURATION_FIELDS,
+    AuctionMutationPolicy,
+)
 
 
 class ProductSerializer(serializers.ModelSerializer):
@@ -120,8 +125,27 @@ class AuctionSerializer(serializers.ModelSerializer):
         return value
 
     def validate(self, attrs):
+        if self.instance is not None:
+            mutating_protected = bool(
+                PROTECTED_CONFIGURATION_FIELDS.intersection(attrs.keys())
+            )
+            uploaded = attrs.get('uploaded_images')
+            if uploaded:
+                mutating_protected = True
+            if mutating_protected and not AuctionMutationPolicy.is_configuration_mutable(
+                self.instance
+            ):
+                raise serializers.ValidationError(CONFIGURATION_EDIT_FROZEN_MESSAGE)
+
         start_time = attrs.get('start_time')
         end_time = attrs.get('end_time')
+
+        if self.instance is not None:
+            # Partial update: combine incoming times with the stored schedule.
+            if start_time is None:
+                start_time = self.instance.start_time
+            if end_time is None:
+                end_time = self.instance.end_time
 
         if start_time is not None and end_time is not None and end_time <= start_time:
             raise serializers.ValidationError(
@@ -295,6 +319,43 @@ class AuctionSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     {'product': 'This product already has an auction.'}
                 ) from exc
+
+            for image_file in uploaded_images:
+                AuctionImage.objects.create(auction=auction, image=image_file)
+
+        return auction
+
+    def update(self, instance, validated_data):
+        """Apply configuration updates only while the mutation freeze allows it."""
+        uploaded_images = self._collect_uploaded_images(validated_data)
+        # Never trust client-supplied lifecycle/payment fields on update.
+        validated_data.pop('winning_bidder', None)
+        validated_data.pop('status', None)
+        validated_data.pop('is_paid', None)
+        validated_data.pop('is_featured', None)
+        validated_data.pop('_existing_product', None)
+        validated_data.pop('_nested_product_data', None)
+        validated_data.pop('seller', None)
+
+        with transaction.atomic():
+            auction = AuctionMutationPolicy.lock_auction(instance.pk)
+            mutating = bool(validated_data) or bool(uploaded_images)
+            if mutating and not AuctionMutationPolicy.is_configuration_mutable(auction):
+                raise serializers.ValidationError(CONFIGURATION_EDIT_FROZEN_MESSAGE)
+
+            if uploaded_images:
+                try:
+                    validate_auction_image_quota(
+                        auction=auction,
+                        incoming_count=len(uploaded_images),
+                    )
+                except DjangoValidationError as exc:
+                    raise serializers.ValidationError({'images': exc.messages}) from exc
+
+            for attr, value in validated_data.items():
+                setattr(auction, attr, value)
+            if validated_data:
+                auction.save(update_fields=list(validated_data.keys()))
 
             for image_file in uploaded_images:
                 AuctionImage.objects.create(auction=auction, image=image_file)

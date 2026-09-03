@@ -6,9 +6,12 @@ import {
   DEFAULT_AUCTION_MIN_INCREMENT,
   SELLER_AUCTION_CREATE_FROM_EXISTING_PRODUCT_SUPPORTED,
   SELLER_AUCTION_CREATE_PATH,
+  auctionFormValuesFromAuction,
+  buildAuctionUpdatePayload,
   buildExistingProductAuctionPayload,
   datetimeLocalToIso,
   emptyAuctionFormValues,
+  isoToDatetimeLocalValue,
   isPositiveMoneyString,
   isSellerAuctionCreateRouteEnabled,
   serializeExistingProductAuctionCreate,
@@ -164,4 +167,74 @@ test('datetime helpers convert local wall time without inventing Z on input', ()
   assert.equal(isPositiveMoneyString('10.50'), true);
   assert.equal(isPositiveMoneyString('0'), false);
   assert.equal(isPositiveMoneyString('abc'), false);
+});
+
+test('edit payload includes safe fields; omits reserve unless changeReserve', () => {
+  const values: AuctionFormValues = {
+    starting_bid: '1000.00',
+    min_increment: '50.00',
+    reserve_price: '2000.00',
+    start_time: '2026-09-04T10:00',
+    end_time: '2026-09-05T10:00',
+  };
+  const snapshot = { ...values };
+
+  const withoutReserve = buildAuctionUpdatePayload(values, {
+    changeReserve: false,
+  });
+  assert.deepEqual(values, snapshot);
+  assert.equal(withoutReserve.starting_bid, '1000.00');
+  assert.equal(withoutReserve.min_increment, '50.00');
+  assert.ok(withoutReserve.start_time.includes('T'));
+  assert.ok(withoutReserve.end_time.includes('T'));
+  assert.equal('reserve_price' in withoutReserve, false);
+  assert.equal('product' in withoutReserve, false);
+  assert.equal('product_id' in withoutReserve, false);
+  assert.equal('current_highest_bid' in withoutReserve, false);
+  assert.equal('winning_bidder' in withoutReserve, false);
+  assert.equal('status' in withoutReserve, false);
+  assert.equal('is_paid' in withoutReserve, false);
+  assert.equal('is_featured' in withoutReserve, false);
+  assert.equal('seller' in withoutReserve, false);
+
+  const withReserve = buildAuctionUpdatePayload(values, {
+    changeReserve: true,
+  });
+  assert.equal(withReserve.reserve_price, '2000.00');
+  assert.deepEqual(values, snapshot);
+});
+
+test('edit validation skips product; reserve only when changeReserve', () => {
+  const values: AuctionFormValues = {
+    starting_bid: '100.00',
+    min_increment: '10.00',
+    reserve_price: '',
+    start_time: '2026-09-10T09:00',
+    end_time: '2026-09-12T09:00',
+  };
+  assert.deepEqual(
+    validateAuctionForm(values, null, { mode: 'edit', changeReserve: false }),
+    {},
+  );
+  assert.ok(
+    validateAuctionForm(values, null, { mode: 'edit', changeReserve: true })
+      .reserve_price,
+  );
+});
+
+test('auctionFormValuesFromAuction prefills starting_bid not current_highest_bid', () => {
+  const form = auctionFormValuesFromAuction({
+    id: 1,
+    starting_bid: '250.00',
+    current_highest_bid: '999.00',
+    min_increment: '25.00',
+    start_time: '2026-09-04T14:30:00.000Z',
+    end_time: '2026-09-05T14:30:00.000Z',
+  });
+  assert.equal(form.starting_bid, '250.00');
+  assert.equal(form.min_increment, '25.00');
+  assert.equal(form.reserve_price, '');
+  assert.ok(form.start_time.length > 0);
+  assert.ok(form.end_time.length > 0);
+  assert.equal(isoToDatetimeLocalValue('2026-09-04T14:30:00.000Z'), form.start_time);
 });

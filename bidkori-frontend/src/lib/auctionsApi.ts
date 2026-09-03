@@ -1,5 +1,12 @@
 import api from '@/lib/api';
-import type { ExistingProductAuctionCreatePayload } from '@/lib/auctionCreateContract';
+import type {
+  AuctionUpdatePayload,
+  ExistingProductAuctionCreatePayload,
+} from '@/lib/auctionCreateContract';
+import {
+  buildAuctionImagesFormData,
+  buildAuctionImagesUploadApiPath,
+} from '@/lib/auctionImageSafety';
 import {
   buildAuctionCancelTransitionPayload,
   buildAuctionTransitionApiPath,
@@ -132,4 +139,39 @@ export async function cancelAuction(
   return data;
 }
 
+/**
+ * Update Auction configuration while pre-freeze (PATCH only — never PUT).
+ * Payload must omit product/seller/status and only include reserve when intentional.
+ */
+export async function updateAuction(
+  auctionId: string | number,
+  payload: AuctionUpdatePayload,
+): Promise<Auction> {
+  const { data } = await api.patch<Auction>(
+    buildAuctionDetailApiPath(auctionId),
+    payload,
+  );
+  return data;
+}
+
+/**
+ * Upload Auction images via multipart POST.
+ * Field name must be `images`. Does not mutate `files`.
+ */
+export async function uploadAuctionImages(
+  auctionId: string | number,
+  files: readonly File[],
+): Promise<Auction> {
+  const formData = buildAuctionImagesFormData(files);
+  const { data } = await api.post<Auction>(
+    buildAuctionImagesUploadApiPath(auctionId),
+    formData,
+  );
+  return data;
+}
+
+export {
+  AUCTION_IMAGE_UPLOAD_FIELD,
+  buildAuctionImagesUploadApiPath,
+} from '@/lib/auctionImageSafety';
 export { buildAuctionTransitionApiPath } from '@/lib/auctionManagementSafety';

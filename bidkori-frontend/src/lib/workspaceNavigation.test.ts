@@ -18,6 +18,7 @@ import {
   isNavItemNavigable,
   sellerAuctionCreatePath,
   sellerAuctionDetailPath,
+  sellerAuctionEditPath,
   sellerProductDetailPath,
   sellerProductEditPath,
 } from './workspaceNavigation.ts';
@@ -118,9 +119,14 @@ test('seller config does not contain buyer/admin-only items', () => {
   assert.equal(sellerAuctions?.href, SELLER_AUCTIONS_PATH);
   assert.equal(SELLER_AUCTIONS_PATH, '/seller/auctions');
   assert.equal(sellerAuctionDetailPath(42), '/seller/auctions/42');
+  assert.equal(sellerAuctionEditPath(42), '/seller/auctions/42/edit');
   assert.equal(SELLER_AUCTION_CREATE_PATH, '/seller/auctions/create');
   assert.equal(sellerAuctionCreatePath(), '/seller/auctions/create');
   assert.equal(sellerAuctionCreatePath(42), '/seller/auctions/create?product=42');
+  const sellerEditNav = WORKSPACE_CONFIGS.SELLER.navItems.find(
+    (item) => item.href?.includes('/edit'),
+  );
+  assert.equal(sellerEditNav, undefined);
   const sellerAnalytics = WORKSPACE_CONFIGS.SELLER.navItems.find((item) => item.id === 'analytics');
   assert.equal(sellerAnalytics?.enabled, false);
   const sellerProfile = WORKSPACE_CONFIGS.SELLER.navItems.find((item) => item.id === 'profile');
@@ -206,6 +212,14 @@ test('active-route detection handles nested paths', () => {
   assert.equal(
     isNavItemActive('/seller/auctions/create', auctions, sellerHome),
     true,
+  );
+  assert.equal(
+    isNavItemActive('/seller/auctions/42/edit', auctions, sellerHome),
+    true,
+  );
+  assert.equal(
+    isNavItemActive('/seller/auctions/42/edit', dashboard, sellerHome),
+    false,
   );
   assert.equal(isNavItemActive('/seller', auctions, sellerHome), false);
   assert.equal(

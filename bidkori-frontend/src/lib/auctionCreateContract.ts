@@ -1,10 +1,12 @@
 /**
- * Seller Auction creation against the existing-product API contract (BE-A01).
+ * Seller Auction creation/edit against the existing-product API contract.
  *
  * POST /api/auctions/ accepts `product` as an existing Product PK.
+ * PATCH /api/auctions/<id>/ updates configuration only while pre-freeze.
  * Nested Product create remains a legacy path only (`/auctions/create`).
  */
 
+import type { Auction } from './types.ts';
 import { SELLER_AUCTION_CREATE_PATH } from './workspaceNavigation.ts';
 
 export { SELLER_AUCTION_CREATE_PATH };
@@ -17,6 +19,8 @@ export const SELLER_AUCTION_CREATE_FROM_EXISTING_PRODUCT_SUPPORTED = true;
 
 /** Exact Django model default for `Auction.min_increment`. */
 export const DEFAULT_AUCTION_MIN_INCREMENT = '100.00';
+
+export type AuctionFormMode = 'create' | 'edit';
 
 export type AuctionFormValues = {
   starting_bid: string;
@@ -37,6 +41,15 @@ export type ExistingProductAuctionCreatePayload = {
   end_time: string;
 };
 
+/** PATCH body — never includes product/seller/status/server fields. */
+export type AuctionUpdatePayload = {
+  starting_bid: string;
+  min_increment: string;
+  start_time: string;
+  end_time: string;
+  reserve_price?: string;
+};
+
 export type AuctionFormField = keyof AuctionFormValues | 'product';
 
 /** True when Seller UI may expose `/seller/auctions/create`. */
@@ -51,6 +64,17 @@ export function toDatetimeLocalValue(date: Date): string {
 }
 
 /**
+ * Convert an API ISO timestamp into a `datetime-local` wall-time value.
+ * Uses the browser local timezone (same convention as create).
+ */
+export function isoToDatetimeLocalValue(iso: string | undefined): string {
+  if (!iso) return '';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  return toDatetimeLocalValue(date);
+}
+
+/**
  * Convert a `datetime-local` string to an ISO-8601 UTC string for the API.
  * `new Date(localWithoutZ)` uses the browser's local timezone — do not append `Z`.
  */
@@ -60,6 +84,23 @@ export function datetimeLocalToIso(value: string): string | null {
   const date = new Date(trimmed);
   if (Number.isNaN(date.getTime())) return null;
   return date.toISOString();
+}
+
+/** Prefill edit form from Auction detail. Reserve stays blank (write-only). */
+export function auctionFormValuesFromAuction(auction: Auction): AuctionFormValues {
+  const starting =
+    auction.starting_bid != null ? String(auction.starting_bid) : '';
+  const increment =
+    auction.min_increment != null
+      ? String(auction.min_increment)
+      : DEFAULT_AUCTION_MIN_INCREMENT;
+  return {
+    starting_bid: starting,
+    min_increment: increment,
+    reserve_price: '',
+    start_time: isoToDatetimeLocalValue(auction.start_time),
+    end_time: isoToDatetimeLocalValue(auction.end_time),
+  };
 }
 
 /** Positive decimal money string (up to 2 fractional digits). Does not mutate input. */
@@ -87,11 +128,16 @@ export function emptyAuctionFormValues(
 export function validateAuctionForm(
   values: AuctionFormValues,
   productId: number | null,
+  options?: { mode?: AuctionFormMode; changeReserve?: boolean },
 ): Partial<Record<AuctionFormField, string>> {
+  const mode = options?.mode ?? 'create';
+  const changeReserve = options?.changeReserve ?? false;
   const errors: Partial<Record<AuctionFormField, string>> = {};
 
-  if (productId == null || !Number.isFinite(productId) || productId <= 0) {
-    errors.product = 'Select a product for this auction.';
+  if (mode === 'create') {
+    if (productId == null || !Number.isFinite(productId) || productId <= 0) {
+      errors.product = 'Select a product for this auction.';
+    }
   }
 
   if (!values.starting_bid.trim()) {
@@ -106,8 +152,20 @@ export function validateAuctionForm(
     errors.min_increment = 'Enter a valid increment greater than 0.';
   }
 
-  if (values.reserve_price.trim() && !isPositiveMoneyString(values.reserve_price)) {
-    errors.reserve_price = 'Enter a valid reserve price greater than 0, or leave blank.';
+  if (mode === 'create') {
+    if (
+      values.reserve_price.trim() &&
+      !isPositiveMoneyString(values.reserve_price)
+    ) {
+      errors.reserve_price =
+        'Enter a valid reserve price greater than 0, or leave blank.';
+    }
+  } else if (changeReserve) {
+    if (!values.reserve_price.trim()) {
+      errors.reserve_price = 'Enter a new reserve price, or uncheck Change reserve.';
+    } else if (!isPositiveMoneyString(values.reserve_price)) {
+      errors.reserve_price = 'Enter a valid reserve price greater than 0.';
+    }
   }
 
   const startIso = datetimeLocalToIso(values.start_time);
@@ -117,7 +175,11 @@ export function validateAuctionForm(
   }
   if (!values.end_time.trim() || !endIso) {
     errors.end_time = 'End time is required.';
-  } else if (startIso && endIso && new Date(endIso).getTime() <= new Date(startIso).getTime()) {
+  } else if (
+    startIso &&
+    endIso &&
+    new Date(endIso).getTime() <= new Date(startIso).getTime()
+  ) {
     errors.end_time = 'End time must be after start time.';
   }
 
@@ -165,4 +227,34 @@ export function serializeExistingProductAuctionCreate(
   values: AuctionFormValues,
 ): ExistingProductAuctionCreatePayload {
   return buildExistingProductAuctionPayload(productId, values);
+}
+
+/**
+ * Build PATCH body for Auction configuration edit.
+ * Omits reserve unless the Seller explicitly opted to change it.
+ * Never includes product, seller, status, or server-controlled fields.
+ * Does not mutate `values`.
+ */
+export function buildAuctionUpdatePayload(
+  values: AuctionFormValues,
+  options: { changeReserve: boolean },
+): AuctionUpdatePayload {
+  const start_time = datetimeLocalToIso(values.start_time);
+  const end_time = datetimeLocalToIso(values.end_time);
+  if (!start_time || !end_time) {
+    throw new Error('Invalid auction datetime values.');
+  }
+
+  const payload: AuctionUpdatePayload = {
+    starting_bid: values.starting_bid.trim(),
+    min_increment: values.min_increment.trim(),
+    start_time,
+    end_time,
+  };
+
+  if (options.changeReserve) {
+    payload.reserve_price = values.reserve_price.trim();
+  }
+
+  return payload;
 }

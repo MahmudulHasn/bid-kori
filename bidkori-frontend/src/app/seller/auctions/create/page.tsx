@@ -376,6 +376,9 @@ function CreateAuctionPageContent() {
                 onSubmit={(values) => void handleSubmit(values)}
               />
             </div>
+            <p className="mt-3 text-sm text-zinc-500 dark:text-zinc-400">
+              After creation you can add images from the auction detail page.
+            </p>
             <p className="sr-only">Posts to {AUCTION_CREATE_API_PATH}</p>
           </section>
         </div>
