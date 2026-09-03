@@ -8,16 +8,21 @@ import {
   PRODUCT_WRITE_FIELDS,
   SELLER_PRODUCT_DELETE_ENABLED,
   emptyProductFormValues,
+  filterSellerAuctions,
   filterSellerProducts,
   getRecentSellerAuctions,
   getRecentSellerProducts,
   getSellerActiveAuctions,
+  getSellerAuctionDisplayStatus,
+  getSellerAuctionPaymentLabel,
+  getSellerAuctionWinnerLabel,
   getSellerAuctions,
   getSellerCancelledAuctions,
   getSellerClosedAuctions,
   getSellerDashboardMetrics,
   isProductOwnedByUser,
   isSellerAuctionAwaitingFinalization,
+  sortSellerAuctions,
   productFormValuesFromProduct,
   productUpdateApiPath,
   productWritePayloadKeys,
@@ -242,6 +247,104 @@ test('nested product PK without seller is not treated as owned', () => {
     auction({ id: 1, product: 44, product_title: 'Nested pk only' }),
   ];
   assert.equal(getSellerAuctions(auctions, 7).length, 0);
+});
+
+test('filterSellerAuctions keeps backend status buckets and does not recategorize stale ACTIVE', () => {
+  const now = Date.parse('2026-09-04T12:00:00Z');
+  const auctions = [
+    auction({
+      id: 1,
+      status: 'ACTIVE',
+      end_time: '2026-09-04T11:00:00Z',
+      product: { title: 'Stale', seller: 7 },
+    }),
+    auction({ id: 2, status: 'CLOSED', product: { title: 'Closed', seller: 7 } }),
+    auction({
+      id: 3,
+      status: 'CANCELLED',
+      product: { title: 'Cancelled', seller: 7 },
+    }),
+    auction({ id: 4, status: 'ACTIVE', product: { title: 'Other', seller: 8 } }),
+  ];
+  const snapshot = auctions.map((item) => item.id);
+  assert.deepEqual(
+    filterSellerAuctions(auctions, 7, 'ACTIVE').map((item) => item.id),
+    [1],
+  );
+  assert.deepEqual(
+    filterSellerAuctions(auctions, 7, 'CLOSED').map((item) => item.id),
+    [2],
+  );
+  assert.deepEqual(
+    filterSellerAuctions(auctions, 7, 'CANCELLED').map((item) => item.id),
+    [3],
+  );
+  assert.equal(isSellerAuctionAwaitingFinalization(auctions[0], now), true);
+  assert.equal(
+    getSellerAuctionDisplayStatus(auctions[0], now),
+    'Awaiting finalization',
+  );
+  assert.notEqual(getSellerAuctionDisplayStatus(auctions[0], now), 'Closed');
+  assert.deepEqual(
+    auctions.map((item) => item.id),
+    snapshot,
+  );
+});
+
+test('sortSellerAuctions orders by start_time then id without mutating source', () => {
+  const auctions = [
+    auction({
+      id: 1,
+      start_time: '2026-01-01T00:00:00Z',
+      product: { title: 'Old', seller: 7 },
+    }),
+    auction({
+      id: 3,
+      start_time: '2026-03-01T00:00:00Z',
+      product: { title: 'New A', seller: 7 },
+    }),
+    auction({
+      id: 2,
+      start_time: '2026-03-01T00:00:00Z',
+      product: { title: 'New B', seller: 7 },
+    }),
+  ];
+  const snapshot = auctions.map((item) => item.id);
+  assert.deepEqual(
+    sortSellerAuctions(auctions).map((item) => item.id),
+    [3, 2, 1],
+  );
+  assert.deepEqual(
+    auctions.map((item) => item.id),
+    snapshot,
+  );
+});
+
+test('CLOSED winner and payment labels stay fail-closed for ACTIVE auctions', () => {
+  const active = auction({
+    id: 1,
+    status: 'ACTIVE',
+    winning_bidder: 9,
+    product: { title: 'Live', seller: 7 },
+  });
+  const closedNone = auction({
+    id: 2,
+    status: 'CLOSED',
+    winning_bidder: null,
+    product: { title: 'Unsold', seller: 7 },
+  });
+  const closedPaid = auction({
+    id: 3,
+    status: 'CLOSED',
+    winning_bidder: 4,
+    is_paid: true,
+    product: { title: 'Sold', seller: 7 },
+  });
+  assert.equal(getSellerAuctionWinnerLabel(active), null);
+  assert.equal(getSellerAuctionWinnerLabel(closedNone), 'No winner');
+  assert.equal(getSellerAuctionWinnerLabel(closedPaid), 'Bidder #4');
+  assert.equal(getSellerAuctionPaymentLabel(active), null);
+  assert.equal(getSellerAuctionPaymentLabel(closedPaid), 'Paid');
 });
 
 test('product create and update API paths and methods are catalog-only', () => {

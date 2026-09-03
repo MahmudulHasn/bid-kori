@@ -1,11 +1,12 @@
 import api from '@/lib/api';
 import { MY_BIDS_API_PATH } from '@/lib/buyer';
-import { buildCheckoutApiPath } from '@/lib/checkoutApi';
+import { buildAuctionDetailApiPath, buildCheckoutApiPath } from '@/lib/checkoutApi';
 import { ACTIVE_AUCTIONS_API_PATH, buildAuctionSearchApiPath } from '@/lib/marketplace';
 import type { Auction, PaymentSummary, UserBid } from '@/lib/types';
 
 export {
   AUCTIONS_LIST_API_PATH,
+  buildAuctionDetailApiPath,
   buildCheckoutApiPath,
   isCheckoutAlreadyPaidError,
 } from '@/lib/checkoutApi';
@@ -43,7 +44,13 @@ export async function searchAuctions(query: string): Promise<Auction[]> {
 }
 
 export async function fetchAuction(id: string | number): Promise<Auction> {
-  const { data } = await api.get<Auction>(`/auctions/${id}/`);
+  const { data } = await api.get<Auction>(buildAuctionDetailApiPath(id));
+  return data;
+}
+
+/** SWR-compatible fetcher for `/auctions/<id>/`. */
+export async function auctionDetailFetcher(url: string): Promise<Auction> {
+  const { data } = await api.get<Auction>(url);
   return data;
 }
 

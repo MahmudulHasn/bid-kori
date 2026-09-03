@@ -8,21 +8,22 @@ import useSWR from 'swr';
 
 import { useAuth } from '@/context/AuthContext';
 import { getApiErrorMessage } from '@/lib/apiErrors';
-import { formatAuctionMoney, formatAuctionStatus, getAuctionTitle } from '@/lib/auctionDisplay';
+import { formatAuctionMoney, getAuctionTitle } from '@/lib/auctionDisplay';
 import { AUCTIONS_LIST_API_PATH, auctionListFetcher } from '@/lib/auctionsApi';
-import { MARKETPLACE_ROUTES } from '@/lib/marketplace';
 import { MY_LISTINGS_API_PATH, myListingsFetcher } from '@/lib/productsApi';
 import {
   getRecentSellerAuctions,
   getRecentSellerProducts,
   getSellerDashboardMetrics,
-  isSellerAuctionAwaitingFinalization,
+  getSellerAuctionDisplayStatus,
   formatSellerProductCondition,
 } from '@/lib/seller';
 import type { Auction, Product } from '@/lib/types';
 import {
+  SELLER_AUCTIONS_PATH,
   SELLER_PRODUCTS_PATH,
   SELLER_PRODUCT_CREATE_PATH,
+  sellerAuctionDetailPath,
   sellerProductDetailPath,
 } from '@/lib/workspaceNavigation';
 
@@ -127,17 +128,14 @@ function ProductPreview({ item }: { item: Product }) {
 
 function AuctionPreview({ item }: { item: Auction }) {
   const ended = formatEndedAt(item.end_time);
-  const awaiting = isSellerAuctionAwaitingFinalization(item);
-  const statusLabel = awaiting
-    ? 'Awaiting finalization'
-    : formatAuctionStatus(item.status) ?? 'Unknown';
+  const statusLabel = getSellerAuctionDisplayStatus(item);
   const amount = Number(item.current_highest_bid);
 
   return (
     <article className="rounded-xl border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-950">
       <h3 className="truncate text-sm font-semibold text-zinc-900 dark:text-white">
         <Link
-          href={MARKETPLACE_ROUTES.auctionDetail(item.id)}
+          href={sellerAuctionDetailPath(item.id)}
           className="hover:text-sky-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:hover:text-sky-300"
         >
           {getAuctionTitle(item)}
@@ -349,15 +347,25 @@ export default function SellerHomePage() {
             </section>
 
             <section aria-labelledby="recent-auctions-heading">
-              <h2
-                id="recent-auctions-heading"
-                className="text-xl font-semibold text-zinc-900 dark:text-white"
-              >
-                Recent Auctions
-              </h2>
-              <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-                Auctions running on products you own.
-              </p>
+              <div className="flex flex-wrap items-end justify-between gap-3">
+                <div>
+                  <h2
+                    id="recent-auctions-heading"
+                    className="text-xl font-semibold text-zinc-900 dark:text-white"
+                  >
+                    Recent Auctions
+                  </h2>
+                  <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+                    Auctions running on products you own.
+                  </p>
+                </div>
+                <Link
+                  href={SELLER_AUCTIONS_PATH}
+                  className="text-sm font-medium text-sky-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:text-sky-300"
+                >
+                  View all auctions
+                </Link>
+              </div>
               <div className="mt-4 space-y-3">
                 {recentAuctions.length > 0 ? (
                   recentAuctions.map((item) => (

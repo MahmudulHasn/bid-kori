@@ -32,6 +32,7 @@ export const BUYER_PROFILE_PATH = '/buyer/profile';
 export const BUYER_SETTINGS_PATH = '/buyer/settings';
 export const SELLER_PRODUCTS_PATH = '/seller/products';
 export const SELLER_PRODUCT_CREATE_PATH = '/seller/products/create';
+export const SELLER_AUCTIONS_PATH = '/seller/auctions';
 
 const BUYER_NAV: readonly WorkspaceNavItem[] = [
   { id: 'dashboard', label: 'Dashboard', href: '/buyer', enabled: true },
@@ -45,7 +46,7 @@ const BUYER_NAV: readonly WorkspaceNavItem[] = [
 const SELLER_NAV: readonly WorkspaceNavItem[] = [
   { id: 'dashboard', label: 'Dashboard', href: '/seller', enabled: true },
   { id: 'products', label: 'Products', href: SELLER_PRODUCTS_PATH, enabled: true },
-  { id: 'auctions', label: 'Auctions', enabled: false },
+  { id: 'auctions', label: 'Auctions', href: SELLER_AUCTIONS_PATH, enabled: true },
   { id: 'analytics', label: 'Analytics', enabled: false },
   { id: 'profile', label: 'Profile', enabled: false },
   { id: 'settings', label: 'Settings', enabled: false },
@@ -133,6 +134,10 @@ export function sellerProductDetailPath(id: string | number): string {
 
 export function sellerProductEditPath(id: string | number): string {
   return `${SELLER_PRODUCTS_PATH}/${id}/edit`;
+}
+
+export function sellerAuctionDetailPath(id: string | number): string {
+  return `${SELLER_AUCTIONS_PATH}/${id}`;
 }
 
 /** True when an item is safe to navigate (enabled + href). */

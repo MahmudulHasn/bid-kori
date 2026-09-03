@@ -5,6 +5,7 @@ import { getRoleHome } from './authRouting.ts';
 import {
   BUYER_PROFILE_PATH,
   BUYER_SETTINGS_PATH,
+  SELLER_AUCTIONS_PATH,
   SELLER_PRODUCTS_PATH,
   SELLER_PRODUCT_CREATE_PATH,
   WORKSPACE_CONFIGS,
@@ -14,6 +15,7 @@ import {
   getWorkspaceNavLabel,
   isNavItemActive,
   isNavItemNavigable,
+  sellerAuctionDetailPath,
   sellerProductDetailPath,
   sellerProductEditPath,
 } from './workspaceNavigation.ts';
@@ -110,7 +112,10 @@ test('seller config does not contain buyer/admin-only items', () => {
   assert.equal(sellerProductDetailPath(42), '/seller/products/42');
   assert.equal(sellerProductEditPath(42), '/seller/products/42/edit');
   const sellerAuctions = WORKSPACE_CONFIGS.SELLER.navItems.find((item) => item.id === 'auctions');
-  assert.equal(sellerAuctions?.enabled, false);
+  assert.equal(sellerAuctions?.enabled, true);
+  assert.equal(sellerAuctions?.href, SELLER_AUCTIONS_PATH);
+  assert.equal(SELLER_AUCTIONS_PATH, '/seller/auctions');
+  assert.equal(sellerAuctionDetailPath(42), '/seller/auctions/42');
   const sellerAnalytics = WORKSPACE_CONFIGS.SELLER.navItems.find((item) => item.id === 'analytics');
   assert.equal(sellerAnalytics?.enabled, false);
   const sellerProfile = WORKSPACE_CONFIGS.SELLER.navItems.find((item) => item.id === 'profile');
@@ -144,6 +149,7 @@ test('active-route detection handles nested paths', () => {
   const sellerHome = getRoleHome('SELLER');
   const dashboard = { href: '/seller', enabled: true as const };
   const products = { href: '/seller/products', enabled: true as const };
+  const auctions = { href: '/seller/auctions', enabled: true as const };
   const buyerHome = getRoleHome('BUYER');
   const myBids = { href: '/buyer/my-bids', enabled: true as const };
   const won = { href: '/buyer/won', enabled: true as const };
@@ -182,6 +188,23 @@ test('active-route detection handles nested paths', () => {
   );
   assert.equal(
     isNavItemActive('/seller/products/42/edit', dashboard, sellerHome),
+    false,
+  );
+  assert.equal(
+    isNavItemActive('/seller/auctions', auctions, sellerHome),
+    true,
+  );
+  assert.equal(
+    isNavItemActive('/seller/auctions/42', auctions, sellerHome),
+    true,
+  );
+  assert.equal(isNavItemActive('/seller', auctions, sellerHome), false);
+  assert.equal(
+    isNavItemActive('/seller/auctions', dashboard, sellerHome),
+    false,
+  );
+  assert.equal(
+    isNavItemActive('/seller/auctions', products, sellerHome),
     false,
   );
   assert.equal(isNavItemActive('/seller', products, sellerHome), false);

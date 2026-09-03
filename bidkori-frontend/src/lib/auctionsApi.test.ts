@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
   AUCTIONS_LIST_API_PATH,
+  buildAuctionDetailApiPath,
   buildCheckoutApiPath,
   isCheckoutAlreadyPaidError,
 } from './checkoutApi.ts';
@@ -10,6 +11,10 @@ import {
 test('checkout helper posts to /auctions/<id>/checkout/', () => {
   assert.equal(buildCheckoutApiPath(42), '/auctions/42/checkout/');
   assert.equal(AUCTIONS_LIST_API_PATH, '/auctions/');
+});
+
+test('auction detail retrieve path is /auctions/<id>/', () => {
+  assert.equal(buildAuctionDetailApiPath(42), '/auctions/42/');
 });
 
 test('already-paid checkout errors are recognized from Django 400 payloads', () => {

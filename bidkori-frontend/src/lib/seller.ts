@@ -1,4 +1,5 @@
 import { isAuctionOwnedByUser } from './auctionOwnership.ts';
+import { formatAuctionStatus } from './auctionDisplay.ts';
 import type { AuthUser, Auction, Product } from './types.ts';
 
 export const RECENT_SELLER_PRODUCTS_LIMIT = 4;
@@ -54,6 +55,51 @@ export function getSellerCancelledAuctions(
   );
 }
 
+export type SellerAuctionStatusFilter = 'all' | 'ACTIVE' | 'CLOSED' | 'CANCELLED';
+
+export function filterSellerAuctions(
+  auctions: readonly Auction[],
+  userId: number,
+  statusFilter: SellerAuctionStatusFilter = 'all',
+): Auction[] {
+  const owned = getSellerAuctions(auctions, userId);
+  if (statusFilter === 'all') return owned;
+  return owned.filter((auction) => auctionStatus(auction) === statusFilter);
+}
+
+export function sortSellerAuctions(auctions: readonly Auction[]): Auction[] {
+  return auctions.slice().sort((a, b) => {
+    const startDiff = timestampMs(b.start_time) - timestampMs(a.start_time);
+    if (startDiff !== 0) return startDiff;
+    return b.id - a.id;
+  });
+}
+
+export function getSellerAuctionDisplayStatus(
+  auction: Auction,
+  nowMs: number = Date.now(),
+): string {
+  if (isSellerAuctionAwaitingFinalization(auction, nowMs)) {
+    return 'Awaiting finalization';
+  }
+  return formatAuctionStatus(auction.status) ?? 'Unknown';
+}
+
+export function getSellerAuctionWinnerLabel(auction: Auction): string | null {
+  if (auctionStatus(auction) !== 'CLOSED') return null;
+  if (auction.winning_bidder == null) return 'No winner';
+  const username = auction.winning_bidder_username?.trim();
+  if (username) return username;
+  return `Bidder #${auction.winning_bidder}`;
+}
+
+export function getSellerAuctionPaymentLabel(auction: Auction): string | null {
+  if (auctionStatus(auction) !== 'CLOSED') return null;
+  if (auction.is_paid === true) return 'Paid';
+  if (auction.is_paid === false) return 'Unpaid';
+  return null;
+}
+
 /**
  * ACTIVE past end_time is still ACTIVE until Django closes it.
  * Display-only; does not change metric status.
@@ -72,14 +118,10 @@ export function getRecentSellerAuctions(
   userId: number,
   limit: number = RECENT_SELLER_AUCTIONS_LIMIT,
 ): Auction[] {
-  return getSellerAuctions(auctions, userId)
-    .slice()
-    .sort((a, b) => {
-      const startDiff = timestampMs(b.start_time) - timestampMs(a.start_time);
-      if (startDiff !== 0) return startDiff;
-      return b.id - a.id;
-    })
-    .slice(0, Math.max(0, limit));
+  return sortSellerAuctions(getSellerAuctions(auctions, userId)).slice(
+    0,
+    Math.max(0, limit),
+  );
 }
 
 export type SellerProductSort = 'newest' | 'oldest' | 'name';

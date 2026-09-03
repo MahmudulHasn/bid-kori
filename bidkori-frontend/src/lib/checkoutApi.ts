@@ -8,6 +8,11 @@ export function buildCheckoutApiPath(auctionId: string | number): string {
   return `/auctions/${auctionId}/checkout/`;
 }
 
+/** GET retrieve path: `/api/auctions/<id>/`. */
+export function buildAuctionDetailApiPath(id: string | number): string {
+  return `/auctions/${id}/`;
+}
+
 /** True when Django reports checkout was already completed (400). */
 export function isCheckoutAlreadyPaidError(error: unknown): boolean {
   if (getApiStatus(error) !== 400) return false;
