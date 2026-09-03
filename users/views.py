@@ -1,4 +1,5 @@
 from django.contrib.auth import authenticate
+from django.contrib.auth.models import User
 from drf_spectacular.utils import extend_schema
 from rest_framework import serializers, status
 from rest_framework.exceptions import AuthenticationFailed
@@ -7,6 +8,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .auth_tokens import issue_auth_token, revoke_auth_token
+from .models import ensure_user_profile
 from .serializers import UserRegistrationSerializer, UserSerializer
 
 
@@ -22,6 +24,13 @@ class LoginRequestSerializer(serializers.Serializer):
 
     username = serializers.CharField(trim_whitespace=True)
     password = serializers.CharField(write_only=True, trim_whitespace=False)
+
+
+def _identity_payload(user: User) -> dict:
+    """Ensure a profile exists for legacy users, then serialize identity."""
+    if not user.is_staff and not user.is_superuser:
+        ensure_user_profile(user)
+    return UserSerializer(user).data
 
 
 class RegisterView(APIView):
@@ -43,7 +52,7 @@ class RegisterView(APIView):
         return Response(
             {
                 'token': token.key,
-                'user': UserSerializer(user).data,
+                'user': _identity_payload(user),
             },
             status=status.HTTP_201_CREATED,
         )
@@ -80,7 +89,7 @@ class LoginView(APIView):
         return Response(
             {
                 'token': token.key,
-                'user': UserSerializer(user).data,
+                'user': _identity_payload(user),
             },
             status=status.HTTP_200_OK,
         )
@@ -113,4 +122,4 @@ class UserProfileView(APIView):
         responses={200: UserSerializer},
     )
     def get(self, request):
-        return Response(UserSerializer(request.user).data)
+        return Response(_identity_payload(request.user))
