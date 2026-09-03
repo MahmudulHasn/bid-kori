@@ -8,8 +8,13 @@ import useSWR from 'swr';
 import { useAuth } from '@/context/AuthContext';
 import { getApiErrorMessage } from '@/lib/apiErrors';
 import { formatAuctionMoney, getAuctionTitle } from '@/lib/auctionDisplay';
-import { auctionListFetcher, myBidsFetcher } from '@/lib/auctionsApi';
 import {
+  AUCTIONS_LIST_API_PATH,
+  auctionListFetcher,
+  myBidsFetcher,
+} from '@/lib/auctionsApi';
+import {
+  BUYER_WON_PATH,
   MY_BIDS_API_PATH,
   buildBuyerBidActivity,
   indexAuctionsById,
@@ -61,13 +66,24 @@ function AuctionAction({ row }: { row: BuyerAuctionBidActivity }) {
   const label = row.status === 'outbid' ? 'Bid Again' : 'View Auction';
 
   return (
-    <Link
-      href={href}
-      className="inline-flex rounded-lg bg-zinc-900 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-zinc-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-400 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
-    >
-      {label}
-      <span className="sr-only"> for {getAuctionTitle(row.auction)}</span>
-    </Link>
+    <div className="flex flex-wrap items-center justify-end gap-2">
+      {row.status === 'won' ? (
+        <Link
+          href={BUYER_WON_PATH}
+          className="inline-flex rounded-lg border border-zinc-300 px-3 py-1.5 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-400 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+        >
+          Manage Win
+          <span className="sr-only"> for {getAuctionTitle(row.auction)}</span>
+        </Link>
+      ) : null}
+      <Link
+        href={href}
+        className="inline-flex rounded-lg bg-zinc-900 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-zinc-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-400 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+      >
+        {label}
+        <span className="sr-only"> for {getAuctionTitle(row.auction)}</span>
+      </Link>
+    </div>
   );
 }
 
@@ -161,7 +177,7 @@ function ActivityCard({ row }: { row: BuyerAuctionBidActivity }) {
       </p>
       {row.status === 'won' ? (
         <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
-          Checkout will be managed from Won Auctions later.
+          Complete mock checkout from Won Auctions.
         </p>
       ) : null}
       <OwnBids row={row} />
@@ -189,7 +205,7 @@ export default function BuyerMyBidsPage() {
     error: auctionsError,
     isLoading: auctionsLoading,
     mutate: mutateAuctions,
-  } = useSWR('/auctions/', auctionListFetcher);
+  } = useSWR(AUCTIONS_LIST_API_PATH, auctionListFetcher);
 
   const loading = bidsLoading || auctionsLoading;
   const error = bidsError || auctionsError;
@@ -363,7 +379,7 @@ export default function BuyerMyBidsPage() {
                             </p>
                             {row.status === 'won' ? (
                               <p className="mt-1 text-xs text-zinc-500">
-                                Checkout will be managed from Won Auctions later.
+                                Complete mock checkout from Won Auctions.
                               </p>
                             ) : null}
                             <OwnBids row={row} />

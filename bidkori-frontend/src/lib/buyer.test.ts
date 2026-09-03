@@ -8,13 +8,19 @@ import {
   getBuyerDashboardMetrics,
   getBuyerHighestBid,
   getBuyerLatestBid,
+  BUYER_WON_PATH,
+  getAuctionPaymentState,
   getBuyerWonAuctions,
   getDistinctBidAuctionIds,
   getPendingCheckoutAuctions,
   getRecentBuyerAuctions,
+  getUnpaidWonAuctions,
   groupBuyerBidsByAuction,
   indexAuctionsById,
   matchesBuyerMyBidsFilter,
+  matchesBuyerWonFilter,
+  sortWonAuctions,
+  withAuctionMarkedPaid,
 } from './buyer.ts';
 import type { Auction, UserBid } from './types.ts';
 
@@ -36,7 +42,7 @@ test('distinct auctions from repeated bids are counted once', () => {
   assert.equal(getBuyerDashboardMetrics(bids, [], 1).auctionsBidOn, 2);
 });
 
-test('buyer only gets auctions where winning_bidder matches user', () => {
+test('CLOSED + current user winner is included in won auctions', () => {
   const auctions = [
     auction({ id: 1, status: 'CLOSED', winning_bidder: 7 }),
     auction({ id: 2, status: 'CLOSED', winning_bidder: 8 }),
@@ -49,33 +55,114 @@ test('buyer only gets auctions where winning_bidder matches user', () => {
   );
 });
 
-test('non-winning CLOSED auction is not counted as won', () => {
+test('CLOSED + different winner is excluded from won auctions', () => {
   const auctions = [
     auction({ id: 1, status: 'CLOSED', winning_bidder: 99 }),
   ];
   assert.equal(getBuyerWonAuctions(auctions, 7).length, 0);
 });
 
-test('ACTIVE auction is not counted as won', () => {
+test('CLOSED + winning_bidder null is excluded from won auctions', () => {
   const auctions = [
-    auction({ id: 1, status: 'ACTIVE', winning_bidder: 7 }),
-    auction({ id: 2, status: 'CANCELLED', winning_bidder: 7 }),
+    auction({ id: 1, status: 'CLOSED', winning_bidder: null, current_highest_bid: '500' }),
   ];
   assert.equal(getBuyerWonAuctions(auctions, 7).length, 0);
 });
 
-test('pending checkout logic excludes already-paid auction', () => {
+test('ACTIVE highest bid is not treated as a win', () => {
+  const auctions = [
+    auction({
+      id: 1,
+      status: 'ACTIVE',
+      winning_bidder: 7,
+      current_highest_bid: '250',
+    }),
+  ];
+  assert.equal(getBuyerWonAuctions(auctions, 7).length, 0);
+});
+
+test('CANCELLED auction is excluded from won auctions', () => {
+  const auctions = [
+    auction({ id: 1, status: 'CANCELLED', winning_bidder: 7 }),
+  ];
+  assert.equal(getBuyerWonAuctions(auctions, 7).length, 0);
+});
+
+test('explicit is_paid true is paid, false is unpaid, missing is unknown', () => {
+  assert.equal(getAuctionPaymentState({ is_paid: true }), 'paid');
+  assert.equal(getAuctionPaymentState({ is_paid: false }), 'unpaid');
+  assert.equal(getAuctionPaymentState({}), 'unknown');
+  assert.equal(matchesBuyerWonFilter({ is_paid: true }, 'paid'), true);
+  assert.equal(matchesBuyerWonFilter({ is_paid: false }, 'awaiting_checkout'), true);
+  assert.equal(matchesBuyerWonFilter({}, 'awaiting_checkout'), false);
+  assert.equal(matchesBuyerWonFilter({}, 'paid'), false);
+});
+
+test('pending checkout only includes explicit unpaid won auctions', () => {
   const auctions = [
     auction({ id: 1, status: 'CLOSED', winning_bidder: 7, is_paid: false }),
     auction({ id: 2, status: 'CLOSED', winning_bidder: 7, is_paid: true }),
     auction({ id: 3, status: 'CLOSED', winning_bidder: 7 }),
   ];
   const pending = getPendingCheckoutAuctions(auctions, 7);
+  const unpaid = getUnpaidWonAuctions(auctions, 7);
   assert.deepEqual(
     pending.map((item) => item.id),
-    [3, 1],
+    [1],
+  );
+  assert.deepEqual(
+    unpaid.map((item) => item.id),
+    [1],
   );
   assert.equal(pending.some((item) => item.id === 2), false);
+  assert.equal(pending.some((item) => item.id === 3), false);
+});
+
+test('won auctions sort by end_time descending with id tie-break', () => {
+  const auctions = [
+    auction({
+      id: 1,
+      status: 'CLOSED',
+      winning_bidder: 7,
+      end_time: '2026-01-01T00:00:00Z',
+    }),
+    auction({
+      id: 2,
+      status: 'CLOSED',
+      winning_bidder: 7,
+      end_time: '2026-03-01T00:00:00Z',
+    }),
+    auction({
+      id: 3,
+      status: 'CLOSED',
+      winning_bidder: 7,
+      end_time: '2026-03-01T00:00:00Z',
+    }),
+  ];
+  const won = getBuyerWonAuctions(auctions, 7);
+  assert.deepEqual(
+    won.map((item) => item.id),
+    [3, 2, 1],
+  );
+  const resorted = sortWonAuctions(auctions);
+  assert.deepEqual(
+    resorted.map((item) => item.id),
+    [3, 2, 1],
+  );
+});
+
+test('withAuctionMarkedPaid copies the list and does not mutate source', () => {
+  const auctions = [
+    auction({ id: 1, status: 'CLOSED', winning_bidder: 7, is_paid: false }),
+  ];
+  const next = withAuctionMarkedPaid(auctions, 1);
+  assert.equal(auctions[0].is_paid, false);
+  assert.equal(next[0].is_paid, true);
+  assert.equal(next[0] === auctions[0], false);
+});
+
+test('buyer won path is the dashboard preview destination', () => {
+  assert.equal(BUYER_WON_PATH, '/buyer/won');
 });
 
 test('empty bid list produces zero activity', () => {
@@ -88,7 +175,7 @@ test('empty bid list produces zero activity', () => {
   assert.deepEqual(getBuyerDashboardMetrics(bids, auctions, 7), {
     auctionsBidOn: 0,
     wonAuctions: 1,
-    pendingCheckout: 1,
+    pendingCheckout: 0,
   });
 });
 
@@ -126,6 +213,7 @@ test('buyer helpers do not mutate source arrays', () => {
   getDistinctBidAuctionIds(bids);
   getBuyerWonAuctions(auctions, 7);
   getPendingCheckoutAuctions(auctions, 7);
+  sortWonAuctions(auctions);
   getRecentBuyerAuctions(bids, indexAuctionsById(auctions));
 
   assert.deepEqual(bids, bidSnapshot);

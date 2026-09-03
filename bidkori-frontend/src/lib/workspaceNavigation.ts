@@ -30,7 +30,7 @@ const MARKETPLACE_LABEL = 'Browse Marketplace';
 const BUYER_NAV: readonly WorkspaceNavItem[] = [
   { id: 'dashboard', label: 'Dashboard', href: '/buyer', enabled: true },
   { id: 'my-bids', label: 'My Bids', href: '/buyer/my-bids', enabled: true },
-  { id: 'won-auctions', label: 'Won Auctions', enabled: false },
+  { id: 'won-auctions', label: 'Won Auctions', href: '/buyer/won', enabled: true },
   { id: 'watchlist', label: 'Watchlist', enabled: false },
   { id: 'profile', label: 'Profile', enabled: false },
   { id: 'settings', label: 'Settings', enabled: false },

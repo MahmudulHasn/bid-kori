@@ -1,7 +1,14 @@
 import api from '@/lib/api';
 import { MY_BIDS_API_PATH } from '@/lib/buyer';
+import { buildCheckoutApiPath } from '@/lib/checkoutApi';
 import { ACTIVE_AUCTIONS_API_PATH, buildAuctionSearchApiPath } from '@/lib/marketplace';
-import type { Auction, UserBid } from '@/lib/types';
+import type { Auction, PaymentSummary, UserBid } from '@/lib/types';
+
+export {
+  AUCTIONS_LIST_API_PATH,
+  buildCheckoutApiPath,
+  isCheckoutAlreadyPaidError,
+} from '@/lib/checkoutApi';
 
 /**
  * Normalize list/search/active payloads into a flat auction array.
@@ -69,4 +76,17 @@ export async function fetchMyBids(): Promise<UserBid[]> {
 export async function myBidsFetcher(url: string): Promise<UserBid[]> {
   const { data } = await api.get<unknown>(url);
   return unwrapBidList(data);
+}
+
+/**
+ * Mock checkout for a CLOSED auction winner.
+ * Sends no payment payload — the backend creates a completed Payment row.
+ */
+export async function checkoutAuction(
+  auctionId: string | number,
+): Promise<PaymentSummary> {
+  const { data } = await api.post<PaymentSummary>(
+    buildCheckoutApiPath(auctionId),
+  );
+  return data;
 }

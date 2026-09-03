@@ -1,6 +1,7 @@
 import type { Auction, UserBid } from './types.ts';
 
 export const MY_BIDS_API_PATH = '/auctions/my-bids/';
+export const BUYER_WON_PATH = '/buyer/won';
 export const RECENT_BUYER_ACTIVITY_LIMIT = 4;
 export const WON_AUCTION_PREVIEW_LIMIT = 4;
 
@@ -56,6 +57,22 @@ function winningBidderId(auction: Auction): number | null {
 }
 
 /**
+ * Sort won auctions by end_time descending (missing dates last among ties by id).
+ * Does not mutate the source array.
+ */
+export function sortWonAuctions(auctions: readonly Auction[]): Auction[] {
+  return auctions.slice().sort((a, b) => {
+    const aMs = a.end_time ? new Date(a.end_time).getTime() : 0;
+    const bMs = b.end_time ? new Date(b.end_time).getTime() : 0;
+    const aValid = !Number.isNaN(aMs);
+    const bValid = !Number.isNaN(bMs);
+    if (aValid && bValid && aMs !== bMs) return bMs - aMs;
+    if (aValid !== bValid) return aValid ? -1 : 1;
+    return b.id - a.id;
+  });
+}
+
+/**
  * CLOSED auctions whose winning_bidder matches the buyer.
  * Does not mutate the source array.
  */
@@ -63,30 +80,76 @@ export function getBuyerWonAuctions(
   auctions: readonly Auction[],
   userId: number,
 ): Auction[] {
-  return auctions
-    .filter(
+  return sortWonAuctions(
+    auctions.filter(
       (auction) =>
         auction.status === 'CLOSED' && winningBidderId(auction) === userId,
-    )
-    .slice()
-    .sort((a, b) => {
-      const aMs = a.end_time ? new Date(a.end_time).getTime() : 0;
-      const bMs = b.end_time ? new Date(b.end_time).getTime() : 0;
-      if (aMs !== bMs) return bMs - aMs;
-      return b.id - a.id;
-    });
+    ),
+  );
+}
+
+/**
+ * Auction list/detail serializers include `is_paid` as a boolean.
+ * If the field is omitted, do not infer unpaid — treat as unknown.
+ */
+export type AuctionPaymentState = 'paid' | 'unpaid' | 'unknown';
+
+export function getAuctionPaymentState(
+  auction: Pick<Auction, 'is_paid'>,
+): AuctionPaymentState {
+  if (auction.is_paid === true) return 'paid';
+  if (auction.is_paid === false) return 'unpaid';
+  return 'unknown';
+}
+
+export type BuyerWonFilter = 'all' | 'awaiting_checkout' | 'paid';
+
+export function matchesBuyerWonFilter(
+  auction: Pick<Auction, 'is_paid'>,
+  filter: BuyerWonFilter,
+): boolean {
+  const payment = getAuctionPaymentState(auction);
+  switch (filter) {
+    case 'all':
+      return true;
+    case 'awaiting_checkout':
+      return payment === 'unpaid';
+    case 'paid':
+      return payment === 'paid';
+  }
+}
+
+/**
+ * Won auctions with explicit `is_paid === false`.
+ * Omitted `is_paid` is not treated as unpaid.
+ */
+export function getUnpaidWonAuctions(
+  auctions: readonly Auction[],
+  userId: number,
+): Auction[] {
+  return getBuyerWonAuctions(auctions, userId).filter(
+    (auction) => getAuctionPaymentState(auction) === 'unpaid',
+  );
 }
 
 /**
  * Won, unpaid auctions that still need checkout.
- * `is_paid === true` is excluded; missing/false is treated as unpaid.
+ * Only `is_paid === false` counts; missing is unknown, not pending.
  */
 export function getPendingCheckoutAuctions(
   auctions: readonly Auction[],
   userId: number,
 ): Auction[] {
-  return getBuyerWonAuctions(auctions, userId).filter(
-    (auction) => auction.is_paid !== true,
+  return getUnpaidWonAuctions(auctions, userId);
+}
+
+/** Optimistic list update after mock checkout (does not mutate source). */
+export function withAuctionMarkedPaid(
+  auctions: readonly Auction[],
+  auctionId: number,
+): Auction[] {
+  return auctions.map((auction) =>
+    auction.id === auctionId ? { ...auction, is_paid: true } : auction,
   );
 }
 

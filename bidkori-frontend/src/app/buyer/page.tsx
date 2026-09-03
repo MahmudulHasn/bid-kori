@@ -8,9 +8,14 @@ import useSWR from 'swr';
 import AuctionGrid from '@/components/marketplace/AuctionGrid';
 import { AuctionGridSkeleton } from '@/components/marketplace/MarketplaceStates';
 import { useAuth } from '@/context/AuthContext';
-import { auctionListFetcher, myBidsFetcher } from '@/lib/auctionsApi';
+import {
+  AUCTIONS_LIST_API_PATH,
+  auctionListFetcher,
+  myBidsFetcher,
+} from '@/lib/auctionsApi';
 import { getApiErrorMessage } from '@/lib/apiErrors';
 import {
+  BUYER_WON_PATH,
   MY_BIDS_API_PATH,
   WON_AUCTION_PREVIEW_LIMIT,
   getBuyerDashboardMetrics,
@@ -83,7 +88,7 @@ export default function BuyerHomePage() {
     error: auctionsError,
     isLoading: auctionsLoading,
     mutate: mutateAuctions,
-  } = useSWR('/auctions/', auctionListFetcher);
+  } = useSWR(AUCTIONS_LIST_API_PATH, auctionListFetcher);
 
   const loading = bidsLoading || auctionsLoading;
   const error = bidsError || auctionsError;
@@ -198,7 +203,7 @@ export default function BuyerHomePage() {
               <MetricCard
                 label="Pending Checkout"
                 value={metrics.pendingCheckout}
-                hint="Won auctions not yet marked paid"
+                hint="Won auctions with unpaid checkout status"
                 icon={<Wallet className="h-4 w-4" />}
               />
             </div>
@@ -247,16 +252,12 @@ export default function BuyerHomePage() {
                   Closed listings where you are the winning bidder.
                 </p>
               </div>
-              <span
-                aria-disabled="true"
-                title="Coming soon"
-                className="cursor-not-allowed text-sm text-zinc-400 dark:text-zinc-500"
+              <Link
+                href={BUYER_WON_PATH}
+                className="text-sm font-medium text-amber-700 hover:underline dark:text-amber-300"
               >
-                View all
-                <span className="ml-1.5 text-[10px] font-semibold uppercase tracking-wide">
-                  Soon
-                </span>
-              </span>
+                View all won auctions
+              </Link>
             </div>
             {wonPreview.length > 0 ? (
               <AuctionGrid auctions={wonPreview} />

@@ -8,17 +8,23 @@ import toast from 'react-hot-toast';
 import useSWR from 'swr';
 
 import { useAuth } from '@/context/AuthContext';
-import api from '@/lib/api';
 import { getApiErrorMessage, getApiStatus } from '@/lib/apiErrors';
 import { getAuctionTitle } from '@/lib/auctionDisplay';
-import { auctionListFetcher, myBidsFetcher } from '@/lib/auctionsApi';
+import {
+  AUCTIONS_LIST_API_PATH,
+  auctionListFetcher,
+  checkoutAuction,
+  isCheckoutAlreadyPaidError,
+  myBidsFetcher,
+} from '@/lib/auctionsApi';
 import {
   MY_BIDS_API_PATH,
   getBidAuctionId,
   getBuyerWonAuctions,
   indexAuctionsById,
+  withAuctionMarkedPaid,
 } from '@/lib/buyer';
-import type { Auction, PaymentSummary, UserBid } from '@/lib/types';
+import type { Auction, UserBid } from '@/lib/types';
 
 function formatMoney(value: string | number | undefined) {
   return `৳${Number(value ?? 0).toLocaleString(undefined, {
@@ -45,7 +51,7 @@ export default function DashboardPage() {
     error: auctionsError,
     isLoading: auctionsLoading,
     mutate: mutateAuctions,
-  } = useSWR(isAuthenticated ? '/auctions/' : null, auctionListFetcher);
+  } = useSWR(isAuthenticated ? AUCTIONS_LIST_API_PATH : null, auctionListFetcher);
 
   const {
     data: myBids,
@@ -87,17 +93,12 @@ export default function DashboardPage() {
     }
     setPayingId(auctionId);
     try {
-      const { data } = await api.post<PaymentSummary>(
-        `/auctions/${auctionId}/checkout/`,
-      );
+      const data = await checkoutAuction(auctionId);
       const txn = data.transaction_id || 'N/A';
-      toast.success(`Payment successful. Transaction ID: ${txn}`);
+      toast.success(`Checkout complete (mock). Transaction ${txn}`);
       setPaidOverrides((prev) => ({ ...prev, [auctionId]: txn }));
       await mutateAuctions(
-        (current) =>
-          (current ?? []).map((auction) =>
-            auction.id === auctionId ? { ...auction, is_paid: true } : auction,
-          ),
+        (current) => withAuctionMarkedPaid(current ?? [], auctionId),
         { revalidate: true },
       );
     } catch (error: unknown) {
@@ -106,12 +107,22 @@ export default function DashboardPage() {
         error,
         'Checkout failed. Please try again.',
       );
-      if (status === 401) {
+      if (isCheckoutAlreadyPaidError(error)) {
+        toast.success('This auction has already been paid.');
+        setPaidOverrides((prev) => ({ ...prev, [auctionId]: 'already paid' }));
+        await mutateAuctions(
+          (current) => withAuctionMarkedPaid(current ?? [], auctionId),
+          { revalidate: true },
+        );
+      } else if (status === 401) {
         toast.error('Please log in again to complete checkout.');
+        await mutateAuctions();
       } else if (status === 403) {
         toast.error(message || 'Only the winning bidder can complete checkout.');
+        await mutateAuctions();
       } else {
         toast.error(message);
+        await mutateAuctions();
       }
     } finally {
       setPayingId(null);
@@ -287,7 +298,9 @@ export default function DashboardPage() {
                       className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-amber-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       <CreditCard className="h-4 w-4" aria-hidden />
-                      {payingId === auction.id ? 'Processing…' : 'Pay Now'}
+                      {payingId === auction.id
+                        ? 'Completing checkout...'
+                        : 'Complete Checkout'}
                     </button>
                   ) : (
                     isPaid && (
