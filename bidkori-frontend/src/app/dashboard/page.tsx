@@ -11,23 +11,14 @@ import { useAuth } from '@/context/AuthContext';
 import api from '@/lib/api';
 import { getApiErrorMessage, getApiStatus } from '@/lib/apiErrors';
 import { getAuctionTitle } from '@/lib/auctionDisplay';
+import { auctionListFetcher, myBidsFetcher } from '@/lib/auctionsApi';
+import {
+  MY_BIDS_API_PATH,
+  getBidAuctionId,
+  getBuyerWonAuctions,
+  indexAuctionsById,
+} from '@/lib/buyer';
 import type { Auction, PaymentSummary, UserBid } from '@/lib/types';
-
-const fetchAuctions = async (url: string) => {
-  const { data } = await api.get<Auction[]>(url);
-  return data;
-};
-
-const fetchBids = async (url: string) => {
-  const { data } = await api.get<UserBid[]>(url);
-  return data;
-};
-
-function getAuctionId(bid: UserBid): number | null {
-  if (typeof bid.auction === 'number') return bid.auction;
-  if (bid.auction && typeof bid.auction === 'object') return bid.auction.id;
-  return null;
-}
 
 function formatMoney(value: string | number | undefined) {
   return `৳${Number(value ?? 0).toLocaleString(undefined, {
@@ -54,28 +45,25 @@ export default function DashboardPage() {
     error: auctionsError,
     isLoading: auctionsLoading,
     mutate: mutateAuctions,
-  } = useSWR(isAuthenticated ? '/auctions/' : null, fetchAuctions);
+  } = useSWR(isAuthenticated ? '/auctions/' : null, auctionListFetcher);
 
   const {
     data: myBids,
     error: bidsError,
     isLoading: bidsLoading,
-  } = useSWR(isAuthenticated ? '/auctions/my-bids/' : null, fetchBids);
+  } = useSWR(isAuthenticated ? MY_BIDS_API_PATH : null, myBidsFetcher);
 
-  const auctionById = useMemo(() => {
-    const map = new Map<number, Auction>();
-    for (const auction of auctions ?? []) {
-      map.set(auction.id, auction);
-    }
-    return map;
-  }, [auctions]);
+  const auctionById = useMemo(
+    () => indexAuctionsById(auctions ?? []),
+    [auctions],
+  );
 
   const activeBids = useMemo(() => {
     const seen = new Set<number>();
     const rows: Array<{ bid: UserBid; auction: Auction }> = [];
 
     for (const bid of myBids ?? []) {
-      const auctionId = getAuctionId(bid);
+      const auctionId = getBidAuctionId(bid);
       if (auctionId == null || seen.has(auctionId)) continue;
       const auction = auctionById.get(auctionId);
       if (!auction) continue;
@@ -89,10 +77,7 @@ export default function DashboardPage() {
 
   const wonAuctions = useMemo(() => {
     if (!user) return [];
-    return (auctions ?? []).filter(
-      (auction) =>
-        auction.status === 'CLOSED' && auction.winning_bidder === user.id,
-    );
+    return getBuyerWonAuctions(auctions ?? [], user.id);
   }, [auctions, user]);
 
   const handlePayNow = async (auctionId: number) => {
@@ -196,7 +181,7 @@ export default function DashboardPage() {
         {activeBids.length === 0 ? (
           <p className="rounded-xl border border-dashed border-zinc-300 px-4 py-6 text-sm text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
             You have no active bids right now.{' '}
-            <Link href="/" className="text-amber-700 hover:underline">
+            <Link href="/auctions" className="text-amber-700 hover:underline">
               Browse auctions
             </Link>
           </p>

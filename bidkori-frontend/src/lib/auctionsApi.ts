@@ -1,6 +1,7 @@
 import api from '@/lib/api';
+import { MY_BIDS_API_PATH } from '@/lib/buyer';
 import { ACTIVE_AUCTIONS_API_PATH, buildAuctionSearchApiPath } from '@/lib/marketplace';
-import type { Auction } from '@/lib/types';
+import type { Auction, UserBid } from '@/lib/types';
 
 /**
  * Normalize list/search/active payloads into a flat auction array.
@@ -43,4 +44,29 @@ export async function fetchAuction(id: string | number): Promise<Auction> {
 export async function auctionListFetcher(url: string): Promise<Auction[]> {
   const { data } = await api.get<unknown>(url);
   return unwrapAuctionList(data);
+}
+
+export function unwrapBidList(data: unknown): UserBid[] {
+  if (Array.isArray(data)) {
+    return data as UserBid[];
+  }
+  if (
+    data &&
+    typeof data === 'object' &&
+    Array.isArray((data as { results?: unknown }).results)
+  ) {
+    return (data as { results: UserBid[] }).results;
+  }
+  return [];
+}
+
+export async function fetchMyBids(): Promise<UserBid[]> {
+  const { data } = await api.get<unknown>(MY_BIDS_API_PATH);
+  return unwrapBidList(data);
+}
+
+/** SWR-compatible fetcher for `/auctions/my-bids/`. */
+export async function myBidsFetcher(url: string): Promise<UserBid[]> {
+  const { data } = await api.get<unknown>(url);
+  return unwrapBidList(data);
 }
