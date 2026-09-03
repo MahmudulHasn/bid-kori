@@ -7,32 +7,31 @@ import { LogIn } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 import { useAuth } from '@/context/AuthContext';
-import { isSafeNextPath } from '@/lib/authRouting';
+import { resolvePostAuthPath } from '@/lib/authRouting';
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { login, isAuthenticated, isLoading } = useAuth();
+  const { login, isAuthenticated, isLoading, user } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   const nextPath = searchParams.get('next');
-  const redirectTo = isSafeNextPath(nextPath) ? nextPath : '/';
 
   useEffect(() => {
-    if (!isLoading && isAuthenticated) {
-      router.replace(redirectTo);
+    if (!isLoading && isAuthenticated && user) {
+      router.replace(resolvePostAuthPath(nextPath, user.role));
     }
-  }, [isAuthenticated, isLoading, redirectTo, router]);
+  }, [isAuthenticated, isLoading, nextPath, router, user]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSubmitting(true);
     try {
-      await login(username.trim(), password);
+      const authenticatedUser = await login(username.trim(), password);
       toast.success('Logged in successfully.');
-      router.push(redirectTo);
+      router.push(resolvePostAuthPath(nextPath, authenticatedUser.role));
     } catch (error: unknown) {
       const data = (error as { response?: { data?: Record<string, unknown> } })
         ?.response?.data;

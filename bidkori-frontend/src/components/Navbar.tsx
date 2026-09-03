@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 
 import { useAuth } from '@/context/AuthContext';
+import { isRoleWorkspacePath } from '@/lib/authRouting';
 
 const navLinkClass = (active: boolean) =>
   [
@@ -25,7 +26,14 @@ const navLinkClass = (active: boolean) =>
 export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
+  // Role-aware AuthUser (role / is_staff) is available via `user` for later
+  // Buyer/Seller/Admin nav variants — this shell stays shared for now.
   const { isAuthenticated, user, logout, isLoading } = useAuth();
+
+  // Role workspaces render their own chrome via RoleWorkspaceLayout.
+  if (isRoleWorkspacePath(pathname)) {
+    return null;
+  }
 
   const handleLogout = () => {
     logout();

@@ -1,3 +1,18 @@
+/** Authoritative marketplace roles from Django identity responses. */
+export type UserRole = 'BUYER' | 'SELLER' | 'ADMIN';
+
+/** Roles allowed on public registration (ADMIN is never selectable). */
+export type PublicRegistrationRole = 'BUYER' | 'SELLER';
+
+/** Authenticated user shape from /users/me/, login, and register. */
+export type AuthUser = {
+  id: number;
+  username: string;
+  email: string;
+  role: UserRole;
+  is_staff: boolean;
+};
+
 export type AuctionImage = {
   id: number;
   image: string;

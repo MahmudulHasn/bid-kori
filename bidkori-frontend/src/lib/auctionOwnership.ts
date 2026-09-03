@@ -1,4 +1,4 @@
-import type { AuthUser } from '@/context/AuthContext';
+import type { AuthUser } from '@/lib/types';
 import type { Auction } from '@/lib/types';
 
 /**

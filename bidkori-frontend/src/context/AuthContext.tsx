@@ -16,31 +16,31 @@ import {
   AUTH_EXPIRED_EVENT,
   TOKEN_KEY,
   USER_KEY,
+  buildRegisterPayload,
 } from '@/lib/authRouting';
 import {
   clearClientAuthStorage,
   setSessionHintCookie,
 } from '@/lib/authStorage';
+import type { AuthUser, PublicRegistrationRole } from '@/lib/types';
 
-export type AuthUser = {
-  id: number;
-  username: string;
-  email: string;
-};
+export type { AuthUser, PublicRegistrationRole, UserRole } from '@/lib/types';
 
 type AuthContextValue = {
   user: AuthUser | null;
   token: string | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (username: string, password: string) => Promise<void>;
+  login: (username: string, password: string) => Promise<AuthUser>;
   register: (
     username: string,
     email: string,
     password: string,
     confirmPassword: string,
-  ) => Promise<void>;
+    role?: PublicRegistrationRole,
+  ) => Promise<AuthUser>;
   logout: () => Promise<void>;
+  refreshUser: () => Promise<AuthUser | null>;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -125,6 +125,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       );
       persistSession(data.token, data.user);
       toast.success(`Welcome back, ${data.user.username}!`);
+      return data.user;
     },
     [persistSession],
   );
@@ -135,18 +136,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email: string,
       password: string,
       confirmPassword: string,
+      role: PublicRegistrationRole = 'BUYER',
     ) => {
+      const payload = buildRegisterPayload({
+        username,
+        email,
+        password,
+        confirmPassword,
+        role,
+      });
       const { data } = await api.post<{ token: string; user: AuthUser }>(
         '/users/register/',
-        {
-          username,
-          email,
-          password,
-          confirm_password: confirmPassword,
-        },
+        payload,
       );
       persistSession(data.token, data.user);
       toast.success(`Account created. Welcome, ${data.user.username}!`);
+      return data.user;
     },
     [persistSession],
   );
@@ -162,6 +167,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [resetSessionState]);
 
+  const refreshUser = useCallback(async () => {
+    const storedToken = localStorage.getItem(TOKEN_KEY);
+    if (!storedToken) {
+      resetSessionState();
+      return null;
+    }
+    try {
+      const { data } = await api.get<AuthUser>('/users/me/');
+      setToken(storedToken);
+      setUser(data);
+      localStorage.setItem(USER_KEY, JSON.stringify(data));
+      setSessionHintCookie();
+      return data;
+    } catch {
+      resetSessionState();
+      return null;
+    }
+  }, [resetSessionState]);
+
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
@@ -172,8 +196,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       register,
       logout,
+      refreshUser,
     }),
-    [user, token, isLoading, login, register, logout],
+    [user, token, isLoading, login, register, logout, refreshUser],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

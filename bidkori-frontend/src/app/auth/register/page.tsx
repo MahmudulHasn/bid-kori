@@ -7,21 +7,27 @@ import { UserPlus } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 import { useAuth } from '@/context/AuthContext';
+import {
+  PUBLIC_ACCOUNT_TYPE_OPTIONS,
+  resolvePostAuthPath,
+} from '@/lib/authRouting';
+import type { PublicRegistrationRole } from '@/lib/types';
 
 export default function RegisterPage() {
   const router = useRouter();
-  const { register, isAuthenticated } = useAuth();
+  const { register, isAuthenticated, user, isLoading } = useAuth();
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [role, setRole] = useState<PublicRegistrationRole>('BUYER');
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (isAuthenticated) {
-      router.replace('/');
+    if (!isLoading && isAuthenticated && user) {
+      router.replace(resolvePostAuthPath(null, user.role));
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, isLoading, router, user]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -33,9 +39,15 @@ export default function RegisterPage() {
 
     setSubmitting(true);
     try {
-      await register(username.trim(), email.trim(), password, confirmPassword);
+      const authenticatedUser = await register(
+        username.trim(),
+        email.trim(),
+        password,
+        confirmPassword,
+        role,
+      );
       toast.success('Registration successful.');
-      router.push('/');
+      router.push(resolvePostAuthPath(null, authenticatedUser.role));
     } catch (error: unknown) {
       const data = (error as { response?: { data?: Record<string, unknown> } })
         ?.response?.data;
@@ -58,7 +70,7 @@ export default function RegisterPage() {
           </span>
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-white">
-              Create account
+              Create your account
             </h1>
             <p className="text-sm text-zinc-500 dark:text-zinc-400">
               Join BidKori to list items and place bids.
@@ -67,6 +79,45 @@ export default function RegisterPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          <fieldset className="space-y-3">
+            <legend className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+              Account Type
+            </legend>
+            <div className="space-y-2">
+              {PUBLIC_ACCOUNT_TYPE_OPTIONS.map((option) => {
+                const selected = role === option.role;
+                return (
+                  <label
+                    key={option.role}
+                    className={[
+                      'flex cursor-pointer gap-3 rounded-lg border px-3 py-3 transition',
+                      selected
+                        ? 'border-amber-500 bg-amber-500/10'
+                        : 'border-zinc-300 hover:border-zinc-400 dark:border-zinc-700 dark:hover:border-zinc-600',
+                    ].join(' ')}
+                  >
+                    <input
+                      type="radio"
+                      name="account-type"
+                      value={option.role}
+                      checked={selected}
+                      onChange={() => setRole(option.role)}
+                      className="mt-1"
+                    />
+                    <span>
+                      <span className="block text-sm font-medium text-zinc-900 dark:text-white">
+                        {option.label}
+                      </span>
+                      <span className="block text-xs text-zinc-500 dark:text-zinc-400">
+                        {option.description}
+                      </span>
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
+
           <label className="block space-y-1.5">
             <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
               Username
