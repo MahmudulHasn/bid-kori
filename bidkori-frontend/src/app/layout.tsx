@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import { Toaster } from 'react-hot-toast';
+import type { ReactNode } from 'react';
 
 import Navbar from '@/components/Navbar';
 import { AuthProvider } from '@/context/AuthContext';
@@ -21,7 +22,7 @@ export const metadata: Metadata = {
   description: 'Real-time online auction marketplace',
 };
 
-export default function RootLayout({ children }: LayoutProps<'/'>) {
+export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html
       lang="en"

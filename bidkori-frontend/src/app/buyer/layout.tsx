@@ -3,6 +3,7 @@
 import { Suspense, type ReactNode } from 'react';
 
 import RoleGuard from '@/components/auth/RoleGuard';
+import RoleWorkspaceLayout from '@/components/layout/RoleWorkspaceLayout';
 
 function GuardFallback() {
   return (
@@ -17,7 +18,9 @@ function GuardFallback() {
 export default function BuyerLayout({ children }: { children: ReactNode }) {
   return (
     <Suspense fallback={<GuardFallback />}>
-      <RoleGuard allowedRoles={['BUYER']}>{children}</RoleGuard>
+      <RoleGuard allowedRoles={['BUYER']}>
+        <RoleWorkspaceLayout role="BUYER">{children}</RoleWorkspaceLayout>
+      </RoleGuard>
     </Suspense>
   );
 }

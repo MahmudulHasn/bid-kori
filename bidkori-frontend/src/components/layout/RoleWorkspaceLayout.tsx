@@ -1,125 +1,77 @@
 'use client';
 
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import type { ReactNode } from 'react';
-import { Gavel, LogOut, Store } from 'lucide-react';
+import { usePathname } from 'next/navigation';
+import { useEffect, useState, type ReactNode } from 'react';
 
-import { useAuth } from '@/context/AuthContext';
-
-export type WorkspaceNavItem = {
-  label: string;
-  /** When omitted or upcoming, the item is shown as disabled placeholder. */
-  href?: string;
-  upcoming?: boolean;
-};
+import WorkspaceHeader from '@/components/layout/WorkspaceHeader';
+import WorkspaceSidebar from '@/components/layout/WorkspaceSidebar';
+import { getWorkspaceConfig } from '@/lib/workspaceNavigation';
+import type { UserRole } from '@/lib/types';
 
 type RoleWorkspaceLayoutProps = {
-  title: string;
-  subtitle?: string;
-  navItems?: readonly WorkspaceNavItem[];
+  role: UserRole;
   children: ReactNode;
 };
 
+/**
+ * Shared chrome for Buyer / Seller / Admin workspaces.
+ * Navigation IA comes from workspaceNavigation.ts — not duplicated per role page.
+ */
 export default function RoleWorkspaceLayout({
-  title,
-  subtitle,
-  navItems = [],
+  role,
   children,
 }: RoleWorkspaceLayoutProps) {
-  const router = useRouter();
-  const { user, logout } = useAuth();
+  const pathname = usePathname();
+  const config = getWorkspaceConfig(role);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
-  const handleLogout = async () => {
-    await logout();
-    router.push('/');
-  };
+  useEffect(() => {
+    if (!mobileNavOpen) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [mobileNavOpen]);
+
+  const closeMobileNav = () => setMobileNavOpen(false);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col bg-zinc-50 dark:bg-zinc-950">
-      <header className="border-b border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-        <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6">
-          <div className="flex min-w-0 items-start gap-3">
-            <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-500/15 text-amber-700 dark:text-amber-300">
-              <Store className="h-4 w-4" aria-hidden />
-            </span>
-            <div className="min-w-0">
-              <p className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                BidKori workspace
-              </p>
-              <h1 className="truncate text-lg font-semibold text-zinc-900 dark:text-white">
-                {title}
-              </h1>
-              {subtitle ? (
-                <p className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">
-                  {subtitle}
-                </p>
-              ) : null}
-            </div>
-          </div>
+    <div className="flex min-h-0 flex-1 bg-zinc-50 dark:bg-zinc-950">
+      {/* Desktop sidebar */}
+      <div className="hidden lg:sticky lg:top-0 lg:flex lg:h-screen lg:shrink-0">
+        <WorkspaceSidebar config={config} pathname={pathname} />
+      </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <Link
-              href="/"
-              className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-white"
-            >
-              <Gavel className="h-4 w-4" aria-hidden />
-              Marketplace
-            </Link>
-            {user?.username ? (
-              <span className="hidden text-sm text-zinc-500 sm:inline dark:text-zinc-400">
-                {user.username}
-              </span>
-            ) : null}
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-3 py-2 text-sm font-medium text-white transition hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
-            >
-              <LogOut className="h-4 w-4" aria-hidden />
-              Logout
-            </button>
+      {/* Mobile drawer */}
+      {mobileNavOpen ? (
+        <div className="fixed inset-0 z-40 lg:hidden" role="dialog" aria-modal="true">
+          <button
+            type="button"
+            className="absolute inset-0 bg-zinc-950/40"
+            aria-label="Close navigation menu"
+            onClick={closeMobileNav}
+          />
+          <div className="absolute inset-y-0 left-0 flex max-w-[85vw] shadow-xl">
+            <WorkspaceSidebar
+              config={config}
+              pathname={pathname}
+              onNavigate={closeMobileNav}
+            />
           </div>
         </div>
+      ) : null}
 
-        {navItems.length > 0 ? (
-          <nav
-            aria-label="Workspace sections"
-            className="mx-auto flex w-full max-w-5xl gap-1 overflow-x-auto px-4 pb-3 sm:px-6"
-          >
-            {navItems.map((item) => {
-              const upcoming = item.upcoming || !item.href;
-              if (upcoming) {
-                return (
-                  <span
-                    key={item.label}
-                    title="Coming soon"
-                    className="inline-flex cursor-default items-center rounded-lg px-3 py-1.5 text-sm text-zinc-400 dark:text-zinc-500"
-                  >
-                    {item.label}
-                    <span className="ml-1.5 text-[10px] uppercase tracking-wide">
-                      Soon
-                    </span>
-                  </span>
-                );
-              }
-              return (
-                <Link
-                  key={item.label}
-                  href={item.href!}
-                  className="inline-flex items-center rounded-lg px-3 py-1.5 text-sm font-medium text-amber-800 transition hover:bg-amber-500/10 dark:text-amber-300"
-                >
-                  {item.label}
-                </Link>
-              );
-            })}
-          </nav>
-        ) : null}
-      </header>
-
-      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 sm:px-6">
-        {children}
-      </main>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <WorkspaceHeader
+          config={config}
+          menuOpen={mobileNavOpen}
+          onMenuToggle={() => setMobileNavOpen((open) => !open)}
+        />
+        <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 sm:px-6">
+          {children}
+        </main>
+      </div>
     </div>
   );
 }
