@@ -24,6 +24,10 @@ import {
   cancelAuction,
 } from '@/lib/auctionsApi';
 import { canSellerCancelAuction } from '@/lib/auctionManagementSafety';
+import {
+  SELLER_AUCTION_IMAGE_DELETE_ENABLED,
+  SELLER_AUCTION_IMAGE_UPLOAD_ENABLED,
+} from '@/lib/auctionImageSafety';
 import { resolveMediaUrl } from '@/lib/media';
 import {
   getSellerAuctionDisplayStatus,
@@ -228,6 +232,14 @@ function OwnedAuctionDetail({
           No auction images
         </div>
       )}
+
+      {!SELLER_AUCTION_IMAGE_UPLOAD_ENABLED &&
+      !SELLER_AUCTION_IMAGE_DELETE_ENABLED ? (
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          Image upload and removal are unavailable until auction image
+          lifecycle guards exist. Existing photos remain view-only here.
+        </p>
+      ) : null}
 
       <section
         aria-labelledby="auction-details-heading"
