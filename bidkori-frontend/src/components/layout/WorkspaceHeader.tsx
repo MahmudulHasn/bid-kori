@@ -9,6 +9,7 @@ import { useAuth } from '@/context/AuthContext';
 import {
   getRoleDisplayLabel,
   getWorkspaceAccent,
+  getWorkspaceAccountPaths,
   type WorkspaceConfig,
 } from '@/lib/workspaceNavigation';
 
@@ -39,6 +40,7 @@ export default function WorkspaceHeader({
   const menuId = useId();
   const accent = getWorkspaceAccent(config.role);
   const roleLabel = getRoleDisplayLabel(config.role);
+  const accountPaths = getWorkspaceAccountPaths(config.role);
 
   useEffect(() => {
     if (!menuExpanded) return;
@@ -144,12 +146,32 @@ export default function WorkspaceHeader({
               >
                 <div className="border-b border-zinc-100 px-3 py-2 dark:border-zinc-800">
                   <p className="truncate text-sm font-medium text-zinc-900 dark:text-white">
-                    {user?.username}
+                    {user?.username ?? 'Account'}
                   </p>
                   <p className="text-xs text-zinc-500 dark:text-zinc-400">
                     {roleLabel}
                   </p>
                 </div>
+                {accountPaths.profile ? (
+                  <Link
+                    href={accountPaths.profile}
+                    role="menuitem"
+                    onClick={() => setMenuExpanded(false)}
+                    className="block px-3 py-2 text-sm text-zinc-700 transition hover:bg-zinc-100 focus-visible:bg-zinc-100 focus-visible:outline-none dark:text-zinc-200 dark:hover:bg-zinc-800"
+                  >
+                    Profile
+                  </Link>
+                ) : null}
+                {accountPaths.settings ? (
+                  <Link
+                    href={accountPaths.settings}
+                    role="menuitem"
+                    onClick={() => setMenuExpanded(false)}
+                    className="block px-3 py-2 text-sm text-zinc-700 transition hover:bg-zinc-100 focus-visible:bg-zinc-100 focus-visible:outline-none dark:text-zinc-200 dark:hover:bg-zinc-800"
+                  >
+                    Settings
+                  </Link>
+                ) : null}
                 <button
                   type="button"
                   role="menuitem"

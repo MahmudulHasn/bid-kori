@@ -3,8 +3,11 @@ import test from 'node:test';
 
 import { getRoleHome } from './authRouting.ts';
 import {
+  BUYER_PROFILE_PATH,
+  BUYER_SETTINGS_PATH,
   WORKSPACE_CONFIGS,
   getRoleDisplayLabel,
+  getWorkspaceAccountPaths,
   getWorkspaceConfig,
   getWorkspaceNavLabel,
   isNavItemActive,
@@ -66,6 +69,17 @@ test('buyer config does not contain seller/admin-only items', () => {
   const won = WORKSPACE_CONFIGS.BUYER.navItems.find((item) => item.id === 'won-auctions');
   assert.equal(won?.enabled, true);
   assert.equal(won?.href, '/buyer/won');
+  const dashboard = WORKSPACE_CONFIGS.BUYER.navItems.find((item) => item.id === 'dashboard');
+  assert.equal(dashboard?.href, '/buyer');
+  const profile = WORKSPACE_CONFIGS.BUYER.navItems.find((item) => item.id === 'profile');
+  assert.equal(profile?.enabled, true);
+  assert.equal(profile?.href, BUYER_PROFILE_PATH);
+  const settings = WORKSPACE_CONFIGS.BUYER.navItems.find((item) => item.id === 'settings');
+  assert.equal(settings?.enabled, true);
+  assert.equal(settings?.href, BUYER_SETTINGS_PATH);
+  const watchlist = WORKSPACE_CONFIGS.BUYER.navItems.find((item) => item.id === 'watchlist');
+  assert.equal(watchlist?.enabled, false);
+  assert.equal(watchlist?.href, undefined);
 });
 
 test('seller config does not contain buyer/admin-only items', () => {
@@ -80,6 +94,10 @@ test('seller config does not contain buyer/admin-only items', () => {
   assert.ok(ids.has('auctions'));
   assert.ok(ids.has('analytics'));
   assert.equal(WORKSPACE_CONFIGS.SELLER.brandTitle, 'BidKori Seller');
+  const sellerProfile = WORKSPACE_CONFIGS.SELLER.navItems.find((item) => item.id === 'profile');
+  assert.equal(sellerProfile?.enabled, false);
+  const sellerSettings = WORKSPACE_CONFIGS.SELLER.navItems.find((item) => item.id === 'settings');
+  assert.equal(sellerSettings?.enabled, false);
 });
 
 test('admin config does not contain buyer/seller-only items', () => {
@@ -97,6 +115,8 @@ test('admin config does not contain buyer/seller-only items', () => {
   assert.ok(ids.has('categories'));
   assert.ok(ids.has('reports'));
   assert.equal(WORKSPACE_CONFIGS.ADMIN.brandTitle, 'BidKori Admin');
+  const adminSettings = WORKSPACE_CONFIGS.ADMIN.navItems.find((item) => item.id === 'settings');
+  assert.equal(adminSettings?.enabled, false);
 });
 
 test('active-route detection handles nested paths', () => {
@@ -106,6 +126,8 @@ test('active-route detection handles nested paths', () => {
   const buyerHome = getRoleHome('BUYER');
   const myBids = { href: '/buyer/my-bids', enabled: true as const };
   const won = { href: '/buyer/won', enabled: true as const };
+  const profile = { href: BUYER_PROFILE_PATH, enabled: true as const };
+  const settings = { href: BUYER_SETTINGS_PATH, enabled: true as const };
 
   assert.equal(isNavItemActive('/seller', dashboard, sellerHome), true);
   assert.equal(isNavItemActive('/seller/', dashboard, sellerHome), true);
@@ -137,6 +159,17 @@ test('active-route detection handles nested paths', () => {
     false,
   );
   assert.equal(isNavItemActive('/buyer/won', myBids, buyerHome), false);
+  assert.equal(isNavItemActive('/buyer/profile', profile, buyerHome), true);
+  assert.equal(
+    isNavItemActive('/buyer/profile', { href: '/buyer', enabled: true }, buyerHome),
+    false,
+  );
+  assert.equal(isNavItemActive('/buyer/settings', settings, buyerHome), true);
+  assert.equal(
+    isNavItemActive('/buyer/settings', { href: '/buyer', enabled: true }, buyerHome),
+    false,
+  );
+  assert.equal(isNavItemActive('/buyer/settings', profile, buyerHome), false);
 });
 
 test('disabled items cannot be treated as navigable', () => {
@@ -186,4 +219,16 @@ test('every workspace shares Browse Marketplace to public auctions', () => {
     assert.equal(config.marketplaceHref, '/auctions');
     assert.equal(config.marketplaceLabel, 'Browse Marketplace');
   }
+});
+
+test('buyer account route helpers and account-path availability', () => {
+  assert.equal(BUYER_PROFILE_PATH, '/buyer/profile');
+  assert.equal(BUYER_SETTINGS_PATH, '/buyer/settings');
+  assert.deepEqual(getWorkspaceAccountPaths('BUYER'), {
+    profile: '/buyer/profile',
+    settings: '/buyer/settings',
+  });
+  assert.deepEqual(getWorkspaceAccountPaths('SELLER'), {});
+  assert.deepEqual(getWorkspaceAccountPaths('ADMIN'), {});
+  assert.equal(getRoleDisplayLabel('BUYER'), 'Buyer');
 });

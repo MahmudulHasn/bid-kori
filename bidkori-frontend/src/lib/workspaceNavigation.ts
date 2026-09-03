@@ -27,13 +27,17 @@ export type WorkspaceConfig = {
 const MARKETPLACE_HREF = '/auctions';
 const MARKETPLACE_LABEL = 'Browse Marketplace';
 
+/** Canonical Buyer account routes (Seller/Admin account pages do not exist yet). */
+export const BUYER_PROFILE_PATH = '/buyer/profile';
+export const BUYER_SETTINGS_PATH = '/buyer/settings';
+
 const BUYER_NAV: readonly WorkspaceNavItem[] = [
   { id: 'dashboard', label: 'Dashboard', href: '/buyer', enabled: true },
   { id: 'my-bids', label: 'My Bids', href: '/buyer/my-bids', enabled: true },
   { id: 'won-auctions', label: 'Won Auctions', href: '/buyer/won', enabled: true },
   { id: 'watchlist', label: 'Watchlist', enabled: false },
-  { id: 'profile', label: 'Profile', enabled: false },
-  { id: 'settings', label: 'Settings', enabled: false },
+  { id: 'profile', label: 'Profile', href: BUYER_PROFILE_PATH, enabled: true },
+  { id: 'settings', label: 'Settings', href: BUYER_SETTINGS_PATH, enabled: true },
 ];
 
 const SELLER_NAV: readonly WorkspaceNavItem[] = [
@@ -101,6 +105,24 @@ export function getRoleDisplayLabel(role: UserRole): string {
 
 export function getWorkspaceConfig(role: UserRole): WorkspaceConfig {
   return WORKSPACE_CONFIGS[role];
+}
+
+/**
+ * Account-area paths that currently exist for a workspace.
+ * Seller/Admin profile and settings pages are not implemented — omit hrefs
+ * rather than linking to missing routes.
+ */
+export function getWorkspaceAccountPaths(role: UserRole): {
+  profile?: string;
+  settings?: string;
+} {
+  if (role === 'BUYER') {
+    return {
+      profile: BUYER_PROFILE_PATH,
+      settings: BUYER_SETTINGS_PATH,
+    };
+  }
+  return {};
 }
 
 /** True when an item is safe to navigate (enabled + href). */

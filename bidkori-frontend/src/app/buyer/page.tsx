@@ -24,6 +24,7 @@ import {
   indexAuctionsById,
 } from '@/lib/buyer';
 import { MARKETPLACE_ROUTES } from '@/lib/marketplace';
+import { BUYER_PROFILE_PATH } from '@/lib/workspaceNavigation';
 
 function MetricCard({
   label,
@@ -137,13 +138,21 @@ export default function BuyerHomePage() {
         <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
           Track your bids and won auctions from here.
         </p>
-        <Link
-          href={MARKETPLACE_ROUTES.auctions}
-          className="mt-5 inline-flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-amber-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500"
-        >
-          Browse Auctions
-          <ArrowRight className="h-4 w-4" aria-hidden />
-        </Link>
+        <div className="mt-5 flex flex-wrap items-center gap-3">
+          <Link
+            href={MARKETPLACE_ROUTES.auctions}
+            className="inline-flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-amber-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500"
+          >
+            Browse Auctions
+            <ArrowRight className="h-4 w-4" aria-hidden />
+          </Link>
+          <Link
+            href={BUYER_PROFILE_PATH}
+            className="text-sm font-medium text-amber-700 underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500 dark:text-amber-300"
+          >
+            View profile
+          </Link>
+        </div>
       </header>
 
       {loading ? <DashboardSkeleton /> : null}
