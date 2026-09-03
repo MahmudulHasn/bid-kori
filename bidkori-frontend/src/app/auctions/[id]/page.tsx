@@ -13,6 +13,9 @@ import { useAuctionTimer } from '@/hooks/useAuctionTimer';
 import api from '@/lib/api';
 import { getApiErrorMessage, getApiStatus } from '@/lib/apiErrors';
 import { isAuctionOwnedByUser } from '@/lib/auctionOwnership';
+import { buildLoginHref } from '@/lib/authRouting';
+import { getAuctionTitle } from '@/lib/auctionDisplay';
+import { MARKETPLACE_ROUTES } from '@/lib/marketplace';
 import { resolveMediaUrl } from '@/lib/media';
 import type { Auction } from '@/lib/types';
 
@@ -71,6 +74,11 @@ export default function AuctionDetailPage() {
     }
     if (!isAuthenticated) {
       toast.error('Please log in to place a bid.');
+      if (auctionId) {
+        router.push(
+          buildLoginHref(MARKETPLACE_ROUTES.auctionDetail(auctionId)),
+        );
+      }
       return;
     }
     if (isOwner) {
@@ -168,7 +176,7 @@ export default function AuctionDetailPage() {
     try {
       await api.delete(`/auctions/${auctionId}/`);
       toast.success('Auction deleted.');
-      router.push('/');
+      router.push(MARKETPLACE_ROUTES.auctions);
     } catch (err: unknown) {
       const status = getApiStatus(err);
       const message = getApiErrorMessage(
@@ -201,8 +209,11 @@ export default function AuctionDetailPage() {
         <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">
           Auction not found or the API is unavailable.
         </p>
-        <Link href="/" className="mt-4 inline-block text-sm text-amber-700 hover:underline">
-          Back to marketplace
+        <Link
+          href={MARKETPLACE_ROUTES.auctions}
+          className="mt-4 inline-block text-sm text-amber-700 hover:underline"
+        >
+          Back to auctions
         </Link>
       </main>
     );
@@ -211,13 +222,16 @@ export default function AuctionDetailPage() {
   return (
     <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-10 sm:px-6">
       <div className="mb-6">
-        <Link href="/" className="text-sm text-amber-700 hover:underline dark:text-amber-300">
+        <Link
+          href={MARKETPLACE_ROUTES.auctions}
+          className="text-sm text-amber-700 hover:underline dark:text-amber-300"
+        >
           ← Back to auctions
         </Link>
         <h1 className="mt-3 text-3xl font-semibold tracking-tight text-zinc-900 dark:text-white">
-          {auction.product?.title ?? 'Auction'}
+          {getAuctionTitle(auction)}
         </h1>
-        {auction.product?.description && (
+        {typeof auction.product === 'object' && auction.product?.description && (
           <p className="mt-2 max-w-3xl text-zinc-600 dark:text-zinc-400">
             {auction.product.description}
           </p>
@@ -230,7 +244,7 @@ export default function AuctionDetailPage() {
             {activeImage ? (
               <Image
                 src={activeImage}
-                alt={auction.product?.title ?? 'Auction image'}
+                alt={getAuctionTitle(auction)}
                 fill
                 priority
                 sizes="(max-width: 1024px) 100vw, 60vw"
@@ -391,7 +405,14 @@ export default function AuctionDetailPage() {
                 </button>
                 {!authLoading && !isAuthenticated && (
                   <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                    <Link href="/auth/login" className="text-amber-700 hover:underline">
+                    <Link
+                      href={buildLoginHref(
+                        auctionId
+                          ? MARKETPLACE_ROUTES.auctionDetail(auctionId)
+                          : MARKETPLACE_ROUTES.auctions,
+                      )}
+                      className="text-amber-700 hover:underline"
+                    >
                       Log in
                     </Link>{' '}
                     to place a bid.

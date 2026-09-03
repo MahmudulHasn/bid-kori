@@ -10,6 +10,7 @@ import useSWR from 'swr';
 import { useAuth } from '@/context/AuthContext';
 import api from '@/lib/api';
 import { getApiErrorMessage, getApiStatus } from '@/lib/apiErrors';
+import { getAuctionTitle } from '@/lib/auctionDisplay';
 import type { Auction, PaymentSummary, UserBid } from '@/lib/types';
 
 const fetchAuctions = async (url: string) => {
@@ -210,7 +211,7 @@ export default function DashboardPage() {
                   href={`/auctions/${auction.id}`}
                   className="text-lg font-semibold text-zinc-900 hover:text-amber-700 dark:text-white dark:hover:text-amber-300"
                 >
-                  {auction.product?.title ?? `Auction #${auction.id}`}
+                  {getAuctionTitle(auction)}
                 </Link>
                 <dl className="mt-3 space-y-1 text-sm text-zinc-600 dark:text-zinc-400">
                   <div className="flex justify-between gap-3">
@@ -268,7 +269,7 @@ export default function DashboardPage() {
                     href={`/auctions/${auction.id}`}
                     className="text-lg font-semibold text-zinc-900 hover:text-amber-700 dark:text-white dark:hover:text-amber-300"
                   >
-                    {auction.product?.title ?? `Auction #${auction.id}`}
+                    {getAuctionTitle(auction)}
                   </Link>
                   <dl className="mt-3 space-y-1 text-sm text-zinc-600 dark:text-zinc-400">
                     <div className="flex justify-between gap-3">

@@ -24,7 +24,7 @@ export type WorkspaceConfig = {
   navItems: readonly WorkspaceNavItem[];
 };
 
-const MARKETPLACE_HREF = '/';
+const MARKETPLACE_HREF = '/auctions';
 const MARKETPLACE_LABEL = 'Browse Marketplace';
 
 const BUYER_NAV: readonly WorkspaceNavItem[] = [

@@ -4,16 +4,17 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   Gavel,
-  Home,
   LayoutDashboard,
   LogIn,
   LogOut,
-  PlusCircle,
+  Search,
+  Store,
   UserPlus,
 } from 'lucide-react';
 
 import { useAuth } from '@/context/AuthContext';
 import { getRoleHome, isRoleWorkspacePath } from '@/lib/authRouting';
+import { MARKETPLACE_ROUTES, PUBLIC_NAV_LINKS } from '@/lib/marketplace';
 import { getWorkspaceNavLabel } from '@/lib/workspaceNavigation';
 
 const navLinkClass = (active: boolean) =>
@@ -23,6 +24,11 @@ const navLinkClass = (active: boolean) =>
       ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
       : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-white',
   ].join(' ');
+
+const navIcons = {
+  Marketplace: Store,
+  Search: Search,
+} as const;
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -46,7 +52,7 @@ export default function Navbar() {
     <header className="sticky top-0 z-40 border-b border-zinc-200/80 bg-white/90 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/90">
       <nav className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
         <Link
-          href="/"
+          href={MARKETPLACE_ROUTES.home}
           className="inline-flex items-center gap-2 text-lg font-semibold tracking-tight text-zinc-900 dark:text-white"
         >
           <Gavel className="h-5 w-5 text-amber-600" aria-hidden />
@@ -54,38 +60,31 @@ export default function Navbar() {
         </Link>
 
         <div className="flex flex-wrap items-center gap-1 sm:gap-2">
-          <Link href="/" className={navLinkClass(pathname === '/')}>
-            <Home className="h-4 w-4" aria-hidden />
-            Marketplace
-          </Link>
+          {PUBLIC_NAV_LINKS.map((link) => {
+            const Icon = navIcons[link.label];
+            const active =
+              pathname === link.href || pathname.startsWith(`${link.href}/`);
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={navLinkClass(active)}
+              >
+                <Icon className="h-4 w-4" aria-hidden />
+                {link.label}
+              </Link>
+            );
+          })}
 
-          {isAuthenticated && (
-            <>
-              {workspaceHref && workspaceLabel ? (
-                <Link
-                  href={workspaceHref}
-                  className={navLinkClass(pathname.startsWith(workspaceHref))}
-                >
-                  <LayoutDashboard className="h-4 w-4" aria-hidden />
-                  {workspaceLabel}
-                </Link>
-              ) : null}
-              <Link
-                href="/dashboard"
-                className={navLinkClass(pathname.startsWith('/dashboard'))}
-              >
-                <LayoutDashboard className="h-4 w-4" aria-hidden />
-                Dashboard
-              </Link>
-              <Link
-                href="/auctions/create"
-                className={navLinkClass(pathname.startsWith('/auctions/create'))}
-              >
-                <PlusCircle className="h-4 w-4" aria-hidden />
-                Create Auction
-              </Link>
-            </>
-          )}
+          {isAuthenticated && workspaceHref && workspaceLabel ? (
+            <Link
+              href={workspaceHref}
+              className={navLinkClass(pathname.startsWith(workspaceHref))}
+            >
+              <LayoutDashboard className="h-4 w-4" aria-hidden />
+              {workspaceLabel}
+            </Link>
+          ) : null}
 
           {isLoading ? (
             <div

@@ -31,16 +31,27 @@ export type AuctionProduct = {
 
 export type Auction = {
   id: number;
-  product: AuctionProduct;
-  starting_bid: string | number;
+  /**
+   * Nested product on list/detail serializers, or product PK on some
+   * active-list payloads (AuctionDetailSerializer).
+   */
+  product?: AuctionProduct | number | null;
+  /** Present on active-list payloads that omit nested product.title. */
+  product_title?: string;
+  starting_bid?: string | number;
   current_highest_bid: string | number;
   min_increment?: string | number;
   end_time?: string;
   start_time?: string;
   status?: string;
   is_paid?: boolean;
+  is_featured?: boolean;
+  is_active?: boolean;
   winning_bidder?: number | null;
+  winning_bidder_username?: string | null;
   images?: AuctionImage[];
+  /** Optional recent bids (active list); used for honest starting vs current labels. */
+  recent_bids?: UserBid[];
 };
 
 export type UserBid = {

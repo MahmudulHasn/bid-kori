@@ -1,5 +1,4 @@
-import type { AuthUser } from '@/lib/types';
-import type { Auction } from '@/lib/types';
+import type { AuthUser, Auction, AuctionProduct } from '@/lib/types';
 
 /**
  * UX ownership check only — backend object permissions remain authoritative.
@@ -10,7 +9,8 @@ export function isAuctionOwnedByUser(
   user: Pick<AuthUser, 'id'> | null | undefined,
 ): boolean {
   if (!auction || !user) return false;
-  const sellerId = auction.product?.seller;
+  if (!auction.product || typeof auction.product !== 'object') return false;
+  const sellerId = (auction.product as AuctionProduct).seller;
   if (sellerId == null || sellerId === '') return false;
   return Number(sellerId) === Number(user.id);
 }

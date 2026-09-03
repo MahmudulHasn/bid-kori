@@ -160,10 +160,10 @@ test('role display labels and public workspace labels are correct', () => {
   assert.equal(getWorkspaceNavLabel('ADMIN'), 'Admin Dashboard');
 });
 
-test('every workspace shares Browse Marketplace to public home', () => {
+test('every workspace shares Browse Marketplace to public auctions', () => {
   for (const role of ['BUYER', 'SELLER', 'ADMIN'] as const) {
     const config = getWorkspaceConfig(role);
-    assert.equal(config.marketplaceHref, '/');
+    assert.equal(config.marketplaceHref, '/auctions');
     assert.equal(config.marketplaceLabel, 'Browse Marketplace');
   }
 });
