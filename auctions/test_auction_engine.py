@@ -128,6 +128,9 @@ class AuctionCreationAPITests(APITestCase):
             email='create_seller@test.com',
             password='pass12345',
         )
+        from users.models import ensure_user_profile, UserProfile
+
+        ensure_user_profile(self.seller, role=UserProfile.Role.SELLER)
         self.token = Token.objects.create(user=self.seller)
         self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
         self.now = timezone.now()

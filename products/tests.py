@@ -167,6 +167,9 @@ class ProductAuctionContractTests(APITestCase):
             email='seller@test.com',
             password='pass12345',
         )
+        from users.models import UserProfile, ensure_user_profile
+
+        ensure_user_profile(self.user, role=UserProfile.Role.SELLER)
         self.token = Token.objects.create(user=self.user)
         self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
 

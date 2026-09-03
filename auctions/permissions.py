@@ -1,5 +1,7 @@
 from rest_framework.permissions import SAFE_METHODS, BasePermission
 
+from users.models import resolve_user_role
+
 from .models import Auction
 
 
@@ -20,6 +22,24 @@ class IsAuctionSellerOrReadOnly(BasePermission):
         if auction is None:
             return False
         return request.user == auction.product.seller
+
+
+class IsSellerOrAdminForAuctionCreate(BasePermission):
+    """Restrict auction creation to SELLER or ADMIN marketplace roles.
+
+    BUYER tokens remain authenticated but cannot create auctions.
+    Object-level ownership for existing products is enforced in the serializer.
+    """
+
+    message = 'Action forbidden: Only sellers can create auctions.'
+
+    def has_permission(self, request, view):
+        if getattr(view, 'action', None) != 'create':
+            return True
+        if not request.user or not request.user.is_authenticated:
+            return False
+        role = resolve_user_role(request.user)
+        return role in ('SELLER', 'ADMIN')
 
 
 class IsNotSeller(BasePermission):

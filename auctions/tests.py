@@ -1383,3 +1383,276 @@ class AuctionListFilterAuthorizationTests(APITestCase):
         self.assertEqual(response.data['product']['seller'], self.seller.pk)
         self.assertNotIn('reserve_price', response.data)
 
+
+
+class ExistingProductAuctionCreateTests(APITestCase):
+    """POST /api/auctions/ with existing Product PK (Seller contract)."""
+
+    def setUp(self):
+        from users.models import UserProfile, ensure_user_profile
+
+        self.seller = User.objects.create_user(
+            username='ep_seller',
+            email='ep_seller@test.com',
+            password='pass12345',
+        )
+        self.other_seller = User.objects.create_user(
+            username='ep_other_seller',
+            email='ep_other@test.com',
+            password='pass12345',
+        )
+        self.buyer = User.objects.create_user(
+            username='ep_buyer',
+            email='ep_buyer@test.com',
+            password='pass12345',
+        )
+        self.admin = User.objects.create_user(
+            username='ep_admin',
+            email='ep_admin@test.com',
+            password='pass12345',
+            is_staff=True,
+        )
+        ensure_user_profile(self.seller, role=UserProfile.Role.SELLER)
+        ensure_user_profile(self.other_seller, role=UserProfile.Role.SELLER)
+        ensure_user_profile(self.buyer, role=UserProfile.Role.BUYER)
+        ensure_user_profile(self.admin, role=UserProfile.Role.SELLER)
+
+        self.seller_token = Token.objects.create(user=self.seller)
+        self.other_token = Token.objects.create(user=self.other_seller)
+        self.buyer_token = Token.objects.create(user=self.buyer)
+        self.admin_token = Token.objects.create(user=self.admin)
+
+        self.product = Product.objects.create(
+            seller=self.seller,
+            title='Existing Catalog Item',
+            description='Owned by seller',
+            condition=Product.Condition.USED_GOOD,
+        )
+        self.other_product = Product.objects.create(
+            seller=self.other_seller,
+            title='Other Catalog Item',
+            description='Owned by other',
+            condition=Product.Condition.NEW,
+        )
+        self.now = timezone.now()
+
+    def _auth(self, token):
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {token.key}')
+
+    def _payload(self, product_pk, **overrides):
+        body = {
+            'product': product_pk,
+            'starting_bid': '1000.00',
+            'min_increment': '100.00',
+            'start_time': self.now.isoformat(),
+            'end_time': (self.now + timedelta(days=1)).isoformat(),
+        }
+        body.update(overrides)
+        return body
+
+    def test_seller_creates_auction_for_owned_product_without_new_product(self):
+        self._auth(self.seller_token)
+        before = Product.objects.count()
+        response = self.client.post(
+            '/api/auctions/',
+            self._payload(self.product.pk, reserve_price='1500.00'),
+            format='json',
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(Product.objects.count(), before)
+        auction = Auction.objects.get(pk=response.data['id'])
+        self.assertEqual(auction.product_id, self.product.pk)
+        self.assertEqual(str(auction.starting_bid), '1000.00')
+        self.assertEqual(str(auction.current_highest_bid), '1000.00')
+        self.assertEqual(str(auction.reserve_price), '1500.00')
+        self.assertEqual(auction.status, Auction.Status.ACTIVE)
+        self.assertFalse(auction.is_featured)
+        self.assertEqual(response.data['product']['id'], self.product.pk)
+        self.assertEqual(response.data['product']['seller'], self.seller.pk)
+        self.assertEqual(response.data['product']['title'], 'Existing Catalog Item')
+        self.assertNotIn('reserve_price', response.data)
+
+    def test_seller_cannot_create_for_other_sellers_product(self):
+        self._auth(self.seller_token)
+        response = self.client.post(
+            '/api/auctions/',
+            self._payload(self.other_product.pk),
+            format='json',
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('product', response.data['error'])
+        self.assertEqual(Auction.objects.count(), 0)
+
+    def test_buyer_cannot_create_auction(self):
+        self._auth(self.buyer_token)
+        response = self.client.post(
+            '/api/auctions/',
+            self._payload(self.product.pk),
+            format='json',
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(Auction.objects.count(), 0)
+
+    def test_admin_can_create_auction_for_any_product(self):
+        self._auth(self.admin_token)
+        before = Product.objects.count()
+        response = self.client.post(
+            '/api/auctions/',
+            self._payload(self.other_product.pk),
+            format='json',
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(Product.objects.count(), before)
+        self.assertEqual(
+            Auction.objects.get(pk=response.data['id']).product_id,
+            self.other_product.pk,
+        )
+
+    def test_duplicate_auction_returns_clean_400(self):
+        self._auth(self.seller_token)
+        first = self.client.post(
+            '/api/auctions/',
+            self._payload(self.product.pk),
+            format='json',
+        )
+        self.assertEqual(first.status_code, 201, first.data)
+        second = self.client.post(
+            '/api/auctions/',
+            self._payload(self.product.pk),
+            format='json',
+        )
+        self.assertEqual(second.status_code, 400)
+        self.assertIn('product', second.data['error'])
+        self.assertIn('already', str(second.data['error']['product']).lower())
+        self.assertNotIn('IntegrityError', str(second.data))
+        self.assertNotIn('UNIQUE', str(second.data))
+        self.assertEqual(Auction.objects.filter(product=self.product).count(), 1)
+
+    def test_missing_product_returns_not_found(self):
+        self._auth(self.seller_token)
+        response = self.client.post(
+            '/api/auctions/',
+            self._payload(999999),
+            format='json',
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('product', response.data['error'])
+
+    def test_protected_fields_ignored_on_create(self):
+        self._auth(self.seller_token)
+        response = self.client.post(
+            '/api/auctions/',
+            self._payload(
+                self.product.pk,
+                current_highest_bid='9999.00',
+                winning_bidder=self.buyer.pk,
+                is_paid=True,
+                status='CLOSED',
+                is_featured=True,
+            ),
+            format='json',
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        auction = Auction.objects.get(pk=response.data['id'])
+        self.assertEqual(str(auction.current_highest_bid), '1000.00')
+        self.assertIsNone(auction.winning_bidder)
+        self.assertFalse(auction.is_paid)
+        self.assertEqual(auction.status, Auction.Status.ACTIVE)
+        self.assertFalse(auction.is_featured)
+        self.assertNotIn('reserve_price', response.data)
+
+    def test_invalid_end_before_start_rejected(self):
+        self._auth(self.seller_token)
+        response = self.client.post(
+            '/api/auctions/',
+            self._payload(
+                self.product.pk,
+                start_time=self.now.isoformat(),
+                end_time=(self.now - timedelta(hours=1)).isoformat(),
+            ),
+            format='json',
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(Auction.objects.count(), 0)
+
+    def test_product_metadata_unchanged_after_create(self):
+        self._auth(self.seller_token)
+        original_title = self.product.title
+        original_description = self.product.description
+        original_condition = self.product.condition
+        response = self.client.post(
+            '/api/auctions/',
+            self._payload(self.product.pk),
+            format='json',
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.title, original_title)
+        self.assertEqual(self.product.description, original_description)
+        self.assertEqual(self.product.condition, original_condition)
+        self.assertEqual(self.product.seller_id, self.seller.pk)
+
+    def test_legacy_nested_create_still_works_for_seller(self):
+        self._auth(self.seller_token)
+        before = Product.objects.count()
+        response = self.client.post(
+            '/api/auctions/',
+            {
+                'product': {
+                    'title': 'Legacy Nested Camera',
+                    'description': 'Nested body',
+                    'condition': 'USED_GOOD',
+                },
+                'starting_bid': '2500.00',
+                'min_increment': '50.00',
+                'start_time': self.now.isoformat(),
+                'end_time': (self.now + timedelta(days=1)).isoformat(),
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(Product.objects.count(), before + 1)
+        auction = Auction.objects.get(pk=response.data['id'])
+        self.assertEqual(auction.product.seller_id, self.seller.pk)
+        self.assertEqual(auction.product.title, 'Legacy Nested Camera')
+        self.assertEqual(str(auction.current_highest_bid), '2500.00')
+        self.assertEqual(auction.status, Auction.Status.ACTIVE)
+
+    def test_legacy_nested_create_forbidden_for_buyer(self):
+        self._auth(self.buyer_token)
+        response = self.client.post(
+            '/api/auctions/',
+            {
+                'product': {
+                    'title': 'Buyer Nested',
+                    'description': 'Should fail',
+                    'condition': 'USED_GOOD',
+                },
+                'starting_bid': '100.00',
+                'start_time': self.now.isoformat(),
+                'end_time': (self.now + timedelta(days=1)).isoformat(),
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_list_and_retrieve_keep_nested_product_after_existing_create(self):
+        self._auth(self.seller_token)
+        created = self.client.post(
+            '/api/auctions/',
+            self._payload(self.product.pk),
+            format='json',
+        )
+        self.assertEqual(created.status_code, 201, created.data)
+        auction_id = created.data['id']
+
+        listed = self.client.get('/api/auctions/')
+        self.assertEqual(listed.status_code, 200)
+        row = next(item for item in listed.data if item['id'] == auction_id)
+        self.assertIsInstance(row['product'], dict)
+        self.assertEqual(row['product']['seller'], self.seller.pk)
+
+        detail = self.client.get(f'/api/auctions/{auction_id}/')
+        self.assertEqual(detail.status_code, 200)
+        self.assertIsInstance(detail.data['product'], dict)
+        self.assertEqual(detail.data['product']['id'], self.product.pk)

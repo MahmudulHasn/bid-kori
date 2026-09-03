@@ -17,6 +17,10 @@ test('auction detail retrieve path is /auctions/<id>/', () => {
   assert.equal(buildAuctionDetailApiPath(42), '/auctions/42/');
 });
 
+test('auction collection path is used for existing-product create', () => {
+  assert.equal(AUCTIONS_LIST_API_PATH, '/auctions/');
+});
+
 test('already-paid checkout errors are recognized from Django 400 payloads', () => {
   assert.equal(
     isCheckoutAlreadyPaidError({

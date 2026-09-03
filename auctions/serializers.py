@@ -1,8 +1,9 @@
 from django.core.exceptions import ValidationError as DjangoValidationError
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from rest_framework import serializers
 
 from products.models import Product
+from users.models import resolve_user_role
 from .image_validation import (
     validate_auction_image,
     validate_auction_image_quota,
@@ -45,14 +46,17 @@ class AuctionImageSerializer(serializers.ModelSerializer):
 
 
 class AuctionSerializer(serializers.ModelSerializer):
-    """Serializes an auction with its nested product and images.
+    """Serializes an auction with nested product (read) and dual create modes.
 
-    Supports creating a product and its auction in a single request; the
-    seller is taken from the authenticated request user. Optional multipart
-    image uploads may be sent as ``images`` (one or more files).
+    Create accepts either:
+
+    * ``product`` as an existing Product primary key (Seller flow), or
+    * ``product`` as a nested object / legacy flat title fields (legacy create).
+
+    Existing-product create does not create or mutate Product rows.
     """
 
-    product = ProductSerializer()
+    product = ProductSerializer(read_only=True)
     images = AuctionImageSerializer(many=True, read_only=True)
     uploaded_images = serializers.ListField(
         child=AuctionImageField(max_length=None, allow_empty_file=False),
@@ -89,7 +93,14 @@ class AuctionSerializer(serializers.ModelSerializer):
             'images',
             'uploaded_images',
         ]
-        read_only_fields = ['current_highest_bid', 'winning_bidder', 'status', 'is_paid']
+        read_only_fields = [
+            'current_highest_bid',
+            'winning_bidder',
+            'status',
+            'is_paid',
+            # Featured placement is a platform capability (Django admin / staff).
+            'is_featured',
+        ]
 
     def validate_starting_bid(self, value):
         if value <= 0:
@@ -119,31 +130,113 @@ class AuctionSerializer(serializers.ModelSerializer):
 
         return attrs
 
-    def to_internal_value(self, data):
-        """Accept nested product JSON or flat multipart title/description fields."""
+    def _normalize_product_input(self, payload):
+        """Return product input (dict | int | None) and mutate payload for legacy flat fields."""
         import json
 
-        if hasattr(data, 'copy'):
-            payload = data.copy()
-        else:
-            payload = dict(data)
+        product = payload.get('product', serializers.empty)
+        if product is serializers.empty and payload.get('product_id', serializers.empty) is not serializers.empty:
+            product = payload.get('product_id')
+            payload.pop('product_id', None)
 
-        product = payload.get('product')
-        if isinstance(product, str):
-            try:
-                payload['product'] = json.loads(product)
-            except json.JSONDecodeError as exc:
-                raise serializers.ValidationError(
-                    {'product': 'Invalid product JSON payload.'}
-                ) from exc
-        elif not product and payload.get('title'):
-            payload['product'] = {
+        if product is serializers.empty and payload.get('title'):
+            product = {
                 'title': payload.get('title'),
                 'description': payload.get('description', ''),
                 'condition': payload.get('condition') or Product.Condition.USED_GOOD,
             }
 
-        return super().to_internal_value(payload)
+        if isinstance(product, str):
+            stripped = product.strip()
+            if stripped.startswith('{'):
+                try:
+                    product = json.loads(product)
+                except json.JSONDecodeError as exc:
+                    raise serializers.ValidationError(
+                        {'product': 'Invalid product JSON payload.'}
+                    ) from exc
+            elif stripped.isdigit():
+                product = int(stripped)
+            else:
+                try:
+                    product = json.loads(product)
+                except json.JSONDecodeError as exc:
+                    raise serializers.ValidationError(
+                        {'product': 'Invalid product JSON payload.'}
+                    ) from exc
+
+        return product if product is not serializers.empty else None
+
+    def _resolve_existing_product(self, product_pk):
+        try:
+            pk = int(product_pk)
+        except (TypeError, ValueError):
+            raise serializers.ValidationError({'product': 'Product not found.'}) from None
+
+        try:
+            product = Product.objects.select_related('seller').get(pk=pk)
+        except Product.DoesNotExist:
+            raise serializers.ValidationError({'product': 'Product not found.'}) from None
+
+        request = self.context.get('request')
+        user = getattr(request, 'user', None)
+        role = resolve_user_role(user) if user is not None else None
+
+        if role != 'ADMIN':
+            if user is None or not user.is_authenticated or product.seller_id != user.id:
+                raise serializers.ValidationError(
+                    {
+                        'product': (
+                            'You do not have permission to create an auction '
+                            'for this product.'
+                        ),
+                    }
+                )
+
+        if Auction.objects.filter(product_id=product.pk).exists():
+            raise serializers.ValidationError(
+                {'product': 'This product already has an auction.'}
+            )
+
+        return product
+
+    def to_internal_value(self, data):
+        """Accept existing Product PK or nested/legacy product payloads on create.
+
+        Updates (PATCH/PUT) do not rebind ``product`` and must not require it.
+        """
+        if hasattr(data, 'copy'):
+            payload = data.copy()
+        else:
+            payload = dict(data)
+
+        product_input = self._normalize_product_input(payload)
+        payload.pop('product', None)
+        payload.pop('product_id', None)
+
+        ret = super().to_internal_value(payload)
+
+        # Product binding is create-only.
+        if self.instance is not None:
+            if product_input is not None:
+                raise serializers.ValidationError(
+                    {'product': 'Product cannot be changed after auction creation.'}
+                )
+            return ret
+
+        if product_input is None:
+            raise serializers.ValidationError({'product': 'This field is required.'})
+
+        if isinstance(product_input, dict):
+            nested = ProductSerializer(data=product_input)
+            nested.is_valid(raise_exception=True)
+            ret['_existing_product'] = None
+            ret['_nested_product_data'] = nested.validated_data
+        else:
+            ret['_existing_product'] = self._resolve_existing_product(product_input)
+            ret['_nested_product_data'] = None
+
+        return ret
 
     def _collect_uploaded_images(self, validated_data):
         """Return image files from validated data and/or multipart FILES."""
@@ -170,15 +263,39 @@ class AuctionSerializer(serializers.ModelSerializer):
         return images
 
     def create(self, validated_data):
-        product_data = validated_data.pop('product')
+        nested_product_data = validated_data.pop('_nested_product_data', None)
+        existing_product = validated_data.pop('_existing_product', None)
         seller = validated_data.pop('seller', None) or self.context['request'].user
         uploaded_images = self._collect_uploaded_images(validated_data)
 
         validated_data['current_highest_bid'] = validated_data['starting_bid']
+        # Defensive: never trust client-supplied lifecycle/payment fields.
+        validated_data.pop('winning_bidder', None)
+        validated_data.pop('status', None)
+        validated_data.pop('is_paid', None)
+        validated_data.pop('is_featured', None)
 
         with transaction.atomic():
-            product = Product.objects.create(seller=seller, **product_data)
-            auction = Auction.objects.create(product=product, **validated_data)
+            if existing_product is not None:
+                product = (
+                    Product.objects.select_for_update()
+                    .select_related('seller')
+                    .get(pk=existing_product.pk)
+                )
+                if Auction.objects.filter(product_id=product.pk).exists():
+                    raise serializers.ValidationError(
+                        {'product': 'This product already has an auction.'}
+                    )
+            else:
+                product = Product.objects.create(seller=seller, **nested_product_data)
+
+            try:
+                auction = Auction.objects.create(product=product, **validated_data)
+            except IntegrityError as exc:
+                raise serializers.ValidationError(
+                    {'product': 'This product already has an auction.'}
+                ) from exc
+
             for image_file in uploaded_images:
                 AuctionImage.objects.create(auction=auction, image=image_file)
 

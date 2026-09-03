@@ -33,6 +33,10 @@ export const BUYER_SETTINGS_PATH = '/buyer/settings';
 export const SELLER_PRODUCTS_PATH = '/seller/products';
 export const SELLER_PRODUCT_CREATE_PATH = '/seller/products/create';
 export const SELLER_AUCTIONS_PATH = '/seller/auctions';
+export const SELLER_AUCTION_CREATE_PATH = '/seller/auctions/create';
+
+/** Legacy combined Product+Auction create — not linked from Seller workspace. */
+export const LEGACY_AUCTION_CREATE_PATH = '/auctions/create';
 
 const BUYER_NAV: readonly WorkspaceNavItem[] = [
   { id: 'dashboard', label: 'Dashboard', href: '/buyer', enabled: true },
@@ -138,6 +142,17 @@ export function sellerProductEditPath(id: string | number): string {
 
 export function sellerAuctionDetailPath(id: string | number): string {
   return `${SELLER_AUCTIONS_PATH}/${id}`;
+}
+
+/**
+ * Seller existing-product auction create route.
+ * Optional `product` query is a UX hint validated on the create page.
+ */
+export function sellerAuctionCreatePath(productId?: number): string {
+  if (productId != null && Number.isFinite(productId) && productId > 0) {
+    return `${SELLER_AUCTION_CREATE_PATH}?product=${productId}`;
+  }
+  return SELLER_AUCTION_CREATE_PATH;
 }
 
 /** True when an item is safe to navigate (enabled + href). */

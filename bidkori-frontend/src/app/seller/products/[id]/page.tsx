@@ -17,6 +17,7 @@ import {
 } from '@/lib/seller';
 import {
   SELLER_PRODUCTS_PATH,
+  sellerAuctionCreatePath,
   sellerProductEditPath,
 } from '@/lib/workspaceNavigation';
 import type { Product } from '@/lib/types';
@@ -50,6 +51,12 @@ function OwnedProductDetail({ product }: { product: Product }) {
             className="inline-flex items-center justify-center rounded-lg bg-sky-700 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-sky-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500"
           >
             Edit Product
+          </Link>
+          <Link
+            href={sellerAuctionCreatePath(product.id)}
+            className="inline-flex items-center justify-center rounded-lg border border-sky-700 px-3 py-1.5 text-sm font-semibold text-sky-700 transition hover:bg-sky-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:text-sky-300 dark:hover:bg-sky-950"
+          >
+            Create Auction
           </Link>
         </div>
         <p className="mt-3 text-sm text-zinc-500 dark:text-zinc-400">

@@ -21,6 +21,7 @@ import {
 import type { Auction, Product } from '@/lib/types';
 import {
   SELLER_AUCTIONS_PATH,
+  SELLER_AUCTION_CREATE_PATH,
   SELLER_PRODUCTS_PATH,
   SELLER_PRODUCT_CREATE_PATH,
   sellerAuctionDetailPath,
@@ -253,8 +254,8 @@ export default function SellerHomePage() {
             Your seller workspace is ready.
           </h2>
           <p className="mx-auto mt-2 max-w-md text-sm text-zinc-600 dark:text-zinc-400">
-            Create a catalog product from your Seller workspace. Auction
-            creation will be available later.
+            Create a catalog product, then start an auction from a product you
+            own.
           </p>
           <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
             <Link
@@ -262,6 +263,12 @@ export default function SellerHomePage() {
               className="inline-flex rounded-lg bg-sky-700 px-3 py-2 text-sm font-semibold text-white transition hover:bg-sky-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500"
             >
               Create Product
+            </Link>
+            <Link
+              href={SELLER_AUCTION_CREATE_PATH}
+              className="inline-flex rounded-lg border border-sky-700 px-3 py-2 text-sm font-semibold text-sky-700 transition hover:bg-sky-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:text-sky-300 dark:hover:bg-sky-950"
+            >
+              Create Auction
             </Link>
             <Link
               href={SELLER_PRODUCTS_PATH}
@@ -359,12 +366,20 @@ export default function SellerHomePage() {
                     Auctions running on products you own.
                   </p>
                 </div>
-                <Link
-                  href={SELLER_AUCTIONS_PATH}
-                  className="text-sm font-medium text-sky-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:text-sky-300"
-                >
-                  View all auctions
-                </Link>
+                <div className="flex flex-wrap items-center gap-3">
+                  <Link
+                    href={SELLER_AUCTION_CREATE_PATH}
+                    className="text-sm font-medium text-sky-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:text-sky-300"
+                  >
+                    Create Auction
+                  </Link>
+                  <Link
+                    href={SELLER_AUCTIONS_PATH}
+                    className="text-sm font-medium text-sky-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:text-sky-300"
+                  >
+                    View all auctions
+                  </Link>
+                </div>
               </div>
               <div className="mt-4 space-y-3">
                 {recentAuctions.length > 0 ? (

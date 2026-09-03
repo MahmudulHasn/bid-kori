@@ -323,3 +323,91 @@ export function getSellerDashboardMetrics(
     closedAuctions: getSellerClosedAuctions(auctions, userId).length,
   };
 }
+
+/**
+ * Resolve the Product PK linked to an auction (nested object or bare id).
+ * Does not mutate the auction.
+ */
+export function getAuctionProductId(auction: Auction): number | null {
+  const product = auction.product;
+  if (typeof product === 'number' && Number.isFinite(product) && product > 0) {
+    return product;
+  }
+  if (product && typeof product === 'object' && product.id != null) {
+    const id = Number(product.id);
+    if (Number.isFinite(id) && id > 0) return id;
+  }
+  return null;
+}
+
+/**
+ * Product IDs that already have an Auction (OneToOne).
+ * Does not mutate the source array.
+ */
+export function getAuctionedProductIds(
+  auctions: readonly Auction[],
+): ReadonlySet<number> {
+  const ids = new Set<number>();
+  for (const auction of auctions) {
+    const productId = getAuctionProductId(auction);
+    if (productId != null) ids.add(productId);
+  }
+  return ids;
+}
+
+/**
+ * Seller catalog products that do not yet have an Auction.
+ * Source products should already be my-listings (owned). Does not mutate inputs.
+ */
+export function getEligibleAuctionProducts(
+  products: readonly Product[],
+  auctions: readonly Auction[],
+): Product[] {
+  const auctioned = getAuctionedProductIds(auctions);
+  return products.filter((product) => !auctioned.has(product.id));
+}
+
+export function isProductEligibleForAuction(
+  productId: number,
+  products: readonly Product[],
+  auctions: readonly Auction[],
+): boolean {
+  return getEligibleAuctionProducts(products, auctions).some(
+    (product) => product.id === productId,
+  );
+}
+
+export type AuctionCreateProductHintResult = {
+  productId: number | null;
+  /** Safe informational message when the query hint cannot be used. */
+  message?: string;
+};
+
+/**
+ * Validate `?product=` against owned listings and current eligibility.
+ * Unknown / ineligible hints are ignored without ownership detail leakage.
+ */
+export function resolveAuctionCreateProductHint(
+  hint: string | null | undefined,
+  eligibleProducts: readonly Product[],
+): AuctionCreateProductHintResult {
+  if (hint == null || !String(hint).trim()) {
+    return { productId: null };
+  }
+  const parsed = Number(String(hint).trim());
+  if (!Number.isFinite(parsed) || parsed <= 0 || !Number.isInteger(parsed)) {
+    return {
+      productId: null,
+      message:
+        'That product is not available for a new auction. Choose another product.',
+    };
+  }
+  if (eligibleProducts.some((product) => product.id === parsed)) {
+    return { productId: parsed };
+  }
+  return {
+    productId: null,
+    message:
+      'That product is not available for a new auction. Choose another product.',
+  };
+}

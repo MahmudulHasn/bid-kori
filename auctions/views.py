@@ -17,7 +17,11 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .models import Auction, AuctionImage, Bid, Payment
-from .permissions import IsAuctionSellerOrReadOnly, IsNotSeller
+from .permissions import (
+    IsAuctionSellerOrReadOnly,
+    IsNotSeller,
+    IsSellerOrAdminForAuctionCreate,
+)
 from .serializers import (
     AuctionDetailSerializer,
     AuctionImageSerializer,
@@ -66,7 +70,11 @@ class AuctionViewSet(viewsets.ModelViewSet):
     """
 
     serializer_class = AuctionSerializer
-    permission_classes = [IsAuthenticatedOrReadOnly, IsAuctionSellerOrReadOnly]
+    permission_classes = [
+        IsAuthenticatedOrReadOnly,
+        IsSellerOrAdminForAuctionCreate,
+        IsAuctionSellerOrReadOnly,
+    ]
     parser_classes = (MultiPartParser, FormParser, JSONParser)
 
     def get_queryset(self):
@@ -135,13 +143,21 @@ class AuctionViewSet(viewsets.ModelViewSet):
             'multipart/form-data': {
                 'type': 'object',
                 'properties': {
-                    'product': {'type': 'object'},
+                    'product': {
+                        'description': (
+                            'Existing Product primary key, or nested product '
+                            'object for legacy combined create.'
+                        ),
+                        'oneOf': [
+                            {'type': 'integer'},
+                            {'type': 'object'},
+                        ],
+                    },
                     'starting_bid': {'type': 'string', 'format': 'decimal'},
                     'min_increment': {'type': 'string', 'format': 'decimal'},
                     'reserve_price': {'type': 'string', 'format': 'decimal'},
                     'start_time': {'type': 'string', 'format': 'date-time'},
                     'end_time': {'type': 'string', 'format': 'date-time'},
-                    'is_featured': {'type': 'boolean'},
                     'images': {
                         'type': 'array',
                         'items': {'type': 'string', 'format': 'binary'},
@@ -194,13 +210,19 @@ class AuctionViewSet(viewsets.ModelViewSet):
                 }
             )
         if getattr(self, 'action', None) in {
+            'create',
             'update',
             'partial_update',
             'destroy',
         }:
+            default = (
+                IsSellerOrAdminForAuctionCreate.message
+                if getattr(self, 'action', None) == 'create'
+                else IsAuctionSellerOrReadOnly.message
+            )
             raise PermissionDenied(
                 detail={
-                    'error': message or IsAuctionSellerOrReadOnly.message,
+                    'error': message or default,
                 }
             )
         return super().permission_denied(request, message=message, code=code)

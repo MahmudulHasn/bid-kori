@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import useSWR from 'swr';
 
@@ -17,6 +18,7 @@ import {
   sortSellerAuctions,
   type SellerAuctionStatusFilter,
 } from '@/lib/seller';
+import { SELLER_AUCTION_CREATE_PATH } from '@/lib/workspaceNavigation';
 
 const FILTERS: { id: SellerAuctionStatusFilter; label: string }[] = [
   { id: 'all', label: 'All' },
@@ -54,13 +56,21 @@ export default function SellerAuctionsPage() {
 
   return (
     <div className="space-y-8">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-white sm:text-3xl">
-          My Auctions
-        </h1>
-        <p className="mt-2 max-w-2xl text-sm text-zinc-600 dark:text-zinc-400">
-          Auctions on products you own, using the catalog auction list.
-        </p>
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-white sm:text-3xl">
+            My Auctions
+          </h1>
+          <p className="mt-2 max-w-2xl text-sm text-zinc-600 dark:text-zinc-400">
+            Auctions on products you own, using the catalog auction list.
+          </p>
+        </div>
+        <Link
+          href={SELLER_AUCTION_CREATE_PATH}
+          className="inline-flex rounded-lg bg-sky-700 px-3 py-2 text-sm font-semibold text-white transition hover:bg-sky-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500"
+        >
+          Create Auction
+        </Link>
       </header>
 
       {isLoading || waitingForUser ? (
@@ -100,8 +110,14 @@ export default function SellerAuctionsPage() {
             You haven&apos;t created any auctions yet.
           </h2>
           <p className="mx-auto mt-2 max-w-md text-sm text-zinc-600 dark:text-zinc-400">
-            Auction creation will be available from your Seller workspace.
+            Choose a product you own and set bidding terms to start an auction.
           </p>
+          <Link
+            href={SELLER_AUCTION_CREATE_PATH}
+            className="mt-4 inline-flex rounded-lg bg-sky-700 px-3 py-2 text-sm font-semibold text-white transition hover:bg-sky-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500"
+          >
+            Create Auction
+          </Link>
         </section>
       ) : null}
 

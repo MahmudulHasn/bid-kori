@@ -10,6 +10,9 @@ import {
   emptyProductFormValues,
   filterSellerAuctions,
   filterSellerProducts,
+  getAuctionProductId,
+  getAuctionedProductIds,
+  getEligibleAuctionProducts,
   getRecentSellerAuctions,
   getRecentSellerProducts,
   getSellerActiveAuctions,
@@ -20,8 +23,10 @@ import {
   getSellerCancelledAuctions,
   getSellerClosedAuctions,
   getSellerDashboardMetrics,
+  isProductEligibleForAuction,
   isProductOwnedByUser,
   isSellerAuctionAwaitingFinalization,
+  resolveAuctionCreateProductHint,
   sortSellerAuctions,
   productFormValuesFromProduct,
   productUpdateApiPath,
@@ -414,4 +419,52 @@ test('validateProductForm requires a title and a known condition', () => {
 
 test('product delete remains deferred because cascade is unsafe', () => {
   assert.equal(SELLER_PRODUCT_DELETE_ENABLED, false);
+});
+
+test('eligibility helpers derive auctioned product ids without mutating sources', () => {
+  const products = [
+    product({ id: 1, title: 'Free', seller: 7 }),
+    product({ id: 2, title: 'Taken', seller: 7 }),
+    product({ id: 3, title: 'Also free', seller: 7 }),
+  ];
+  const auctions = [
+    auction({ id: 10, product: { id: 2, title: 'Taken', seller: 7 } }),
+    auction({ id: 11, product: 3 }),
+  ];
+  const productsSnap = JSON.stringify(products);
+  const auctionsSnap = JSON.stringify(auctions);
+
+  assert.equal(getAuctionProductId(auctions[0]), 2);
+  assert.equal(getAuctionProductId(auctions[1]), 3);
+  assert.deepEqual([...getAuctionedProductIds(auctions)].sort(), [2, 3]);
+
+  const eligible = getEligibleAuctionProducts(products, auctions);
+  assert.deepEqual(
+    eligible.map((item) => item.id),
+    [1],
+  );
+  assert.equal(isProductEligibleForAuction(1, products, auctions), true);
+  assert.equal(isProductEligibleForAuction(2, products, auctions), false);
+  assert.equal(JSON.stringify(products), productsSnap);
+  assert.equal(JSON.stringify(auctions), auctionsSnap);
+});
+
+test('product query hint selects only eligible owned products', () => {
+  const eligible = [
+    product({ id: 42, title: 'Lamp', seller: 7 }),
+    product({ id: 7, title: 'Chair', seller: 7 }),
+  ];
+  assert.equal(resolveAuctionCreateProductHint('42', eligible).productId, 42);
+  assert.equal(resolveAuctionCreateProductHint('42', eligible).message, undefined);
+
+  const unknown = resolveAuctionCreateProductHint('99', eligible);
+  assert.equal(unknown.productId, null);
+  assert.ok(unknown.message);
+
+  const auctionedHint = resolveAuctionCreateProductHint('2', eligible);
+  assert.equal(auctionedHint.productId, null);
+  assert.ok(auctionedHint.message);
+
+  assert.equal(resolveAuctionCreateProductHint('', eligible).productId, null);
+  assert.equal(resolveAuctionCreateProductHint('abc', eligible).productId, null);
 });

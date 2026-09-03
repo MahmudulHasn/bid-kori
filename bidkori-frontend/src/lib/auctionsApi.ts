@@ -1,6 +1,11 @@
 import api from '@/lib/api';
+import type { ExistingProductAuctionCreatePayload } from '@/lib/auctionCreateContract';
 import { MY_BIDS_API_PATH } from '@/lib/buyer';
-import { buildAuctionDetailApiPath, buildCheckoutApiPath } from '@/lib/checkoutApi';
+import {
+  AUCTIONS_LIST_API_PATH,
+  buildAuctionDetailApiPath,
+  buildCheckoutApiPath,
+} from '@/lib/checkoutApi';
 import { ACTIVE_AUCTIONS_API_PATH, buildAuctionSearchApiPath } from '@/lib/marketplace';
 import type { Auction, PaymentSummary, UserBid } from '@/lib/types';
 
@@ -95,5 +100,16 @@ export async function checkoutAuction(
   const { data } = await api.post<PaymentSummary>(
     buildCheckoutApiPath(auctionId),
   );
+  return data;
+}
+
+/**
+ * Create an Auction for an existing Product (Seller flow).
+ * Payload must use a Product PK — not a nested Product object.
+ */
+export async function createAuction(
+  payload: ExistingProductAuctionCreatePayload,
+): Promise<Auction> {
+  const { data } = await api.post<Auction>(AUCTIONS_LIST_API_PATH, payload);
   return data;
 }
