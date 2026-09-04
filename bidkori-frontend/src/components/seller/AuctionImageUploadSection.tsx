@@ -25,7 +25,8 @@ export default function AuctionImageUploadSection({
 }: {
   auction: Auction;
   user: AuthUser;
-  onUploaded: (next: Auction) => Promise<void>;
+  /** Revalidate auction detail after upload; response is image list, not Auction. */
+  onUploaded: () => Promise<void>;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [files, setFiles] = useState<File[]>([]);
@@ -67,8 +68,8 @@ export default function AuctionImageUploadSection({
     setPhase('uploading');
     setError(undefined);
     try {
-      const next = await uploadAuctionImages(auction.id, files);
-      await onUploaded(next);
+      await uploadAuctionImages(auction.id, files);
+      await onUploaded();
       toast.success('Images uploaded.');
       resetSelection();
       setPhase('success');
@@ -81,7 +82,7 @@ export default function AuctionImageUploadSection({
             'Images cannot be changed after the auction has started or received bids.',
           ),
         );
-        await onUploaded(auction);
+        await onUploaded();
         setPhase('error');
         return;
       }

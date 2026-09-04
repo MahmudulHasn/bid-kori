@@ -40,6 +40,22 @@ export const SELLER_AUCTION_CREATE_PATH = '/seller/auctions/create';
 /** Legacy combined Product+Auction create — not linked from Seller workspace. */
 export const LEGACY_AUCTION_CREATE_PATH = '/auctions/create';
 
+/**
+ * Compatibility destination for bookmarks/links to `/auctions/create`.
+ * Guest handling stays on the page (login with safe next). Authenticated roles
+ * never remain on the legacy form.
+ */
+export function resolveLegacyAuctionCreateRedirect(role: UserRole): string {
+  switch (role) {
+    case 'SELLER':
+      return SELLER_AUCTION_CREATE_PATH;
+    case 'BUYER':
+      return '/unauthorized';
+    case 'ADMIN':
+      return getRoleHome('ADMIN');
+  }
+}
+
 const BUYER_NAV: readonly WorkspaceNavItem[] = [
   { id: 'dashboard', label: 'Dashboard', href: '/buyer', enabled: true },
   { id: 'my-bids', label: 'My Bids', href: '/buyer/my-bids', enabled: true },

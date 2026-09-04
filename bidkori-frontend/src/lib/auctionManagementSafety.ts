@@ -7,7 +7,8 @@
  * detail serializer; backend remains authoritative on submit.
  *
  * CANCEL — POST /auctions/<id>/transition/ { status: CANCELLED } (ACTIVE only).
- * DELETE — still deferred (cascade integrity).
+ * DELETE — BE-A03 allows only pre-start / no bids / no payment / not terminal.
+ * Frontend can only mirror ownership + start_time + status (UX offer).
  */
 
 import { isAuctionOwnedByUser } from './auctionOwnership.ts';
@@ -22,8 +23,11 @@ export const SELLER_AUCTION_EDIT_ENABLED = true;
  */
 export const SELLER_AUCTION_CANCEL_ENABLED = true;
 
-/** DELETE cascades bid/payment history — never expose from Seller UI. */
-export const SELLER_AUCTION_DELETE_ENABLED = false;
+/**
+ * Delete feature is enabled conditionally via {@link canOfferSellerAuctionDelete}.
+ * Bid/payment existence is often unknown client-side — backend is final.
+ */
+export const SELLER_AUCTION_DELETE_ENABLED = true;
 
 /**
  * Reserve may be changed only via explicit "Change reserve price" intent
@@ -34,12 +38,10 @@ export const SELLER_AUCTION_RESERVE_EDIT_ENABLED = true;
 /** Product binding is create-only; Edit must never rebind product. */
 export const SELLER_AUCTION_PRODUCT_REBIND_ENABLED = false;
 
-export const SELLER_AUCTION_DELETE_BLOCK_REASON =
-  'DELETE DEFERRED — BACKEND INTEGRITY GUARD REQUIRED';
-
 export const SELLER_AUCTION_CANCEL_ENDPOINT_METHOD = 'POST';
 export const SELLER_AUCTION_CANCEL_STATUS = 'CANCELLED';
 export const AUCTION_UPDATE_METHOD = 'PATCH';
+export const AUCTION_DELETE_METHOD = 'DELETE';
 
 /**
  * UX mirror of backend freeze using fields available on Auction detail.
@@ -78,17 +80,35 @@ export function canSellerEditAuction(
   return isAuctionPreFreezeByClientClock(auction, nowMs);
 }
 
-export function canSellerDeleteAuction(
-  _auction: Auction | null | undefined,
-  _user: Pick<AuthUser, 'id'> | null | undefined,
+/**
+ * UX offer for Auction Delete — mirrors only known client fields.
+ * Does NOT prove absence of bids/payment; backend remains authoritative.
+ */
+export function canOfferSellerAuctionDelete(
+  auction: Auction | null | undefined,
+  user: Pick<AuthUser, 'id'> | null | undefined,
+  nowMs: number = Date.now(),
 ): boolean {
-  void _auction;
-  void _user;
-  return SELLER_AUCTION_DELETE_ENABLED;
+  if (!SELLER_AUCTION_DELETE_ENABLED) return false;
+  if (!isAuctionOwnedByUser(auction, user)) return false;
+  return isAuctionPreFreezeByClientClock(auction, nowMs);
+}
+
+/** @deprecated Prefer {@link canOfferSellerAuctionDelete}. */
+export function canSellerDeleteAuction(
+  auction: Auction | null | undefined,
+  user: Pick<AuthUser, 'id'> | null | undefined,
+  nowMs: number = Date.now(),
+): boolean {
+  return canOfferSellerAuctionDelete(auction, user, nowMs);
 }
 
 export function buildAuctionTransitionApiPath(id: string | number): string {
   return `/auctions/${id}/transition/`;
+}
+
+export function buildAuctionDeleteApiPath(id: string | number): string {
+  return `/auctions/${id}/`;
 }
 
 /** Cancel body for the lifecycle transition endpoint — never PATCH status. */
@@ -111,4 +131,19 @@ export function isAuctionConfigurationFreezeError(error: unknown): boolean {
           ? JSON.stringify(raw)
           : '';
   return message.toLowerCase().includes('no longer be edited');
+}
+
+export function isAuctionDeleteBlockedError(error: unknown): boolean {
+  const data = (error as { response?: { data?: { error?: unknown } } })?.response
+    ?.data;
+  const raw = data?.error;
+  const message =
+    typeof raw === 'string'
+      ? raw
+      : Array.isArray(raw)
+        ? raw.join(' ')
+        : typeof raw === 'object' && raw
+          ? JSON.stringify(raw)
+          : '';
+  return message.toLowerCase().includes('cannot be deleted');
 }

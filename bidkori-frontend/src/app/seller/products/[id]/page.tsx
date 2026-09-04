@@ -1,18 +1,28 @@
 'use client';
 
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { format } from 'date-fns';
-import useSWR from 'swr';
+import { useState } from 'react';
+import toast from 'react-hot-toast';
+import useSWR, { useSWRConfig } from 'swr';
 
 import { useAuth } from '@/context/AuthContext';
 import { getApiErrorMessage, getApiStatus } from '@/lib/apiErrors';
 import {
+  AUCTIONS_LIST_API_PATH,
+  auctionListFetcher,
+} from '@/lib/auctionsApi';
+import {
+  MY_LISTINGS_API_PATH,
   buildProductDetailApiPath,
+  deleteProduct,
   productDetailFetcher,
 } from '@/lib/productsApi';
 import {
+  canSellerDeleteProduct,
   formatSellerProductCondition,
+  isProductLinkedAuctionDeleteError,
   isProductOwnedByUser,
 } from '@/lib/seller';
 import {
@@ -20,7 +30,7 @@ import {
   sellerAuctionCreatePath,
   sellerProductEditPath,
 } from '@/lib/workspaceNavigation';
-import type { Product } from '@/lib/types';
+import type { Auction, AuthUser, Product } from '@/lib/types';
 
 function formatTimestamp(
   value: string | undefined,
@@ -34,13 +44,53 @@ function formatTimestamp(
   };
 }
 
-function OwnedProductDetail({ product }: { product: Product }) {
+function OwnedProductDetail({
+  product,
+  user,
+  auctions,
+  onDeleted,
+  onDeleteRejected,
+}: {
+  product: Product;
+  user: AuthUser;
+  auctions: readonly Auction[];
+  onDeleted: () => Promise<void>;
+  onDeleteRejected: () => Promise<void>;
+}) {
   const created = formatTimestamp(product.created_at);
+  const title = product.title.trim() ? product.title : 'Untitled product';
+  const canDelete = canSellerDeleteProduct(product, user, auctions);
+  const [deletePhase, setDeletePhase] = useState<
+    'idle' | 'confirming' | 'submitting'
+  >('idle');
+  const [deleteError, setDeleteError] = useState<string>();
+
+  const handleDelete = async () => {
+    if (deletePhase === 'submitting') return;
+    setDeletePhase('submitting');
+    setDeleteError(undefined);
+    try {
+      await deleteProduct(product.id);
+      toast.success('Product deleted.');
+      await onDeleted();
+    } catch (error: unknown) {
+      const message = getApiErrorMessage(
+        error,
+        isProductLinkedAuctionDeleteError(error)
+          ? 'This product cannot be deleted because it is linked to an auction.'
+          : 'We could not delete this product.',
+      );
+      setDeleteError(message);
+      setDeletePhase('confirming');
+      await onDeleteRejected();
+    }
+  };
+
   return (
     <>
       <header>
         <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-white sm:text-3xl">
-          {product.title.trim() ? product.title : 'Untitled product'}
+          {title}
         </h1>
         <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
           Product details from your catalog.
@@ -59,9 +109,70 @@ function OwnedProductDetail({ product }: { product: Product }) {
             Create Auction
           </Link>
         </div>
-        <p className="mt-3 text-sm text-zinc-500 dark:text-zinc-400">
-          Delete unavailable while auction-history safeguards are pending.
-        </p>
+        {!canDelete ? (
+          <p className="mt-3 text-sm text-zinc-500 dark:text-zinc-400">
+            Delete is unavailable while this product is linked to an auction.
+          </p>
+        ) : deletePhase === 'idle' ? (
+          <div className="mt-4">
+            <button
+              type="button"
+              onClick={() => {
+                setDeleteError(undefined);
+                setDeletePhase('confirming');
+              }}
+              className="inline-flex items-center justify-center rounded-lg border border-red-300 px-3 py-1.5 text-sm font-semibold text-red-700 transition hover:bg-red-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500 dark:border-red-800 dark:text-red-300 dark:hover:bg-red-950"
+            >
+              Delete Product
+            </button>
+          </div>
+        ) : (
+          <div
+            role="group"
+            aria-labelledby="delete-product-confirm-heading"
+            className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-4 dark:border-red-900 dark:bg-red-950/40"
+          >
+            <h2
+              id="delete-product-confirm-heading"
+              className="text-sm font-semibold text-red-900 dark:text-red-200"
+            >
+              Delete product?
+            </h2>
+            <p className="mt-2 text-sm text-red-800 dark:text-red-300">
+              This product has no auction and can be permanently removed.
+            </p>
+            {deleteError ? (
+              <p
+                role="alert"
+                className="mt-3 text-sm font-medium text-red-900 dark:text-red-200"
+              >
+                {deleteError}
+              </p>
+            ) : null}
+            <div className="mt-4 flex flex-wrap gap-3">
+              <button
+                type="button"
+                disabled={deletePhase === 'submitting'}
+                onClick={() => {
+                  setDeletePhase('idle');
+                  setDeleteError(undefined);
+                }}
+                className="inline-flex rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-800 transition hover:bg-zinc-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+              >
+                Keep Product
+              </button>
+              <button
+                type="button"
+                disabled={deletePhase === 'submitting'}
+                aria-busy={deletePhase === 'submitting'}
+                onClick={() => void handleDelete()}
+                className="inline-flex rounded-lg bg-red-700 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-red-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {deletePhase === 'submitting' ? 'Deleting…' : 'Delete Product'}
+              </button>
+            </div>
+          </div>
+        )}
       </header>
 
       <div
@@ -118,7 +229,9 @@ function OwnedProductDetail({ product }: { product: Product }) {
 export default function SellerProductDetailPage() {
   const params = useParams<{ id: string }>();
   const productId = params?.id;
+  const router = useRouter();
   const { user } = useAuth();
+  const { mutate: mutateGlobal } = useSWRConfig();
 
   const {
     data: product,
@@ -130,9 +243,26 @@ export default function SellerProductDetailPage() {
     productDetailFetcher,
   );
 
+  const { data: auctions = [], mutate: mutateAuctions } = useSWR(
+    AUCTIONS_LIST_API_PATH,
+    auctionListFetcher,
+  );
+
   const owned = isProductOwnedByUser(product, user);
   const status = getApiStatus(error);
   const unavailable = Boolean(error) && (status === 404 || status === 403);
+
+  const handleDeleted = async () => {
+    await mutateGlobal(MY_LISTINGS_API_PATH);
+    await mutateAuctions();
+    router.push(SELLER_PRODUCTS_PATH);
+  };
+
+  const handleDeleteRejected = async () => {
+    await mutate();
+    await mutateAuctions();
+    await mutateGlobal(MY_LISTINGS_API_PATH);
+  };
 
   return (
     <div className="space-y-8">
@@ -197,8 +327,14 @@ export default function SellerProductDetailPage() {
         </section>
       ) : null}
 
-      {!isLoading && !error && product && owned ? (
-        <OwnedProductDetail product={product} />
+      {!isLoading && !error && product && owned && user ? (
+        <OwnedProductDetail
+          product={product}
+          user={user}
+          auctions={auctions}
+          onDeleted={handleDeleted}
+          onDeleteRejected={handleDeleteRejected}
+        />
       ) : null}
     </div>
   );

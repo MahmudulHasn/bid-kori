@@ -18,7 +18,7 @@ import {
   buildCheckoutApiPath,
 } from '@/lib/checkoutApi';
 import { ACTIVE_AUCTIONS_API_PATH, buildAuctionSearchApiPath } from '@/lib/marketplace';
-import type { Auction, PaymentSummary, UserBid } from '@/lib/types';
+import type { Auction, AuctionImage, PaymentSummary, UserBid } from '@/lib/types';
 
 export {
   AUCTIONS_LIST_API_PATH,
@@ -156,18 +156,27 @@ export async function updateAuction(
 
 /**
  * Upload Auction images via multipart POST.
- * Field name must be `images`. Does not mutate `files`.
+ * Field name must be `images`. Response is an AuctionImage list (not Auction).
+ * Does not mutate `files`.
  */
 export async function uploadAuctionImages(
   auctionId: string | number,
   files: readonly File[],
-): Promise<Auction> {
+): Promise<AuctionImage[]> {
   const formData = buildAuctionImagesFormData(files);
-  const { data } = await api.post<Auction>(
+  const { data } = await api.post<AuctionImage[]>(
     buildAuctionImagesUploadApiPath(auctionId),
     formData,
   );
-  return data;
+  return Array.isArray(data) ? data : [];
+}
+
+/**
+ * Hard-delete an Auction when backend integrity allows (pre-start, no bids/payment).
+ * Does not delete the linked Product.
+ */
+export async function deleteAuction(auctionId: string | number): Promise<void> {
+  await api.delete(buildAuctionDetailApiPath(auctionId));
 }
 
 export {

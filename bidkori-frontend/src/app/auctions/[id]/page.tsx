@@ -17,6 +17,7 @@ import { buildLoginHref } from '@/lib/authRouting';
 import { getAuctionTitle } from '@/lib/auctionDisplay';
 import { MARKETPLACE_ROUTES } from '@/lib/marketplace';
 import { resolveMediaUrl } from '@/lib/media';
+import { sellerAuctionDetailPath } from '@/lib/workspaceNavigation';
 import type { Auction } from '@/lib/types';
 
 const fetcher = async (url: string) => {
@@ -35,7 +36,6 @@ export default function AuctionDetailPage() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const [bidAmount, setBidAmount] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [managing, setManaging] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
 
   const { data: auction, error, isLoading, mutate } = useSWR(
@@ -49,7 +49,7 @@ export default function AuctionDetailPage() {
     timer.isClosed || auction?.status === 'CLOSED' || auction?.status === 'CANCELLED';
 
   const isOwner = isAuctionOwnedByUser(auction, user);
-  const canShowSellerControls = isOwner && !authLoading;
+  const showSellerWorkspaceLink = isOwner && !authLoading;
 
   const imageUrls = useMemo(() => {
     const urls = (auction?.images ?? [])
@@ -124,74 +124,6 @@ export default function AuctionDetailPage() {
       }
     } finally {
       setSubmitting(false);
-    }
-  };
-
-  const handleCancelAuction = async () => {
-    if (!auctionId || !canShowSellerControls) return;
-    if (auction?.status !== 'ACTIVE') {
-      toast.error('Only active auctions can be cancelled.');
-      return;
-    }
-
-    const confirmed = window.confirm(
-      'Cancel this auction? Bidders will no longer be able to place bids.',
-    );
-    if (!confirmed) return;
-
-    setManaging(true);
-    try {
-      await api.post(`/auctions/${auctionId}/transition/`, {
-        status: 'CANCELLED',
-      });
-      toast.success('Auction cancelled.');
-      await mutate();
-    } catch (err: unknown) {
-      const status = getApiStatus(err);
-      const message = getApiErrorMessage(
-        err,
-        'Could not cancel this auction.',
-      );
-      if (status === 401) {
-        toast.error('Please log in again to manage this auction.');
-      } else if (status === 403) {
-        toast.error(message || 'Only the seller can cancel this auction.');
-      } else {
-        toast.error(message);
-      }
-    } finally {
-      setManaging(false);
-    }
-  };
-
-  const handleDeleteAuction = async () => {
-    if (!auctionId || !canShowSellerControls) return;
-
-    const confirmed = window.confirm(
-      'Permanently delete this auction listing? This cannot be undone.',
-    );
-    if (!confirmed) return;
-
-    setManaging(true);
-    try {
-      await api.delete(`/auctions/${auctionId}/`);
-      toast.success('Auction deleted.');
-      router.push(MARKETPLACE_ROUTES.auctions);
-    } catch (err: unknown) {
-      const status = getApiStatus(err);
-      const message = getApiErrorMessage(
-        err,
-        'Could not delete this auction.',
-      );
-      if (status === 401) {
-        toast.error('Please log in again to manage this auction.');
-      } else if (status === 403) {
-        toast.error(message || 'Only the seller can delete this auction.');
-      } else {
-        toast.error(message);
-      }
-    } finally {
-      setManaging(false);
     }
   };
 
@@ -329,39 +261,26 @@ export default function AuctionDetailPage() {
             )}
           </div>
 
-          {canShowSellerControls && (
+          {showSellerWorkspaceLink && auction ? (
             <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
               <div className="mb-3 flex items-center gap-2">
                 <Shield className="h-4 w-4 text-amber-700 dark:text-amber-300" aria-hidden />
                 <h2 className="text-base font-semibold text-zinc-900 dark:text-white">
-                  Seller controls
+                  Your listing
                 </h2>
               </div>
               <p className="mb-4 text-sm text-zinc-500 dark:text-zinc-400">
-                You own this listing. Management actions are enforced by the API.
+                Edit, upload images, cancel, or delete from your Seller
+                workspace.
               </p>
-              <div className="flex flex-col gap-2">
-                {auction.status === 'ACTIVE' && (
-                  <button
-                    type="button"
-                    onClick={handleCancelAuction}
-                    disabled={managing}
-                    className="rounded-lg border border-zinc-300 px-4 py-2.5 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:text-zinc-100 dark:hover:bg-zinc-900"
-                  >
-                    {managing ? 'Working…' : 'Cancel auction'}
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={handleDeleteAuction}
-                  disabled={managing}
-                  className="rounded-lg border border-red-200 px-4 py-2.5 text-sm font-semibold text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/40"
-                >
-                  {managing ? 'Working…' : 'Delete listing'}
-                </button>
-              </div>
+              <Link
+                href={sellerAuctionDetailPath(auction.id)}
+                className="inline-flex rounded-lg border border-amber-600 px-4 py-2.5 text-sm font-semibold text-amber-800 transition hover:bg-amber-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500 dark:text-amber-200 dark:hover:bg-amber-950/40"
+              >
+                Manage in Seller workspace
+              </Link>
             </div>
-          )}
+          ) : null}
 
           <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
             <div className="mb-4 flex items-center gap-2">

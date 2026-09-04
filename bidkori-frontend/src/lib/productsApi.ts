@@ -70,3 +70,11 @@ export async function updateProduct(
   const { data } = await api.patch<Product>(productUpdateApiPath(id), payload);
   return data;
 }
+
+/**
+ * Delete a Product that has no linked Auction (backend BE-A03).
+ * Linked Products return a clean 400 — do not assume client eligibility.
+ */
+export async function deleteProduct(id: string | number): Promise<void> {
+  await api.delete(productUpdateApiPath(id));
+}

@@ -74,7 +74,8 @@ test('Seller auction image upload is enabled; delete/reorder/primary stay deferr
   assert.equal(canSellerReorderAuctionImages(), false);
   assert.equal(canSellerSetPrimaryAuctionImage(), false);
   assert.equal(SELLER_AUCTION_EDIT_ENABLED, true);
-  assert.equal(SELLER_AUCTION_DELETE_ENABLED, false);
+  // Auction listing DELETE is conditional (pre-start UX); image DELETE stays deferred.
+  assert.equal(SELLER_AUCTION_DELETE_ENABLED, true);
 });
 
 test('upload contract path remains POST /auctions/<id>/images/', () => {

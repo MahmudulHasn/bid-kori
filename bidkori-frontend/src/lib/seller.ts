@@ -182,11 +182,45 @@ export function isProductOwnedByUser(
 }
 
 /**
- * Product DELETE is not exposed in Seller UI.
- * Auction.product uses on_delete=CASCADE and Bid/Payment/images cascade from Auction.
- * ProductDetailView has no destroy guard.
+ * Product DELETE is UX-gated: only when the Product appears unused (no Auction
+ * in the known catalog). Backend BE-A03 remains authoritative.
  */
-export const SELLER_PRODUCT_DELETE_ENABLED = false;
+export const SELLER_PRODUCT_DELETE_ENABLED = true;
+
+export const PRODUCT_DELETE_METHOD = 'DELETE';
+
+export function buildProductDeleteApiPath(id: string | number): string {
+  return `/products/${id}/`;
+}
+
+/**
+ * UX helper — show Delete only for owned Products with no known Auction link.
+ * Catalog may be stale; backend still rejects linked Products.
+ */
+export function canSellerDeleteProduct(
+  product: Product | null | undefined,
+  user: Pick<AuthUser, 'id'> | null | undefined,
+  auctions: readonly Auction[],
+): boolean {
+  if (!SELLER_PRODUCT_DELETE_ENABLED) return false;
+  if (!isProductOwnedByUser(product, user) || !product) return false;
+  return !getAuctionedProductIds(auctions).has(product.id);
+}
+
+export function isProductLinkedAuctionDeleteError(error: unknown): boolean {
+  const data = (error as { response?: { data?: { error?: unknown } } })?.response
+    ?.data;
+  const raw = data?.error;
+  const message =
+    typeof raw === 'string'
+      ? raw
+      : Array.isArray(raw)
+        ? raw.join(' ')
+        : typeof raw === 'object' && raw
+          ? JSON.stringify(raw)
+          : '';
+  return message.toLowerCase().includes('linked to an auction');
+}
 
 export const PRODUCT_WRITE_FIELDS = ['title', 'description', 'condition'] as const;
 

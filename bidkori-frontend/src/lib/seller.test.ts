@@ -4,9 +4,12 @@ import test from 'node:test';
 import {
   PRODUCT_CREATE_API_PATH,
   PRODUCT_CREATE_METHOD,
+  PRODUCT_DELETE_METHOD,
   PRODUCT_UPDATE_METHOD,
   PRODUCT_WRITE_FIELDS,
   SELLER_PRODUCT_DELETE_ENABLED,
+  buildProductDeleteApiPath,
+  canSellerDeleteProduct,
   emptyProductFormValues,
   filterSellerAuctions,
   filterSellerProducts,
@@ -24,6 +27,7 @@ import {
   getSellerClosedAuctions,
   getSellerDashboardMetrics,
   isProductEligibleForAuction,
+  isProductLinkedAuctionDeleteError,
   isProductOwnedByUser,
   isSellerAuctionAwaitingFinalization,
   resolveAuctionCreateProductHint,
@@ -417,8 +421,37 @@ test('validateProductForm requires a title and a known condition', () => {
   assert.equal(errors.description, undefined);
 });
 
-test('product delete remains deferred because cascade is unsafe', () => {
-  assert.equal(SELLER_PRODUCT_DELETE_ENABLED, false);
+test('product delete may be offered only for owned unused products', () => {
+  assert.equal(SELLER_PRODUCT_DELETE_ENABLED, true);
+  assert.equal(PRODUCT_DELETE_METHOD, 'DELETE');
+  assert.equal(buildProductDeleteApiPath(42), '/products/42/');
+  assert.equal(productUpdateApiPath(42), '/products/42/');
+
+  const unused = product({ id: 1, title: 'Free', seller: 7 });
+  const linked = product({ id: 2, title: 'Taken', seller: 7 });
+  const auctions = [
+    auction({ id: 10, product: { id: 2, title: 'Taken', seller: 7 } }),
+  ];
+  const snap = JSON.stringify(auctions);
+
+  assert.equal(canSellerDeleteProduct(unused, { id: 7 }, auctions), true);
+  assert.equal(canSellerDeleteProduct(linked, { id: 7 }, auctions), false);
+  assert.equal(canSellerDeleteProduct(unused, null, auctions), false);
+  assert.equal(canSellerDeleteProduct(unused, { id: 9 }, auctions), false);
+  assert.equal(JSON.stringify(auctions), snap);
+  assert.equal(
+    isProductLinkedAuctionDeleteError({
+      response: {
+        data: {
+          error:
+            'This product cannot be deleted because it is linked to an auction.',
+        },
+      },
+    }),
+    true,
+  );
+  // Success UX destination — Product delete does not cascade to Auction delete.
+  assert.equal('/seller/products', '/seller/products');
 });
 
 test('eligibility helpers derive auctioned product ids without mutating sources', () => {

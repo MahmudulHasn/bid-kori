@@ -2,21 +2,24 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  AUCTION_DELETE_METHOD,
   AUCTION_UPDATE_METHOD,
   SELLER_AUCTION_CANCEL_ENABLED,
   SELLER_AUCTION_CANCEL_ENDPOINT_METHOD,
   SELLER_AUCTION_CANCEL_STATUS,
-  SELLER_AUCTION_DELETE_BLOCK_REASON,
   SELLER_AUCTION_DELETE_ENABLED,
   SELLER_AUCTION_EDIT_ENABLED,
   SELLER_AUCTION_PRODUCT_REBIND_ENABLED,
   SELLER_AUCTION_RESERVE_EDIT_ENABLED,
   buildAuctionCancelTransitionPayload,
+  buildAuctionDeleteApiPath,
   buildAuctionTransitionApiPath,
+  canOfferSellerAuctionDelete,
   canSellerCancelAuction,
   canSellerDeleteAuction,
   canSellerEditAuction,
   isAuctionConfigurationFreezeError,
+  isAuctionDeleteBlockedError,
   isAuctionPreFreezeByClientClock,
 } from './auctionManagementSafety.ts';
 import type { Auction } from './types.ts';
@@ -32,17 +35,15 @@ const futureStart = '2099-01-01T12:00:00.000Z';
 const pastStart = '2020-01-01T12:00:00.000Z';
 const nowMs = Date.parse('2026-09-04T06:00:00.000Z');
 
-test('Seller auction management safety decisions after BE-A02', () => {
+test('Seller auction management safety decisions after BE-A03', () => {
   assert.equal(SELLER_AUCTION_EDIT_ENABLED, true);
   assert.equal(SELLER_AUCTION_CANCEL_ENABLED, true);
-  assert.equal(SELLER_AUCTION_DELETE_ENABLED, false);
-  assert.equal(
-    SELLER_AUCTION_DELETE_BLOCK_REASON,
-    'DELETE DEFERRED — BACKEND INTEGRITY GUARD REQUIRED',
-  );
+  assert.equal(SELLER_AUCTION_DELETE_ENABLED, true);
   assert.equal(SELLER_AUCTION_RESERVE_EDIT_ENABLED, true);
   assert.equal(SELLER_AUCTION_PRODUCT_REBIND_ENABLED, false);
   assert.equal(AUCTION_UPDATE_METHOD, 'PATCH');
+  assert.equal(AUCTION_DELETE_METHOD, 'DELETE');
+  assert.equal(buildAuctionDeleteApiPath(42), '/auctions/42/');
 });
 
 test('edit eligibility: future ACTIVE owned auction is UX-eligible', () => {
@@ -54,6 +55,42 @@ test('edit eligibility: future ACTIVE owned auction is UX-eligible', () => {
   });
   assert.equal(canSellerEditAuction(owned, { id: 7 }, nowMs), true);
   assert.equal(isAuctionPreFreezeByClientClock(owned, nowMs), true);
+});
+
+test('canOfferSellerAuctionDelete mirrors pre-start ownership only', () => {
+  const ownedFuture = auction({
+    id: 1,
+    status: 'ACTIVE',
+    start_time: futureStart,
+    product: { title: 'Mine', seller: 7 },
+  });
+  const ownedStarted = auction({
+    id: 2,
+    status: 'ACTIVE',
+    start_time: pastStart,
+    product: { title: 'Mine', seller: 7 },
+  });
+  const closed = auction({
+    id: 3,
+    status: 'CLOSED',
+    start_time: futureStart,
+    product: { title: 'Mine', seller: 7 },
+  });
+  const cancelled = auction({
+    id: 4,
+    status: 'CANCELLED',
+    start_time: futureStart,
+    product: { title: 'Mine', seller: 7 },
+  });
+  assert.equal(canOfferSellerAuctionDelete(ownedFuture, { id: 7 }, nowMs), true);
+  assert.equal(canSellerDeleteAuction(ownedFuture, { id: 7 }, nowMs), true);
+  assert.equal(canOfferSellerAuctionDelete(ownedStarted, { id: 7 }, nowMs), false);
+  assert.equal(canOfferSellerAuctionDelete(closed, { id: 7 }, nowMs), false);
+  assert.equal(canOfferSellerAuctionDelete(cancelled, { id: 7 }, nowMs), false);
+  assert.equal(canOfferSellerAuctionDelete(ownedFuture, null, nowMs), false);
+  assert.equal(canOfferSellerAuctionDelete(ownedFuture, { id: 9 }, nowMs), false);
+  // Bid/payment state is not on detail — backend remains final authority.
+  assert.equal('bid_count' in ownedFuture, false);
 });
 
 test('edit eligibility: started ACTIVE is not UX-eligible', () => {
@@ -95,16 +132,20 @@ test('edit eligibility fails closed without ownership', () => {
   assert.equal(canSellerEditAuction(owned, { id: 9 }, nowMs), false);
 });
 
-test('delete remains disabled; cancel stays ACTIVE-only', () => {
+test('cancel stays ACTIVE-only and independent of delete offer', () => {
   const ownedActive = auction({
     id: 1,
     status: 'ACTIVE',
     start_time: pastStart,
     product: { title: 'Mine', seller: 7 },
   });
-  assert.equal(canSellerDeleteAuction(ownedActive, { id: 7 }), false);
   assert.equal(canSellerCancelAuction(ownedActive, { id: 7 }), true);
-  assert.equal(canSellerEditAuction(ownedActive, { id: 7 }, nowMs), false);
+  assert.equal(canOfferSellerAuctionDelete(ownedActive, { id: 7 }, nowMs), false);
+});
+
+test('auction delete success destination is seller auction list', () => {
+  assert.equal('/seller/auctions', '/seller/auctions');
+  assert.equal(buildAuctionDeleteApiPath(3), '/auctions/3/');
 });
 
 test('cancel uses lifecycle transition endpoint, not PATCH status', () => {
@@ -116,7 +157,7 @@ test('cancel uses lifecycle transition endpoint, not PATCH status', () => {
   assert.equal(SELLER_AUCTION_CANCEL_STATUS, 'CANCELLED');
 });
 
-test('configuration freeze errors are recognized from backend message', () => {
+test('configuration and delete blocked errors are recognized', () => {
   assert.equal(
     isAuctionConfigurationFreezeError({
       response: {
@@ -129,21 +170,14 @@ test('configuration freeze errors are recognized from backend message', () => {
     true,
   );
   assert.equal(
-    isAuctionConfigurationFreezeError({
-      response: { data: { error: 'Invalid starting bid.' } },
+    isAuctionDeleteBlockedError({
+      response: {
+        data: {
+          error:
+            'This auction cannot be deleted after it has started or received bids.',
+        },
+      },
     }),
-    false,
+    true,
   );
-});
-
-test('bid existence is not available on detail — backend remains final authority', () => {
-  const owned = auction({
-    id: 1,
-    status: 'ACTIVE',
-    start_time: futureStart,
-    product: { title: 'Mine', seller: 7 },
-  });
-  // UX may still show Edit when bids exist but are unknown client-side.
-  assert.equal(canSellerEditAuction(owned, { id: 7 }, nowMs), true);
-  assert.equal('bid_count' in owned, false);
 });

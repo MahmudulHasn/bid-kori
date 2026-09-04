@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -23,10 +23,13 @@ import {
   auctionDetailFetcher,
   buildAuctionDetailApiPath,
   cancelAuction,
+  deleteAuction,
 } from '@/lib/auctionsApi';
 import {
+  canOfferSellerAuctionDelete,
   canSellerCancelAuction,
   canSellerEditAuction,
+  isAuctionDeleteBlockedError,
 } from '@/lib/auctionManagementSafety';
 import { resolveMediaUrl } from '@/lib/media';
 import {
@@ -40,7 +43,6 @@ import {
   sellerProductDetailPath,
 } from '@/lib/workspaceNavigation';
 import type { Auction, AuthUser } from '@/lib/types';
-
 function formatWhen(
   value: string | undefined,
 ): { iso: string; label: string } | null {
@@ -64,11 +66,13 @@ function OwnedAuctionDetail({
   user,
   onCancelled,
   onImagesUpdated,
+  onDeleted,
 }: {
   auction: Auction;
   user: AuthUser;
   onCancelled: (next: Auction) => Promise<void>;
-  onImagesUpdated: (next: Auction) => Promise<void>;
+  onImagesUpdated: () => Promise<void>;
+  onDeleted: () => Promise<void>;
 }) {
   const title = getAuctionTitle(auction);
   const product = getAuctionProduct(auction);
@@ -85,9 +89,14 @@ function OwnedAuctionDetail({
     'idle' | 'confirming' | 'submitting'
   >('idle');
   const [cancelError, setCancelError] = useState<string>();
+  const [deletePhase, setDeletePhase] = useState<
+    'idle' | 'confirming' | 'submitting'
+  >('idle');
+  const [deleteError, setDeleteError] = useState<string>();
 
   const showCancel = canSellerCancelAuction(auction, user);
   const showEdit = canSellerEditAuction(auction, user);
+  const showDelete = canOfferSellerAuctionDelete(auction, user);
 
   const imageUrls = useMemo(() => {
     return (auction.images ?? [])
@@ -118,6 +127,28 @@ function OwnedAuctionDetail({
     }
   };
 
+  const handleDelete = async () => {
+    if (deletePhase === 'submitting') return;
+    setDeletePhase('submitting');
+    setDeleteError(undefined);
+    try {
+      await deleteAuction(auction.id);
+      toast.success('Auction deleted.');
+      await onDeleted();
+    } catch (error: unknown) {
+      setDeleteError(
+        getApiErrorMessage(
+          error,
+          isAuctionDeleteBlockedError(error)
+            ? 'This auction cannot be deleted after it has started or received bids.'
+            : 'We could not delete this auction.',
+        ),
+      );
+      setDeletePhase('confirming');
+      await onCancelled(auction);
+    }
+  };
+
   return (
     <>
       <header>
@@ -142,10 +173,24 @@ function OwnedAuctionDetail({
               onClick={() => {
                 setCancelError(undefined);
                 setCancelPhase('confirming');
+                setDeletePhase('idle');
               }}
               className="inline-flex items-center justify-center rounded-lg border border-red-300 px-3 py-1.5 text-sm font-semibold text-red-700 transition hover:bg-red-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500 dark:border-red-800 dark:text-red-300 dark:hover:bg-red-950"
             >
               Cancel Auction
+            </button>
+          ) : null}
+          {showDelete && deletePhase === 'idle' ? (
+            <button
+              type="button"
+              onClick={() => {
+                setDeleteError(undefined);
+                setDeletePhase('confirming');
+                setCancelPhase('idle');
+              }}
+              className="inline-flex items-center justify-center rounded-lg border border-zinc-300 px-3 py-1.5 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:border-zinc-600 dark:text-zinc-200 dark:hover:bg-zinc-900"
+            >
+              Delete Auction
             </button>
           ) : null}
         </div>
@@ -196,6 +241,59 @@ function OwnedAuctionDetail({
                   {cancelPhase === 'submitting'
                     ? 'Cancelling…'
                     : 'Cancel Auction'}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+        {showDelete && deletePhase !== 'idle' ? (
+          <div className="mt-4 space-y-3">
+            <div
+              role="group"
+              aria-labelledby="delete-auction-confirm-heading"
+              className="rounded-2xl border border-zinc-300 bg-zinc-50 px-4 py-4 dark:border-zinc-700 dark:bg-zinc-950"
+            >
+              <h2
+                id="delete-auction-confirm-heading"
+                className="text-sm font-semibold text-zinc-900 dark:text-zinc-100"
+              >
+                Delete auction?
+              </h2>
+              <p className="mt-2 text-sm text-zinc-700 dark:text-zinc-300">
+                Only unused pre-start auctions can be deleted. This action
+                permanently removes the auction listing. The product is not
+                deleted.
+              </p>
+              {deleteError ? (
+                <p
+                  role="alert"
+                  className="mt-3 text-sm font-medium text-red-800 dark:text-red-300"
+                >
+                  {deleteError}
+                </p>
+              ) : null}
+              <div className="mt-4 flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  disabled={deletePhase === 'submitting'}
+                  onClick={() => {
+                    setDeletePhase('idle');
+                    setDeleteError(undefined);
+                  }}
+                  className="inline-flex rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-800 transition hover:bg-zinc-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+                >
+                  Keep Auction
+                </button>
+                <button
+                  type="button"
+                  disabled={deletePhase === 'submitting'}
+                  aria-busy={deletePhase === 'submitting'}
+                  onClick={() => void handleDelete()}
+                  className="inline-flex rounded-lg bg-zinc-900 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-zinc-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-400 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+                >
+                  {deletePhase === 'submitting'
+                    ? 'Deleting…'
+                    : 'Delete Auction'}
                 </button>
               </div>
             </div>
@@ -355,6 +453,7 @@ function OwnedAuctionDetail({
 export default function SellerAuctionDetailPage() {
   const params = useParams<{ id: string }>();
   const auctionId = params?.id;
+  const router = useRouter();
   const { user } = useAuth();
   const { mutate: mutateGlobal } = useSWRConfig();
 
@@ -380,13 +479,14 @@ export default function SellerAuctionDetailPage() {
     await mutateGlobal(AUCTIONS_LIST_API_PATH);
   };
 
-  const handleImagesUpdated = async (next: Auction) => {
-    if (next?.id != null && next.images) {
-      await mutate(next, { revalidate: false });
-    } else {
-      await mutate();
-    }
+  const handleImagesUpdated = async () => {
+    await mutate();
     await mutateGlobal(AUCTIONS_LIST_API_PATH);
+  };
+
+  const handleDeleted = async () => {
+    await mutateGlobal(AUCTIONS_LIST_API_PATH);
+    router.push(SELLER_AUCTIONS_PATH);
   };
 
   return (
@@ -458,6 +558,7 @@ export default function SellerAuctionDetailPage() {
           user={user}
           onCancelled={handleCancelled}
           onImagesUpdated={handleImagesUpdated}
+          onDeleted={handleDeleted}
         />
       ) : null}
     </div>

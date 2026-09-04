@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { getRoleHome } from './authRouting.ts';
+import { getRoleHome, resolvePostAuthPath } from './authRouting.ts';
 import {
   BUYER_PROFILE_PATH,
   BUYER_SETTINGS_PATH,
   SELLER_AUCTIONS_PATH,
   SELLER_AUCTION_CREATE_PATH,
+  LEGACY_AUCTION_CREATE_PATH,
   SELLER_PRODUCTS_PATH,
   SELLER_PRODUCT_CREATE_PATH,
   SELLER_PROFILE_PATH,
@@ -18,6 +19,7 @@ import {
   getWorkspaceNavLabel,
   isNavItemActive,
   isNavItemNavigable,
+  resolveLegacyAuctionCreateRedirect,
   sellerAuctionCreatePath,
   sellerAuctionDetailPath,
   sellerAuctionEditPath,
@@ -364,4 +366,41 @@ test('workspace account paths are role-aware', () => {
   assert.equal(getRoleDisplayLabel('BUYER'), 'Buyer');
   assert.equal(getRoleDisplayLabel('SELLER'), 'Seller');
   assert.equal(getRoleDisplayLabel('ADMIN'), 'Admin');
+});
+
+test('legacy /auctions/create redirects are role-aware and loop-free', () => {
+  assert.equal(LEGACY_AUCTION_CREATE_PATH, '/auctions/create');
+  assert.equal(
+    resolveLegacyAuctionCreateRedirect('SELLER'),
+    SELLER_AUCTION_CREATE_PATH,
+  );
+  assert.equal(resolveLegacyAuctionCreateRedirect('BUYER'), '/unauthorized');
+  assert.equal(resolveLegacyAuctionCreateRedirect('ADMIN'), '/admin');
+  assert.notEqual(
+    resolveLegacyAuctionCreateRedirect('SELLER'),
+    LEGACY_AUCTION_CREATE_PATH,
+  );
+  assert.notEqual(
+    resolveLegacyAuctionCreateRedirect('BUYER'),
+    SELLER_AUCTION_CREATE_PATH,
+  );
+  assert.notEqual(
+    resolveLegacyAuctionCreateRedirect('ADMIN'),
+    SELLER_AUCTION_CREATE_PATH,
+  );
+  assert.equal(sellerAuctionCreatePath(), SELLER_AUCTION_CREATE_PATH);
+  assert.notEqual(sellerAuctionCreatePath(), LEGACY_AUCTION_CREATE_PATH);
+  const sellerNavHrefs = WORKSPACE_CONFIGS.SELLER.navItems
+    .map((item) => item.href)
+    .filter(Boolean);
+  assert.equal(sellerNavHrefs.includes(LEGACY_AUCTION_CREATE_PATH), false);
+  // Guest keeps /auctions/create as a safe post-login next; shim then role-redirects.
+  assert.equal(
+    resolvePostAuthPath(LEGACY_AUCTION_CREATE_PATH, 'SELLER'),
+    LEGACY_AUCTION_CREATE_PATH,
+  );
+  assert.notEqual(
+    resolveLegacyAuctionCreateRedirect('SELLER'),
+    resolvePostAuthPath(LEGACY_AUCTION_CREATE_PATH, 'SELLER'),
+  );
 });
