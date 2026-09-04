@@ -16,6 +16,10 @@ from rest_framework.permissions import IsAdminUser, IsAuthenticated, IsAuthentic
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from .deletion_policy import (
+    AUCTION_DELETE_BLOCKED_MESSAGE,
+    AuctionDeletionPolicy,
+)
 from .models import Auction, AuctionImage, Bid, Payment
 from .mutation_policy import (
     IMAGE_UPLOAD_FROZEN_MESSAGE,
@@ -193,7 +197,21 @@ class AuctionViewSet(viewsets.ModelViewSet):
 
     @extend_schema(tags=['Auctions'], summary='Delete an auction')
     def destroy(self, request, *args, **kwargs):
-        return super().destroy(request, *args, **kwargs)
+        """Hard-delete only pre-start auctions with no bids and no payment.
+
+        Integrity guard applies to all roles including staff/ADMIN. Ownership
+        remains enforced by ``IsAuctionSellerOrReadOnly``.
+        """
+        with transaction.atomic():
+            instance = self.get_object()
+            locked = AuctionDeletionPolicy.lock_auction(instance.pk)
+            if not AuctionDeletionPolicy.can_delete(locked):
+                return Response(
+                    {'error': AUCTION_DELETE_BLOCKED_MESSAGE},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            self.perform_destroy(locked)
+            return Response(status=status.HTTP_204_NO_CONTENT)
 
     def perform_create(self, serializer):
         serializer.save(seller=self.request.user)

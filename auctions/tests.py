@@ -1949,3 +1949,197 @@ class AuctionMutationFreezeTests(APITestCase):
         self.assertEqual(response.status_code, 200, response.data)
         auction.refresh_from_db()
         self.assertEqual(auction.status, Auction.Status.CANCELLED)
+
+
+@override_settings(
+    STORAGES={
+        'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
+        'staticfiles': {
+            'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
+        },
+    }
+)
+class AuctionDeletionIntegrityTests(APITestCase):
+    """Auction DELETE must not erase bidder/payment history."""
+
+    def setUp(self):
+        from users.models import UserProfile, ensure_user_profile
+
+        self.seller = User.objects.create_user(
+            username='del_seller',
+            email='del_seller@test.com',
+            password='pass12345',
+        )
+        self.other = User.objects.create_user(
+            username='del_other',
+            email='del_other@test.com',
+            password='pass12345',
+        )
+        self.buyer = User.objects.create_user(
+            username='del_buyer',
+            email='del_buyer@test.com',
+            password='pass12345',
+        )
+        self.admin = User.objects.create_user(
+            username='del_admin',
+            email='del_admin@test.com',
+            password='pass12345',
+            is_staff=True,
+        )
+        ensure_user_profile(self.seller, role=UserProfile.Role.SELLER)
+        ensure_user_profile(self.other, role=UserProfile.Role.SELLER)
+        ensure_user_profile(self.buyer, role=UserProfile.Role.BUYER)
+        ensure_user_profile(self.admin, role=UserProfile.Role.SELLER)
+        self.seller_token = Token.objects.create(user=self.seller)
+        self.other_token = Token.objects.create(user=self.other)
+        self.admin_token = Token.objects.create(user=self.admin)
+        self.now = timezone.now()
+
+    def _auth(self, token):
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {token.key}')
+
+    def _create_auction(
+        self,
+        *,
+        seller=None,
+        start_offset=timedelta(hours=1),
+        end_offset=timedelta(days=1),
+        status=Auction.Status.ACTIVE,
+        with_bid=False,
+        with_image=False,
+        with_payment=False,
+    ):
+        from .models import AuctionImage, Bid, Payment
+
+        seller = seller or self.seller
+        product = Product.objects.create(
+            seller=seller,
+            title='Delete Guard Item',
+            description='x',
+        )
+        auction = Auction.objects.create(
+            product=product,
+            starting_bid=100,
+            current_highest_bid=100,
+            min_increment=10,
+            start_time=self.now + start_offset,
+            end_time=self.now + end_offset,
+            status=status,
+        )
+        if with_bid:
+            Bid.objects.create(auction=auction, bidder=self.buyer, amount=150)
+            auction.current_highest_bid = 150
+            auction.save(update_fields=['current_highest_bid'])
+        if with_image:
+            AuctionImage.objects.create(
+                auction=auction,
+                image=_make_test_image('delete-guard.png'),
+            )
+        if with_payment:
+            Payment.objects.create(
+                auction=auction,
+                user=self.buyer,
+                amount=150,
+                status=Payment.Status.COMPLETED,
+                transaction_id=f'tx-del-{auction.pk}',
+            )
+        return auction
+
+    def _assert_delete_blocked(self, auction, token=None):
+        from .models import AuctionImage, Bid, Payment
+
+        token = token or self.seller_token
+        before_bids = Bid.objects.filter(auction=auction).count()
+        before_images = AuctionImage.objects.filter(auction=auction).count()
+        before_payments = Payment.objects.filter(auction=auction).count()
+        self._auth(token)
+        response = self.client.delete(f'/api/auctions/{auction.pk}/')
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertEqual(
+            response.data.get('error'),
+            'This auction cannot be deleted after it has started or received bids.',
+        )
+        self.assertNotIn('IntegrityError', str(response.data))
+        self.assertNotIn('FOREIGN KEY', str(response.data))
+        self.assertTrue(Auction.objects.filter(pk=auction.pk).exists())
+        self.assertEqual(Bid.objects.filter(auction=auction).count(), before_bids)
+        self.assertEqual(
+            AuctionImage.objects.filter(auction=auction).count(),
+            before_images,
+        )
+        self.assertEqual(
+            Payment.objects.filter(auction=auction).count(),
+            before_payments,
+        )
+
+    def test_owner_can_delete_prestart_empty_auction(self):
+        auction = self._create_auction()
+        product_id = auction.product_id
+        self._auth(self.seller_token)
+        response = self.client.delete(f'/api/auctions/{auction.pk}/')
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(Auction.objects.filter(pk=auction.pk).exists())
+        self.assertTrue(Product.objects.filter(pk=product_id).exists())
+
+    def test_prestart_auction_with_images_only_can_be_deleted(self):
+        """Images alone do not create bidder reliance for MVP."""
+        auction = self._create_auction(with_image=True)
+        self._auth(self.seller_token)
+        response = self.client.delete(f'/api/auctions/{auction.pk}/')
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(Auction.objects.filter(pk=auction.pk).exists())
+
+    def test_other_seller_cannot_delete(self):
+        auction = self._create_auction()
+        self._auth(self.other_token)
+        response = self.client.delete(f'/api/auctions/{auction.pk}/')
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(Auction.objects.filter(pk=auction.pk).exists())
+
+    def test_started_auction_delete_rejected(self):
+        auction = self._create_auction(start_offset=timedelta(hours=-1))
+        self._assert_delete_blocked(auction)
+
+    def test_auction_with_bid_delete_rejected(self):
+        auction = self._create_auction(
+            start_offset=timedelta(days=2),
+            with_bid=True,
+            with_image=True,
+        )
+        self._assert_delete_blocked(auction)
+
+    def test_closed_auction_delete_rejected(self):
+        auction = self._create_auction(
+            start_offset=timedelta(hours=-2),
+            end_offset=timedelta(hours=-1),
+            status=Auction.Status.CLOSED,
+            with_bid=True,
+            with_image=True,
+            with_payment=True,
+        )
+        self._assert_delete_blocked(auction)
+
+    def test_cancelled_auction_delete_rejected(self):
+        auction = self._create_auction(
+            start_offset=timedelta(days=1),
+            status=Auction.Status.CANCELLED,
+            with_image=True,
+        )
+        self._assert_delete_blocked(auction)
+
+    def test_auction_with_payment_delete_rejected(self):
+        auction = self._create_auction(
+            start_offset=timedelta(days=2),
+            with_payment=True,
+        )
+        self._assert_delete_blocked(auction)
+
+    def test_admin_owner_cannot_bypass_delete_guard(self):
+        auction = self._create_auction(
+            seller=self.admin,
+            start_offset=timedelta(hours=-1),
+            with_bid=True,
+            with_image=True,
+            with_payment=True,
+        )
+        self._assert_delete_blocked(auction, token=self.admin_token)
