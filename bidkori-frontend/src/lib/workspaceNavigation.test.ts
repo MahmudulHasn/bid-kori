@@ -9,6 +9,8 @@ import {
   SELLER_AUCTION_CREATE_PATH,
   SELLER_PRODUCTS_PATH,
   SELLER_PRODUCT_CREATE_PATH,
+  SELLER_PROFILE_PATH,
+  SELLER_SETTINGS_PATH,
   WORKSPACE_CONFIGS,
   getRoleDisplayLabel,
   getWorkspaceAccountPaths,
@@ -29,6 +31,7 @@ const BUYER_ONLY = new Set([
   'won-auctions',
   'watchlist',
 ]);
+
 const SELLER_ONLY = new Set(['products']);
 const ADMIN_ONLY = new Set([
   'users',
@@ -130,9 +133,23 @@ test('seller config does not contain buyer/admin-only items', () => {
   const sellerAnalytics = WORKSPACE_CONFIGS.SELLER.navItems.find((item) => item.id === 'analytics');
   assert.equal(sellerAnalytics?.enabled, false);
   const sellerProfile = WORKSPACE_CONFIGS.SELLER.navItems.find((item) => item.id === 'profile');
-  assert.equal(sellerProfile?.enabled, false);
+  assert.equal(sellerProfile?.enabled, true);
+  assert.equal(sellerProfile?.href, SELLER_PROFILE_PATH);
   const sellerSettings = WORKSPACE_CONFIGS.SELLER.navItems.find((item) => item.id === 'settings');
-  assert.equal(sellerSettings?.enabled, false);
+  assert.equal(sellerSettings?.enabled, true);
+  assert.equal(sellerSettings?.href, SELLER_SETTINGS_PATH);
+  for (const id of BUYER_ONLY) {
+    assert.equal(
+      WORKSPACE_CONFIGS.SELLER.navItems.some((item) => item.id === id),
+      false,
+    );
+  }
+  for (const id of ADMIN_ONLY) {
+    assert.equal(
+      WORKSPACE_CONFIGS.SELLER.navItems.some((item) => item.id === id),
+      false,
+    );
+  }
 });
 
 test('admin config does not contain buyer/seller-only items', () => {
@@ -161,6 +178,8 @@ test('active-route detection handles nested paths', () => {
   const dashboard = { href: '/seller', enabled: true as const };
   const products = { href: '/seller/products', enabled: true as const };
   const auctions = { href: '/seller/auctions', enabled: true as const };
+  const sellerProfile = { href: SELLER_PROFILE_PATH, enabled: true as const };
+  const sellerSettings = { href: SELLER_SETTINGS_PATH, enabled: true as const };
   const buyerHome = getRoleHome('BUYER');
   const myBids = { href: '/buyer/my-bids', enabled: true as const };
   const won = { href: '/buyer/won', enabled: true as const };
@@ -253,6 +272,30 @@ test('active-route detection handles nested paths', () => {
     false,
   );
   assert.equal(isNavItemActive('/buyer/settings', profile, buyerHome), false);
+  assert.equal(
+    isNavItemActive('/seller/profile', sellerProfile, sellerHome),
+    true,
+  );
+  assert.equal(
+    isNavItemActive('/seller/profile', dashboard, sellerHome),
+    false,
+  );
+  assert.equal(
+    isNavItemActive('/seller/settings', sellerSettings, sellerHome),
+    true,
+  );
+  assert.equal(
+    isNavItemActive('/seller/settings', dashboard, sellerHome),
+    false,
+  );
+  assert.equal(
+    isNavItemActive('/seller/settings', sellerProfile, sellerHome),
+    false,
+  );
+  assert.equal(
+    isNavItemActive('/seller/profile', sellerSettings, sellerHome),
+    false,
+  );
 });
 
 test('disabled items cannot be treated as navigable', () => {
@@ -304,14 +347,21 @@ test('every workspace shares Browse Marketplace to public auctions', () => {
   }
 });
 
-test('buyer account route helpers and account-path availability', () => {
+test('workspace account paths are role-aware', () => {
   assert.equal(BUYER_PROFILE_PATH, '/buyer/profile');
   assert.equal(BUYER_SETTINGS_PATH, '/buyer/settings');
+  assert.equal(SELLER_PROFILE_PATH, '/seller/profile');
+  assert.equal(SELLER_SETTINGS_PATH, '/seller/settings');
   assert.deepEqual(getWorkspaceAccountPaths('BUYER'), {
     profile: '/buyer/profile',
     settings: '/buyer/settings',
   });
-  assert.deepEqual(getWorkspaceAccountPaths('SELLER'), {});
+  assert.deepEqual(getWorkspaceAccountPaths('SELLER'), {
+    profile: '/seller/profile',
+    settings: '/seller/settings',
+  });
   assert.deepEqual(getWorkspaceAccountPaths('ADMIN'), {});
   assert.equal(getRoleDisplayLabel('BUYER'), 'Buyer');
+  assert.equal(getRoleDisplayLabel('SELLER'), 'Seller');
+  assert.equal(getRoleDisplayLabel('ADMIN'), 'Admin');
 });

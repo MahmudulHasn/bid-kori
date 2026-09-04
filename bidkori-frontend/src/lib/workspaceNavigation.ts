@@ -27,9 +27,11 @@ export type WorkspaceConfig = {
 const MARKETPLACE_HREF = '/auctions';
 const MARKETPLACE_LABEL = 'Browse Marketplace';
 
-/** Canonical Buyer account routes (Seller/Admin account pages do not exist yet). */
+/** Canonical account routes. */
 export const BUYER_PROFILE_PATH = '/buyer/profile';
 export const BUYER_SETTINGS_PATH = '/buyer/settings';
+export const SELLER_PROFILE_PATH = '/seller/profile';
+export const SELLER_SETTINGS_PATH = '/seller/settings';
 export const SELLER_PRODUCTS_PATH = '/seller/products';
 export const SELLER_PRODUCT_CREATE_PATH = '/seller/products/create';
 export const SELLER_AUCTIONS_PATH = '/seller/auctions';
@@ -52,8 +54,8 @@ const SELLER_NAV: readonly WorkspaceNavItem[] = [
   { id: 'products', label: 'Products', href: SELLER_PRODUCTS_PATH, enabled: true },
   { id: 'auctions', label: 'Auctions', href: SELLER_AUCTIONS_PATH, enabled: true },
   { id: 'analytics', label: 'Analytics', enabled: false },
-  { id: 'profile', label: 'Profile', enabled: false },
-  { id: 'settings', label: 'Settings', enabled: false },
+  { id: 'profile', label: 'Profile', href: SELLER_PROFILE_PATH, enabled: true },
+  { id: 'settings', label: 'Settings', href: SELLER_SETTINGS_PATH, enabled: true },
 ];
 
 const ADMIN_NAV: readonly WorkspaceNavItem[] = [
@@ -116,8 +118,8 @@ export function getWorkspaceConfig(role: UserRole): WorkspaceConfig {
 
 /**
  * Account-area paths that currently exist for a workspace.
- * Seller/Admin profile and settings pages are not implemented — omit hrefs
- * rather than linking to missing routes.
+ * Admin profile/settings are not implemented — omit hrefs rather than linking
+ * to missing routes.
  */
 export function getWorkspaceAccountPaths(role: UserRole): {
   profile?: string;
@@ -127,6 +129,12 @@ export function getWorkspaceAccountPaths(role: UserRole): {
     return {
       profile: BUYER_PROFILE_PATH,
       settings: BUYER_SETTINGS_PATH,
+    };
+  }
+  if (role === 'SELLER') {
+    return {
+      profile: SELLER_PROFILE_PATH,
+      settings: SELLER_SETTINGS_PATH,
     };
   }
   return {};

@@ -24,6 +24,7 @@ import {
   SELLER_AUCTION_CREATE_PATH,
   SELLER_PRODUCTS_PATH,
   SELLER_PRODUCT_CREATE_PATH,
+  SELLER_PROFILE_PATH,
   sellerAuctionDetailPath,
   sellerProductDetailPath,
 } from '@/lib/workspaceNavigation';
@@ -224,6 +225,14 @@ export default function SellerHomePage() {
         </p>
         <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
           Track the products you own and the auctions you are running.
+        </p>
+        <p className="mt-4">
+          <Link
+            href={SELLER_PROFILE_PATH}
+            className="text-sm font-medium text-sky-700 underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:text-sky-300"
+          >
+            View profile
+          </Link>
         </p>
       </header>
 
