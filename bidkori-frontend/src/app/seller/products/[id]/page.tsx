@@ -20,8 +20,10 @@ import {
   productDetailFetcher,
 } from '@/lib/productsApi';
 import {
+  canOfferSellerProductEdit,
   canSellerDeleteProduct,
   formatSellerProductCondition,
+  getAuctionedProductIds,
   isProductLinkedAuctionDeleteError,
   isProductOwnedByUser,
 } from '@/lib/seller';
@@ -60,6 +62,8 @@ function OwnedProductDetail({
   const created = formatTimestamp(product.created_at);
   const title = product.title.trim() ? product.title : 'Untitled product';
   const canDelete = canSellerDeleteProduct(product, user, auctions);
+  const canEdit = canOfferSellerProductEdit(product, user, auctions);
+  const canCreateAuction = !getAuctionedProductIds(auctions).has(product.id);
   const [deletePhase, setDeletePhase] = useState<
     'idle' | 'confirming' | 'submitting'
   >('idle');
@@ -96,19 +100,29 @@ function OwnedProductDetail({
           Product details from your catalog.
         </p>
         <div className="mt-4 flex flex-wrap gap-3">
-          <Link
-            href={sellerProductEditPath(product.id)}
-            className="inline-flex items-center justify-center rounded-lg bg-sky-700 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-sky-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500"
-          >
-            Edit Product
-          </Link>
-          <Link
-            href={sellerAuctionCreatePath(product.id)}
-            className="inline-flex items-center justify-center rounded-lg border border-sky-700 px-3 py-1.5 text-sm font-semibold text-sky-700 transition hover:bg-sky-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:text-sky-300 dark:hover:bg-sky-950"
-          >
-            Create Auction
-          </Link>
+          {canEdit ? (
+            <Link
+              href={sellerProductEditPath(product.id)}
+              className="inline-flex items-center justify-center rounded-lg bg-sky-700 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-sky-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500"
+            >
+              Edit Product
+            </Link>
+          ) : null}
+          {canCreateAuction ? (
+            <Link
+              href={sellerAuctionCreatePath(product.id)}
+              className="inline-flex items-center justify-center rounded-lg border border-sky-700 px-3 py-1.5 text-sm font-semibold text-sky-700 transition hover:bg-sky-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:text-sky-300 dark:hover:bg-sky-950"
+            >
+              Create Auction
+            </Link>
+          ) : null}
         </div>
+        {!canEdit ? (
+          <p className="mt-3 text-sm text-zinc-500 dark:text-zinc-400">
+            Product details are locked once the linked auction starts or
+            receives bids.
+          </p>
+        ) : null}
         {!canDelete ? (
           <p className="mt-3 text-sm text-zinc-500 dark:text-zinc-400">
             Delete is unavailable while this product is linked to an auction.

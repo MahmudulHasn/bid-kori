@@ -1,4 +1,5 @@
 import { isAuctionOwnedByUser } from './auctionOwnership.ts';
+import { isAuctionPreFreezeByClientClock } from './auctionManagementSafety.ts';
 import { formatAuctionStatus } from './auctionDisplay.ts';
 import type { AuthUser, Auction, Product } from './types.ts';
 
@@ -207,6 +208,36 @@ export function canSellerDeleteProduct(
   return !getAuctionedProductIds(auctions).has(product.id);
 }
 
+/**
+ * Find the Auction linked to a Product id from a known catalog.
+ * Does not mutate ``auctions``. Returns undefined when unknown/unlinked.
+ */
+export function findLinkedAuctionForProduct(
+  productId: number,
+  auctions: readonly Auction[],
+): Auction | undefined {
+  return auctions.find((auction) => getAuctionProductId(auction) === productId);
+}
+
+/**
+ * UX offer for Product Edit (BE-P04).
+ *
+ * Mirrors status + start_time via {@link isAuctionPreFreezeByClientClock}.
+ * Does NOT know Bid existence — a future Auction may still be rejected by the
+ * backend if a Bid already exists. Backend remains authoritative.
+ */
+export function canOfferSellerProductEdit(
+  product: Product | null | undefined,
+  user: Pick<AuthUser, 'id'> | null | undefined,
+  auctions: readonly Auction[],
+  nowMs: number = Date.now(),
+): boolean {
+  if (!isProductOwnedByUser(product, user) || !product) return false;
+  const linked = findLinkedAuctionForProduct(product.id, auctions);
+  if (!linked) return true;
+  return isAuctionPreFreezeByClientClock(linked, nowMs);
+}
+
 export function isProductLinkedAuctionDeleteError(error: unknown): boolean {
   const data = (error as { response?: { data?: { error?: unknown } } })?.response
     ?.data;
@@ -220,6 +251,26 @@ export function isProductLinkedAuctionDeleteError(error: unknown): boolean {
           ? JSON.stringify(raw)
           : '';
   return message.toLowerCase().includes('linked to an auction');
+}
+
+/** Recognize BE-P04 Product metadata freeze 400 payloads. */
+export function isProductEditFrozenError(error: unknown): boolean {
+  const data = (error as { response?: { data?: { error?: unknown } } })?.response
+    ?.data;
+  const raw = data?.error;
+  const message =
+    typeof raw === 'string'
+      ? raw
+      : Array.isArray(raw)
+        ? raw.join(' ')
+        : typeof raw === 'object' && raw
+          ? JSON.stringify(raw)
+          : '';
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes('can no longer be edited') &&
+    normalized.includes('auction')
+  );
 }
 
 export const PRODUCT_WRITE_FIELDS = ['title', 'description', 'condition'] as const;

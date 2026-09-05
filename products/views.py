@@ -9,6 +9,10 @@ from .deletion_policy import (
     ProductDeletionPolicy,
 )
 from .models import Product
+from .mutation_policy import (
+    PRODUCT_EDIT_FROZEN_MESSAGE,
+    ProductMutationPolicy,
+)
 from .permissions import IsSellerOrAdminForProductCreate, IsSellerOrReadOnly
 from .serializers import ProductSerializer
 
@@ -58,13 +62,33 @@ class ProductDetailView(generics.RetrieveUpdateDestroyAPIView):
     """Retrieve, update, or delete a single product by its primary key.
 
     PUT, PATCH, and DELETE are restricted to the product seller via
-    IsSellerOrReadOnly. DELETE is additionally blocked when an Auction is
-    linked (history-preserving integrity guard for all roles including ADMIN).
+    IsSellerOrReadOnly. UPDATE is blocked when a linked Auction is frozen by
+    ``AuctionMutationPolicy`` (started, has bids, or CLOSED/CANCELLED) for all
+    roles including ADMIN. DELETE is blocked when any Auction is linked.
     """
 
     queryset = Product.objects.select_related('category', 'seller').all()
     serializer_class = ProductSerializer
     permission_classes = [IsAuthenticatedOrReadOnly, IsSellerOrReadOnly]
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        with transaction.atomic():
+            instance = self.get_object()
+            locked = ProductMutationPolicy.lock_product_for_mutation(instance.pk)
+            if not ProductMutationPolicy.can_edit(locked):
+                return Response(
+                    {'error': PRODUCT_EDIT_FROZEN_MESSAGE},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            serializer = self.get_serializer(
+                locked,
+                data=request.data,
+                partial=partial,
+            )
+            serializer.is_valid(raise_exception=True)
+            self.perform_update(serializer)
+            return Response(serializer.data)
 
     def destroy(self, request, *args, **kwargs):
         with transaction.atomic():

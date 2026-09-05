@@ -40,6 +40,9 @@ export const SELLER_AUCTION_CREATE_PATH = '/seller/auctions/create';
 /** Legacy combined Product+Auction create — not linked from Seller workspace. */
 export const LEGACY_AUCTION_CREATE_PATH = '/auctions/create';
 
+/** Legacy authenticated dashboard — replaced by role workspaces. */
+export const LEGACY_DASHBOARD_PATH = '/dashboard';
+
 /**
  * Compatibility destination for bookmarks/links to `/auctions/create`.
  * Guest handling stays on the page (login with safe next). Authenticated roles
@@ -54,6 +57,14 @@ export function resolveLegacyAuctionCreateRedirect(role: UserRole): string {
     case 'ADMIN':
       return getRoleHome('ADMIN');
   }
+}
+
+/**
+ * Compatibility destination for bookmarks/links to `/dashboard`.
+ * Always the canonical role home — never remains `/dashboard`.
+ */
+export function resolveLegacyDashboardRedirect(role: UserRole): string {
+  return getRoleHome(role);
 }
 
 const BUYER_NAV: readonly WorkspaceNavItem[] = [

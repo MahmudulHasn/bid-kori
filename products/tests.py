@@ -8,7 +8,8 @@ from rest_framework.test import APITestCase
 from auctions.models import Auction, AuctionImage, Bid, Payment
 from users.models import UserProfile, ensure_user_profile
 
-from .models import Product
+from .models import Category, Product
+from .mutation_policy import PRODUCT_EDIT_FROZEN_MESSAGE
 
 
 class ProductAuthorizationTests(APITestCase):
@@ -44,16 +45,37 @@ class ProductAuthorizationTests(APITestCase):
         self.other_token = Token.objects.create(user=self.other)
         self.buyer_token = Token.objects.create(user=self.buyer)
         self.admin_token = Token.objects.create(user=self.admin)
+        self.category = Category.objects.create(name='Gadgets', slug='gadgets')
+        self.other_category = Category.objects.create(name='Art', slug='art')
 
-    def _create_product(self, seller=None, title='Test Item'):
-        return Product.objects.create(
-            seller=seller or self.owner,
-            title=title,
-            description='Desc',
-        )
+    def _create_product(self, seller=None, title='Test Item', **extra):
+        defaults = {
+            'seller': seller or self.owner,
+            'title': title,
+            'description': 'Desc',
+            'condition': Product.Condition.USED_GOOD,
+            'category': self.category,
+        }
+        defaults.update(extra)
+        return Product.objects.create(**defaults)
 
     def _auth(self, token):
         self.client.credentials(HTTP_AUTHORIZATION=f'Token {token.key}')
+
+    def _create_auction(self, product, *, start_offset=None, status=None, **extra):
+        now = timezone.now()
+        start_offset = timedelta(hours=1) if start_offset is None else start_offset
+        defaults = {
+            'product': product,
+            'starting_bid': 100,
+            'current_highest_bid': 100,
+            'min_increment': 10,
+            'start_time': now + start_offset,
+            'end_time': now + timedelta(days=2),
+            'status': status or Auction.Status.ACTIVE,
+        }
+        defaults.update(extra)
+        return Auction.objects.create(**defaults)
 
     def test_owner_can_update_own_product(self):
         product = self._create_product()
@@ -67,6 +89,26 @@ class ProductAuthorizationTests(APITestCase):
         product.refresh_from_db()
         self.assertEqual(product.title, 'Updated title')
 
+    def test_owner_can_put_standalone_product(self):
+        product = self._create_product()
+        self._auth(self.owner_token)
+        response = self.client.put(
+            f'/api/products/{product.pk}/',
+            {
+                'title': 'Put title',
+                'description': 'Put description',
+                'condition': Product.Condition.NEW,
+                'category': self.other_category.pk,
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        product.refresh_from_db()
+        self.assertEqual(product.title, 'Put title')
+        self.assertEqual(product.description, 'Put description')
+        self.assertEqual(product.condition, Product.Condition.NEW)
+        self.assertEqual(product.category_id, self.other_category.pk)
+
     def test_non_owner_cannot_update_product(self):
         product = self._create_product()
         self._auth(self.other_token)
@@ -78,6 +120,177 @@ class ProductAuthorizationTests(APITestCase):
         self.assertEqual(response.status_code, 403)
         product.refresh_from_db()
         self.assertEqual(product.title, 'Test Item')
+
+    def test_prestart_linked_product_remains_editable(self):
+        product = self._create_product(
+            title='Future listing',
+            description='Original',
+            condition=Product.Condition.USED_GOOD,
+        )
+        self._create_auction(product, start_offset=timedelta(days=1))
+        self._auth(self.owner_token)
+        response = self.client.patch(
+            f'/api/products/{product.pk}/',
+            {
+                'title': 'Updated future listing',
+                'description': 'Revised before start',
+                'condition': Product.Condition.NEW,
+                'category': self.other_category.pk,
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        product.refresh_from_db()
+        self.assertEqual(product.title, 'Updated future listing')
+        self.assertEqual(product.description, 'Revised before start')
+        self.assertEqual(product.condition, Product.Condition.NEW)
+        self.assertEqual(product.category_id, self.other_category.pk)
+
+    def test_started_auction_freezes_product_patch(self):
+        product = self._create_product(
+            title='Live item',
+            description='Live desc',
+            condition=Product.Condition.USED_GOOD,
+        )
+        self._create_auction(product, start_offset=timedelta(hours=-1))
+        snapshot = {
+            'title': product.title,
+            'description': product.description,
+            'condition': product.condition,
+            'category_id': product.category_id,
+        }
+        self._auth(self.owner_token)
+        response = self.client.patch(
+            f'/api/products/{product.pk}/',
+            {
+                'title': 'Bait and switch',
+                'description': 'Changed after start',
+                'condition': Product.Condition.FAIR,
+                'category': self.other_category.pk,
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data.get('error'), PRODUCT_EDIT_FROZEN_MESSAGE)
+        product.refresh_from_db()
+        self.assertEqual(product.title, snapshot['title'])
+        self.assertEqual(product.description, snapshot['description'])
+        self.assertEqual(product.condition, snapshot['condition'])
+        self.assertEqual(product.category_id, snapshot['category_id'])
+
+    def test_started_auction_put_cannot_bypass_freeze(self):
+        product = self._create_product(title='Live put')
+        self._create_auction(product, start_offset=timedelta(hours=-1))
+        self._auth(self.owner_token)
+        response = self.client.put(
+            f'/api/products/{product.pk}/',
+            {
+                'title': 'Put after start',
+                'description': 'No',
+                'condition': Product.Condition.NEW,
+                'category': self.other_category.pk,
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data.get('error'), PRODUCT_EDIT_FROZEN_MESSAGE)
+        product.refresh_from_db()
+        self.assertEqual(product.title, 'Live put')
+
+    def test_bid_freezes_product_even_with_future_start(self):
+        product = self._create_product(
+            title='Bid locked',
+            description='Before bid',
+            condition=Product.Condition.USED_LIKE_NEW,
+        )
+        auction = self._create_auction(product, start_offset=timedelta(days=3))
+        Bid.objects.create(auction=auction, bidder=self.buyer, amount=150)
+        bid_count = Bid.objects.filter(auction=auction).count()
+        self._auth(self.owner_token)
+        response = self.client.patch(
+            f'/api/products/{product.pk}/',
+            {
+                'title': 'Should not change',
+                'description': 'Should not change',
+                'condition': Product.Condition.FAIR,
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data.get('error'), PRODUCT_EDIT_FROZEN_MESSAGE)
+        product.refresh_from_db()
+        self.assertEqual(product.title, 'Bid locked')
+        self.assertEqual(product.description, 'Before bid')
+        self.assertEqual(product.condition, Product.Condition.USED_LIKE_NEW)
+        self.assertEqual(Bid.objects.filter(auction=auction).count(), bid_count)
+
+    def test_closed_linked_product_edit_rejected(self):
+        product = self._create_product(title='Closed listing')
+        self._create_auction(
+            product,
+            start_offset=timedelta(days=-2),
+            status=Auction.Status.CLOSED,
+            end_time=timezone.now() - timedelta(days=1),
+        )
+        self._auth(self.owner_token)
+        response = self.client.patch(
+            f'/api/products/{product.pk}/',
+            {'title': 'Rewrite history'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 400)
+        product.refresh_from_db()
+        self.assertEqual(product.title, 'Closed listing')
+
+    def test_cancelled_linked_product_edit_rejected(self):
+        product = self._create_product(title='Cancelled listing')
+        self._create_auction(
+            product,
+            start_offset=timedelta(days=1),
+            status=Auction.Status.CANCELLED,
+        )
+        self._auth(self.owner_token)
+        response = self.client.patch(
+            f'/api/products/{product.pk}/',
+            {'title': 'Rewrite cancelled'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 400)
+        product.refresh_from_db()
+        self.assertEqual(product.title, 'Cancelled listing')
+
+    def test_admin_cannot_bypass_product_freeze_via_api(self):
+        product = self._create_product(
+            seller=self.admin,
+            title='Admin owned live',
+        )
+        self._create_auction(product, start_offset=timedelta(hours=-1))
+        self._auth(self.admin_token)
+        response = self.client.patch(
+            f'/api/products/{product.pk}/',
+            {'title': 'Staff bypass attempt'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data.get('error'), PRODUCT_EDIT_FROZEN_MESSAGE)
+        product.refresh_from_db()
+        self.assertEqual(product.title, 'Admin owned live')
+
+    def test_admin_may_edit_own_prestart_linked_product(self):
+        product = self._create_product(
+            seller=self.admin,
+            title='Admin prestart',
+        )
+        self._create_auction(product, start_offset=timedelta(days=1))
+        self._auth(self.admin_token)
+        response = self.client.patch(
+            f'/api/products/{product.pk}/',
+            {'title': 'Admin prestart updated'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        product.refresh_from_db()
+        self.assertEqual(product.title, 'Admin prestart updated')
 
     def test_seller_can_create_product(self):
         self._auth(self.owner_token)

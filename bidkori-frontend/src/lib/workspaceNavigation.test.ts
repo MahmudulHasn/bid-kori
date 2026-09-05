@@ -1,13 +1,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { getRoleHome, resolvePostAuthPath } from './authRouting.ts';
+import { getRoleHome, isSafeNextPath, resolvePostAuthPath } from './authRouting.ts';
 import {
   BUYER_PROFILE_PATH,
   BUYER_SETTINGS_PATH,
   SELLER_AUCTIONS_PATH,
   SELLER_AUCTION_CREATE_PATH,
   LEGACY_AUCTION_CREATE_PATH,
+  LEGACY_DASHBOARD_PATH,
   SELLER_PRODUCTS_PATH,
   SELLER_PRODUCT_CREATE_PATH,
   SELLER_PROFILE_PATH,
@@ -20,6 +21,7 @@ import {
   isNavItemActive,
   isNavItemNavigable,
   resolveLegacyAuctionCreateRedirect,
+  resolveLegacyDashboardRedirect,
   sellerAuctionCreatePath,
   sellerAuctionDetailPath,
   sellerAuctionEditPath,
@@ -403,4 +405,34 @@ test('legacy /auctions/create redirects are role-aware and loop-free', () => {
     resolveLegacyAuctionCreateRedirect('SELLER'),
     resolvePostAuthPath(LEGACY_AUCTION_CREATE_PATH, 'SELLER'),
   );
+});
+
+test('legacy /dashboard redirects to role home without loops', () => {
+  assert.equal(LEGACY_DASHBOARD_PATH, '/dashboard');
+  assert.equal(resolveLegacyDashboardRedirect('BUYER'), getRoleHome('BUYER'));
+  assert.equal(resolveLegacyDashboardRedirect('SELLER'), getRoleHome('SELLER'));
+  assert.equal(resolveLegacyDashboardRedirect('ADMIN'), getRoleHome('ADMIN'));
+  assert.equal(resolveLegacyDashboardRedirect('BUYER'), '/buyer');
+  assert.equal(resolveLegacyDashboardRedirect('SELLER'), '/seller');
+  assert.equal(resolveLegacyDashboardRedirect('ADMIN'), '/admin');
+  for (const role of ['BUYER', 'SELLER', 'ADMIN'] as const) {
+    assert.notEqual(resolveLegacyDashboardRedirect(role), LEGACY_DASHBOARD_PATH);
+  }
+  assert.equal(resolvePostAuthPath(LEGACY_DASHBOARD_PATH, 'BUYER'), LEGACY_DASHBOARD_PATH);
+  assert.equal(isSafeNextPath(LEGACY_DASHBOARD_PATH), true);
+  assert.equal(isSafeNextPath('https://evil.example/dashboard'), false);
+
+  const buyerHrefs = WORKSPACE_CONFIGS.BUYER.navItems
+    .map((item) => item.href)
+    .filter(Boolean);
+  const sellerHrefs = WORKSPACE_CONFIGS.SELLER.navItems
+    .map((item) => item.href)
+    .filter(Boolean);
+  const adminHrefs = WORKSPACE_CONFIGS.ADMIN.navItems
+    .map((item) => item.href)
+    .filter(Boolean);
+  assert.equal(buyerHrefs.includes(LEGACY_DASHBOARD_PATH), false);
+  assert.equal(sellerHrefs.includes(LEGACY_DASHBOARD_PATH), false);
+  assert.equal(adminHrefs.includes(LEGACY_DASHBOARD_PATH), false);
+  assert.equal(WORKSPACE_CONFIGS.ADMIN.homePath, '/admin');
 });

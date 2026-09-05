@@ -10,6 +10,10 @@ import ProductForm from '@/components/seller/ProductForm';
 import { useAuth } from '@/context/AuthContext';
 import { getApiErrorMessage, getApiFieldErrors, getApiStatus } from '@/lib/apiErrors';
 import {
+  AUCTIONS_LIST_API_PATH,
+  auctionListFetcher,
+} from '@/lib/auctionsApi';
+import {
   MY_LISTINGS_API_PATH,
   buildProductDetailApiPath,
   productDetailFetcher,
@@ -17,6 +21,8 @@ import {
 } from '@/lib/productsApi';
 import {
   PRODUCT_WRITE_FIELDS,
+  canOfferSellerProductEdit,
+  isProductEditFrozenError,
   isProductOwnedByUser,
   productFormValuesFromProduct,
   serializeProductWritePayload,
@@ -44,21 +50,39 @@ export default function SellerEditProductPage() {
     productDetailFetcher,
   );
 
+  const { data: auctions = [], mutate: mutateAuctions } = useSWR(
+    AUCTIONS_LIST_API_PATH,
+    auctionListFetcher,
+  );
+
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string>();
   const [fieldErrors, setFieldErrors] = useState<
     Partial<Record<keyof ProductFormValues, string>>
   >({});
+  const [freezeRejected, setFreezeRejected] = useState(false);
 
   const owned = isProductOwnedByUser(product, user);
+  const canEdit =
+    Boolean(product && user) &&
+    canOfferSellerProductEdit(product, user, auctions);
   const status = getApiStatus(error);
   const unavailable = Boolean(error) && (status === 404 || status === 403);
+  const clearlyFrozen =
+    !isLoading && !error && Boolean(product) && owned && !canEdit;
+
+  const revalidateAfterFreeze = async () => {
+    await mutate();
+    await mutateAuctions();
+    await mutateCache(MY_LISTINGS_API_PATH);
+  };
 
   const handleSubmit = async (values: ProductFormValues) => {
     if (submitting || !productId) return;
     setSubmitting(true);
     setFormError(undefined);
     setFieldErrors({});
+    setFreezeRejected(false);
 
     try {
       const updated = await updateProduct(
@@ -69,15 +93,29 @@ export default function SellerEditProductPage() {
       await mutateCache(buildProductDetailApiPath(productId), updated, {
         revalidate: false,
       });
+      await mutateAuctions();
       toast.success('Product updated.');
       router.push(sellerProductDetailPath(updated.id));
     } catch (err: unknown) {
-      setFieldErrors(
-        getApiFieldErrors(err, PRODUCT_WRITE_FIELDS) as Partial<
-          Record<keyof ProductFormValues, string>
-        >,
-      );
-      setFormError(getApiErrorMessage(err, 'We could not update this product.'));
+      if (isProductEditFrozenError(err)) {
+        setFreezeRejected(true);
+        setFormError(
+          getApiErrorMessage(
+            err,
+            'This product can no longer be edited after its auction has started or received bids.',
+          ),
+        );
+        await revalidateAfterFreeze();
+      } else {
+        setFieldErrors(
+          getApiFieldErrors(err, PRODUCT_WRITE_FIELDS) as Partial<
+            Record<keyof ProductFormValues, string>
+          >,
+        );
+        setFormError(
+          getApiErrorMessage(err, 'We could not update this product.'),
+        );
+      }
     } finally {
       setSubmitting(false);
     }
@@ -146,7 +184,45 @@ export default function SellerEditProductPage() {
         </section>
       ) : null}
 
-      {!isLoading && !error && product && owned ? (
+      {clearlyFrozen || freezeRejected ? (
+        <section
+          role="status"
+          className="rounded-2xl border border-zinc-200 bg-white px-6 py-10 text-center dark:border-zinc-800 dark:bg-zinc-900"
+        >
+          <h1 className="text-xl font-semibold text-zinc-900 dark:text-white">
+            Product editing unavailable
+          </h1>
+          <p className="mx-auto mt-2 max-w-md text-sm text-zinc-600 dark:text-zinc-400">
+            Product details are locked once the linked auction starts or
+            receives bids. The server remains the authority for this rule.
+          </p>
+          {formError ? (
+            <p
+              role="alert"
+              className="mx-auto mt-3 max-w-md text-sm text-red-700 dark:text-red-300"
+            >
+              {formError}
+            </p>
+          ) : null}
+          <Link
+            href={
+              productId
+                ? sellerProductDetailPath(productId)
+                : SELLER_PRODUCTS_PATH
+            }
+            className="mt-6 inline-flex rounded-lg bg-sky-700 px-3 py-2 text-sm font-semibold text-white transition hover:bg-sky-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500"
+          >
+            Back to Product
+          </Link>
+        </section>
+      ) : null}
+
+      {!isLoading &&
+      !error &&
+      product &&
+      owned &&
+      canEdit &&
+      !freezeRejected ? (
         <>
           <header>
             <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-white sm:text-3xl">

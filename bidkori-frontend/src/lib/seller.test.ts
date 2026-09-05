@@ -9,10 +9,12 @@ import {
   PRODUCT_WRITE_FIELDS,
   SELLER_PRODUCT_DELETE_ENABLED,
   buildProductDeleteApiPath,
+  canOfferSellerProductEdit,
   canSellerDeleteProduct,
   emptyProductFormValues,
   filterSellerAuctions,
   filterSellerProducts,
+  findLinkedAuctionForProduct,
   getAuctionProductId,
   getAuctionedProductIds,
   getEligibleAuctionProducts,
@@ -26,6 +28,7 @@ import {
   getSellerCancelledAuctions,
   getSellerClosedAuctions,
   getSellerDashboardMetrics,
+  isProductEditFrozenError,
   isProductEligibleForAuction,
   isProductLinkedAuctionDeleteError,
   isProductOwnedByUser,
@@ -452,6 +455,142 @@ test('product delete may be offered only for owned unused products', () => {
   );
   // Success UX destination — Product delete does not cascade to Auction delete.
   assert.equal('/seller/products', '/seller/products');
+});
+
+test('canOfferSellerProductEdit mirrors ownership and client pre-freeze only', () => {
+  const nowMs = Date.parse('2026-09-05T06:00:00.000Z');
+  const futureStart = '2099-01-01T12:00:00.000Z';
+  const pastStart = '2020-01-01T12:00:00.000Z';
+  const standalone = product({ id: 1, title: 'Solo', seller: 7 });
+  const linkedFuture = product({ id: 2, title: 'Future', seller: 7 });
+  const linkedStarted = product({ id: 3, title: 'Live', seller: 7 });
+  const linkedClosed = product({ id: 4, title: 'Closed', seller: 7 });
+  const linkedCancelled = product({ id: 5, title: 'Cancelled', seller: 7 });
+  const auctions = [
+    auction({
+      id: 20,
+      status: 'ACTIVE',
+      start_time: futureStart,
+      product: { id: 2, title: 'Future', seller: 7 },
+    }),
+    auction({
+      id: 21,
+      status: 'ACTIVE',
+      start_time: pastStart,
+      product: { id: 3, title: 'Live', seller: 7 },
+    }),
+    auction({
+      id: 22,
+      status: 'CLOSED',
+      start_time: futureStart,
+      product: { id: 4, title: 'Closed', seller: 7 },
+    }),
+    auction({
+      id: 23,
+      status: 'CANCELLED',
+      start_time: futureStart,
+      product: { id: 5, title: 'Cancelled', seller: 7 },
+    }),
+  ];
+  const snap = JSON.stringify(auctions);
+
+  assert.equal(
+    canOfferSellerProductEdit(standalone, { id: 7 }, auctions, nowMs),
+    true,
+  );
+  assert.equal(
+    canOfferSellerProductEdit(linkedFuture, { id: 7 }, auctions, nowMs),
+    true,
+  );
+  assert.equal(
+    canOfferSellerProductEdit(linkedStarted, { id: 7 }, auctions, nowMs),
+    false,
+  );
+  assert.equal(
+    canOfferSellerProductEdit(linkedClosed, { id: 7 }, auctions, nowMs),
+    false,
+  );
+  assert.equal(
+    canOfferSellerProductEdit(linkedCancelled, { id: 7 }, auctions, nowMs),
+    false,
+  );
+  assert.equal(
+    canOfferSellerProductEdit(standalone, null, auctions, nowMs),
+    false,
+  );
+  assert.equal(
+    canOfferSellerProductEdit(standalone, { id: 9 }, auctions, nowMs),
+    false,
+  );
+  assert.equal(
+    canOfferSellerProductEdit(null, { id: 7 }, auctions, nowMs),
+    false,
+  );
+  // Bid count is not on Auction list payloads — helper does not claim it.
+  assert.equal('bid_count' in auctions[0], false);
+  assert.equal(findLinkedAuctionForProduct(2, auctions)?.id, 20);
+  assert.equal(JSON.stringify(auctions), snap);
+});
+
+test('product edit and delete eligibility stay distinct for linked auctions', () => {
+  const nowMs = Date.parse('2026-09-05T06:00:00.000Z');
+  const standalone = product({ id: 1, title: 'Solo', seller: 7 });
+  const future = product({ id: 2, title: 'Future', seller: 7 });
+  const started = product({ id: 3, title: 'Live', seller: 7 });
+  const auctions = [
+    auction({
+      id: 20,
+      status: 'ACTIVE',
+      start_time: '2099-01-01T12:00:00.000Z',
+      product: { id: 2, title: 'Future', seller: 7 },
+    }),
+    auction({
+      id: 21,
+      status: 'ACTIVE',
+      start_time: '2020-01-01T12:00:00.000Z',
+      product: { id: 3, title: 'Live', seller: 7 },
+    }),
+  ];
+
+  assert.equal(canOfferSellerProductEdit(standalone, { id: 7 }, auctions, nowMs), true);
+  assert.equal(canSellerDeleteProduct(standalone, { id: 7 }, auctions), true);
+
+  assert.equal(canOfferSellerProductEdit(future, { id: 7 }, auctions, nowMs), true);
+  assert.equal(canSellerDeleteProduct(future, { id: 7 }, auctions), false);
+
+  assert.equal(canOfferSellerProductEdit(started, { id: 7 }, auctions, nowMs), false);
+  assert.equal(canSellerDeleteProduct(started, { id: 7 }, auctions), false);
+});
+
+test('isProductEditFrozenError recognizes BE-P04 freeze message', () => {
+  assert.equal(
+    isProductEditFrozenError({
+      response: {
+        data: {
+          error:
+            'This product can no longer be edited after its auction has started or received bids.',
+        },
+      },
+    }),
+    true,
+  );
+  assert.equal(
+    isProductEditFrozenError({
+      response: {
+        data: {
+          error:
+            'This product cannot be deleted because it is linked to an auction.',
+        },
+      },
+    }),
+    false,
+  );
+  assert.equal(
+    isProductEditFrozenError({
+      response: { data: { title: ['This field is required.'] } },
+    }),
+    false,
+  );
 });
 
 test('eligibility helpers derive auctioned product ids without mutating sources', () => {
