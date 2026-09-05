@@ -694,6 +694,8 @@ class AnalyticsSummaryView(APIView):
             .order_by('product__category__name')
         ]
 
+        # Newest capped sample: DB-ordered newest-first (timestamp, id tie-break).
+        # Slice at the database — do not load the full Bid table into Python.
         bid_escalation_history = [
             {
                 'bid_id': bid['id'],
@@ -703,7 +705,7 @@ class AnalyticsSummaryView(APIView):
                 'bidder_username': bid['bidder__username'],
             }
             for bid in Bid.objects.select_related('bidder')
-            .order_by('timestamp')
+            .order_by('-timestamp', '-id')
             .values('id', 'auction_id', 'amount', 'timestamp', 'bidder__username')[:100]
         ]
 

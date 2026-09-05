@@ -1,9 +1,11 @@
 from datetime import timedelta
+from decimal import Decimal
 from io import BytesIO
 
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.db.models import Sum
 from django.test import TransactionTestCase, override_settings
 from django.utils import timezone
 from PIL import Image
@@ -302,6 +304,158 @@ class AnalyticsAuthorizationTests(APITestCase):
         response = self.client.get('/api/auctions/analytics/dashboard/')
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'BidKori Analytics')
+
+
+class AnalyticsBidEscalationSampleTests(APITestCase):
+    """bid_escalation_history is a newest-capped sample, newest-first."""
+
+    def setUp(self):
+        self.staff = User.objects.create_user(
+            username='analytics_staff',
+            email='analytics_staff@test.com',
+            password='pass12345',
+            is_staff=True,
+        )
+        self.bidder = User.objects.create_user(
+            username='analytics_bidder',
+            email='analytics_bidder@test.com',
+            password='pass12345',
+        )
+        self.staff_token = Token.objects.create(user=self.staff)
+        self.client.credentials(
+            HTTP_AUTHORIZATION=f'Token {self.staff_token.key}',
+        )
+
+        now = timezone.now()
+        self.product = Product.objects.create(
+            seller=self.staff,
+            title='Escalation Sample Item',
+            description='Desc',
+        )
+        self.auction = Auction.objects.create(
+            product=self.product,
+            starting_bid=100,
+            current_highest_bid=100,
+            min_increment=1,
+            start_time=now - timedelta(hours=2),
+            end_time=now + timedelta(days=1),
+            status=Auction.Status.ACTIVE,
+        )
+
+    def _create_bids_with_timestamps(self, count, base_time):
+        from .models import Bid
+
+        bids = []
+        for index in range(count):
+            bid = Bid.objects.create(
+                auction=self.auction,
+                bidder=self.bidder,
+                amount=Decimal('100.00') + Decimal(index),
+            )
+            Bid.objects.filter(pk=bid.pk).update(
+                timestamp=base_time + timedelta(seconds=index),
+            )
+            bid.refresh_from_db()
+            bids.append(bid)
+        self.auction.current_highest_bid = Decimal('100.00') + Decimal(count - 1)
+        self.auction.save(update_fields=['current_highest_bid'])
+        return bids
+
+    def test_fewer_than_100_bids_returns_all_newest_first(self):
+        base = timezone.now() - timedelta(minutes=10)
+        bids = self._create_bids_with_timestamps(3, base)
+
+        response = self.client.get('/api/auctions/analytics/')
+        self.assertEqual(response.status_code, 200)
+        history = response.data['bid_escalation_history']
+        self.assertEqual(len(history), 3)
+        self.assertEqual(history[0]['bid_id'], bids[2].id)
+        self.assertEqual(history[-1]['bid_id'], bids[0].id)
+        timestamps = [row['timestamp'] for row in history]
+        self.assertEqual(timestamps, sorted(timestamps, reverse=True))
+
+    def test_more_than_100_bids_returns_newest_100_only(self):
+        base = timezone.now() - timedelta(hours=1)
+        bids = self._create_bids_with_timestamps(105, base)
+        oldest = bids[0]
+        newest = bids[-1]
+        oldest_in_window = bids[5]  # index 5 .. 104 inclusive = 100 bids
+
+        response = self.client.get('/api/auctions/analytics/')
+        self.assertEqual(response.status_code, 200)
+        history = response.data['bid_escalation_history']
+        self.assertEqual(len(history), 100)
+
+        history_ids = [row['bid_id'] for row in history]
+        self.assertNotIn(oldest.id, history_ids)
+        for excluded in bids[:5]:
+            self.assertNotIn(excluded.id, history_ids)
+        self.assertIn(newest.id, history_ids)
+        self.assertIn(oldest_in_window.id, history_ids)
+
+        self.assertEqual(history[0]['bid_id'], newest.id)
+        self.assertEqual(history[-1]['bid_id'], oldest_in_window.id)
+
+        timestamps = [row['timestamp'] for row in history]
+        self.assertEqual(timestamps, sorted(timestamps, reverse=True))
+
+    def test_equal_timestamps_use_deterministic_id_tiebreak(self):
+        from .models import Bid
+
+        shared = timezone.now() - timedelta(minutes=1)
+        first = Bid.objects.create(
+            auction=self.auction,
+            bidder=self.bidder,
+            amount=Decimal('110.00'),
+        )
+        second = Bid.objects.create(
+            auction=self.auction,
+            bidder=self.bidder,
+            amount=Decimal('120.00'),
+        )
+        Bid.objects.filter(pk__in=[first.pk, second.pk]).update(timestamp=shared)
+        first.refresh_from_db()
+        second.refresh_from_db()
+        self.assertEqual(first.timestamp, second.timestamp)
+        self.assertGreater(second.id, first.id)
+
+        response = self.client.get('/api/auctions/analytics/')
+        self.assertEqual(response.status_code, 200)
+        history = response.data['bid_escalation_history']
+        matching = [row for row in history if row['bid_id'] in {first.id, second.id}]
+        self.assertEqual(len(matching), 2)
+        self.assertEqual(matching[0]['bid_id'], second.id)
+        self.assertEqual(matching[1]['bid_id'], first.id)
+
+    def test_other_analytics_fields_unchanged_with_escalation_sample(self):
+        base = timezone.now() - timedelta(minutes=5)
+        self._create_bids_with_timestamps(5, base)
+        expected_volume = Auction.objects.aggregate(
+            total=Sum('current_highest_bid'),
+        )['total'] or Decimal('0.00')
+
+        response = self.client.get('/api/auctions/analytics/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['total_active_auctions'], 1)
+        self.assertEqual(response.data['total_bids_placed'], 5)
+        self.assertEqual(
+            Decimal(str(response.data['total_bidding_volume'])),
+            expected_volume,
+        )
+        self.assertIsInstance(response.data['category_breakdown'], list)
+        self.assertGreaterEqual(len(response.data['category_breakdown']), 1)
+        self.assertEqual(len(response.data['top_active_bidders']), 1)
+        self.assertEqual(
+            response.data['top_active_bidders'][0]['username'],
+            self.bidder.username,
+        )
+        self.assertEqual(response.data['top_active_bidders'][0]['bid_count'], 5)
+        history = response.data['bid_escalation_history']
+        self.assertEqual(len(history), 5)
+        self.assertEqual(
+            set(history[0].keys()),
+            {'bid_id', 'auction_id', 'amount', 'timestamp', 'bidder_username'},
+        )
 
 
 class AuctionLifecycleTests(APITestCase):
