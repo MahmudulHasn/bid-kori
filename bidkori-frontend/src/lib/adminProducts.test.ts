@@ -144,17 +144,18 @@ test('admin products navigation is enabled with nested active state', () => {
   assert.equal(isNavItemActive('/admin/products', products!, home), true);
   assert.equal(isNavItemActive('/admin/products/42', products!, home), true);
 
-  for (const id of ['dashboard', 'profile', 'settings', 'products']) {
-    assert.equal(admin.navItems.find((item) => item.id === id)?.enabled, true);
-  }
   for (const id of [
-    'users',
+    'dashboard',
+    'profile',
+    'settings',
+    'products',
     'auctions',
     'bids',
-    'categories',
-    'reports',
     'analytics',
   ]) {
+    assert.equal(admin.navItems.find((item) => item.id === id)?.enabled, true);
+  }
+  for (const id of ['users', 'categories', 'reports']) {
     assert.equal(admin.navItems.find((item) => item.id === id)?.enabled, false);
   }
 

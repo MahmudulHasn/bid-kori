@@ -10,6 +10,9 @@ import {
   ADMIN_SETTINGS_PATH,
 } from './adminAccount.ts';
 import { ADMIN_PRODUCTS_PATH } from './adminProducts.ts';
+import { ADMIN_AUCTIONS_PATH } from './adminAuctions.ts';
+import { ADMIN_BIDS_PATH } from './adminBids.ts';
+import { ADMIN_ANALYTICS_PATH } from './adminAnalytics.ts';
 
 export type WorkspaceNavItem = {
   id: string;
@@ -37,7 +40,14 @@ export const BUYER_PROFILE_PATH = '/buyer/profile';
 export const BUYER_SETTINGS_PATH = '/buyer/settings';
 export const SELLER_PROFILE_PATH = '/seller/profile';
 export const SELLER_SETTINGS_PATH = '/seller/settings';
-export { ADMIN_PROFILE_PATH, ADMIN_SETTINGS_PATH, ADMIN_PRODUCTS_PATH };
+export {
+  ADMIN_PROFILE_PATH,
+  ADMIN_SETTINGS_PATH,
+  ADMIN_PRODUCTS_PATH,
+  ADMIN_AUCTIONS_PATH,
+  ADMIN_BIDS_PATH,
+  ADMIN_ANALYTICS_PATH,
+};
 export const SELLER_PRODUCTS_PATH = '/seller/products';
 export const SELLER_PRODUCT_CREATE_PATH = '/seller/products/create';
 export const SELLER_AUCTIONS_PATH = '/seller/auctions';
@@ -95,11 +105,11 @@ const ADMIN_NAV: readonly WorkspaceNavItem[] = [
   { id: 'dashboard', label: 'Dashboard', href: '/admin', enabled: true },
   { id: 'users', label: 'Users', enabled: false },
   { id: 'products', label: 'Products', href: ADMIN_PRODUCTS_PATH, enabled: true },
-  { id: 'auctions', label: 'Auctions', enabled: false },
-  { id: 'bids', label: 'Bids', enabled: false },
+  { id: 'auctions', label: 'Auctions', href: ADMIN_AUCTIONS_PATH, enabled: true },
+  { id: 'bids', label: 'Bids', href: ADMIN_BIDS_PATH, enabled: true },
   { id: 'categories', label: 'Categories', enabled: false },
   { id: 'reports', label: 'Reports', enabled: false },
-  { id: 'analytics', label: 'Analytics', enabled: false },
+  { id: 'analytics', label: 'Analytics', href: ADMIN_ANALYTICS_PATH, enabled: true },
   { id: 'profile', label: 'Profile', href: ADMIN_PROFILE_PATH, enabled: true },
   { id: 'settings', label: 'Settings', href: ADMIN_SETTINGS_PATH, enabled: true },
 ];
@@ -213,7 +223,8 @@ export function isNavItemNavigable(
 /**
  * Pathname-aware active state that supports nested routes.
  * Dashboard (homePath) is exact-match only so `/seller/products` does not
- * keep Dashboard highlighted.
+ * keep Dashboard highlighted. Query strings are ignored so
+ * `/admin/bids?auction=42` still activates Bids.
  */
 export function isNavItemActive(
   pathname: string,
@@ -224,10 +235,11 @@ export function isNavItemActive(
     return false;
   }
   const { href } = item;
+  const pathOnly = pathname.split('#')[0]?.split('?')[0] ?? pathname;
   if (href === homePath) {
-    return pathname === homePath || pathname === `${homePath}/`;
+    return pathOnly === homePath || pathOnly === `${homePath}/`;
   }
-  return pathname === href || pathname.startsWith(`${href}/`);
+  return pathOnly === href || pathOnly.startsWith(`${href}/`);
 }
 
 /** Public navbar label for returning to the role workspace. */

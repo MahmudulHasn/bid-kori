@@ -3,6 +3,9 @@ import test from 'node:test';
 
 import { getRoleHome, isSafeNextPath, resolvePostAuthPath } from './authRouting.ts';
 import {
+  ADMIN_ANALYTICS_PATH,
+  ADMIN_AUCTIONS_PATH,
+  ADMIN_BIDS_PATH,
   ADMIN_PRODUCTS_PATH,
   ADMIN_PROFILE_PATH,
   ADMIN_SETTINGS_PATH,
@@ -176,6 +179,15 @@ test('admin config does not contain buyer/seller-only items', () => {
   const adminProducts = WORKSPACE_CONFIGS.ADMIN.navItems.find((item) => item.id === 'products');
   assert.equal(adminProducts?.enabled, true);
   assert.equal(adminProducts?.href, ADMIN_PRODUCTS_PATH);
+  const adminAuctions = WORKSPACE_CONFIGS.ADMIN.navItems.find((item) => item.id === 'auctions');
+  assert.equal(adminAuctions?.enabled, true);
+  assert.equal(adminAuctions?.href, ADMIN_AUCTIONS_PATH);
+  const adminBids = WORKSPACE_CONFIGS.ADMIN.navItems.find((item) => item.id === 'bids');
+  assert.equal(adminBids?.enabled, true);
+  assert.equal(adminBids?.href, ADMIN_BIDS_PATH);
+  const adminAnalytics = WORKSPACE_CONFIGS.ADMIN.navItems.find((item) => item.id === 'analytics');
+  assert.equal(adminAnalytics?.enabled, true);
+  assert.equal(adminAnalytics?.href, ADMIN_ANALYTICS_PATH);
   assert.equal(WORKSPACE_CONFIGS.ADMIN.brandTitle, 'BidKori Admin');
   const adminProfile = WORKSPACE_CONFIGS.ADMIN.navItems.find((item) => item.id === 'profile');
   assert.equal(adminProfile?.enabled, true);
@@ -313,6 +325,7 @@ test('active-route detection handles nested paths', () => {
   const adminDashboard = { href: '/admin', enabled: true as const };
   const adminProfile = { href: ADMIN_PROFILE_PATH, enabled: true as const };
   const adminSettings = { href: ADMIN_SETTINGS_PATH, enabled: true as const };
+  const adminAnalytics = { href: ADMIN_ANALYTICS_PATH, enabled: true as const };
   assert.equal(isNavItemActive('/admin/profile', adminProfile, adminHome), true);
   assert.equal(
     isNavItemActive('/admin/profile', adminDashboard, adminHome),
@@ -332,6 +345,14 @@ test('active-route detection handles nested paths', () => {
   );
   assert.equal(
     isNavItemActive('/admin/profile', adminSettings, adminHome),
+    false,
+  );
+  assert.equal(
+    isNavItemActive('/admin/analytics', adminAnalytics, adminHome),
+    true,
+  );
+  assert.equal(
+    isNavItemActive('/admin/analytics', adminDashboard, adminHome),
     false,
   );
 });

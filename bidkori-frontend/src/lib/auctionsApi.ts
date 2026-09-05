@@ -101,6 +101,12 @@ export async function myBidsFetcher(url: string): Promise<UserBid[]> {
   return unwrapBidList(data);
 }
 
+/** SWR-compatible fetcher for `GET /auctions/<id>/history/`. */
+export async function auctionBidHistoryFetcher(url: string): Promise<UserBid[]> {
+  const { data } = await api.get<unknown>(url);
+  return unwrapBidList(data);
+}
+
 /**
  * Mock checkout for a CLOSED auction winner.
  * Sends no payment payload — the backend creates a completed Payment row.

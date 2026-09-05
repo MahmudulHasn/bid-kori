@@ -15,6 +15,7 @@ import {
   formatAdminProductSeller,
   getAdminLinkedAuctionSummary,
 } from '@/lib/adminProducts';
+import { adminAuctionDetailPath } from '@/lib/adminAuctions';
 import {
   AUCTIONS_LIST_API_PATH,
   auctionListFetcher,
@@ -158,7 +159,12 @@ function ProductDetailBody({ product }: { product: Product }) {
             <div className="flex justify-between gap-3">
               <dt className="text-zinc-500 dark:text-zinc-400">Auction</dt>
               <dd className="font-medium tabular-nums text-zinc-900 dark:text-white">
-                #{linked.id}
+                <Link
+                  href={adminAuctionDetailPath(linked.id)}
+                  className="text-violet-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500 dark:text-violet-300"
+                >
+                  #{linked.id}
+                </Link>
               </dd>
             </div>
             <div className="flex justify-between gap-3">
@@ -169,8 +175,7 @@ function ProductDetailBody({ product }: { product: Product }) {
             </div>
           </dl>
           <p className="mt-3 text-xs text-zinc-500 dark:text-zinc-400">
-            Resolved from the auction catalog. Admin Auction pages are not
-            enabled yet.
+            Resolved from the auction catalog.
           </p>
         </section>
       ) : null}

@@ -1,11 +1,13 @@
 'use client';
 
+import Link from 'next/link';
 import { useMemo, type ReactNode } from 'react';
 import { format } from 'date-fns';
 import { Gavel, Package, Store, Trophy } from 'lucide-react';
 import useSWR from 'swr';
 
 import { useAuth } from '@/context/AuthContext';
+import { ADMIN_ANALYTICS_PATH } from '@/lib/adminAnalytics';
 import {
   ADMIN_ANALYTICS_API_PATH,
   BIDDING_VOLUME_HINT,
@@ -314,6 +316,14 @@ export default function AdminHomePage() {
           </p>
         </dl>
       </SectionCard>
+      <p className="-mt-2">
+        <Link
+          href={ADMIN_ANALYTICS_PATH}
+          className="text-sm font-medium text-violet-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500 dark:text-violet-300"
+        >
+          View full analytics
+        </Link>
+      </p>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <SectionCard

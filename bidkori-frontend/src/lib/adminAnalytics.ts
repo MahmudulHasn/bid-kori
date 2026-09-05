@@ -3,14 +3,28 @@
  * Fetchers live in adminAnalyticsApi.ts for the browser app.
  */
 
+import { formatAuctionMoney } from './auctionDisplay.ts';
+
 /** Staff-only platform analytics (IsAdminUser). Relative to Axios `/api` base. */
 export const ADMIN_ANALYTICS_API_PATH = '/auctions/analytics/';
+
+/** Next.js Admin Analytics page route. */
+export const ADMIN_ANALYTICS_PATH = '/admin/analytics';
 
 /** Honest label for analytics.total_bidding_volume — never "Revenue"/"GMV". */
 export const BIDDING_VOLUME_LABEL = 'Total Bidding Volume';
 
 export const BIDDING_VOLUME_HINT =
   'Sum of current highest bids across auctions. Not revenue, sales, or settled GMV.';
+
+/** Fuller page copy for the Analytics surface. */
+export const ANALYTICS_PAGE_VOLUME_HINT =
+  'Sum of bid activity reported by the analytics API; this is not platform revenue.';
+
+export const ANALYTICS_ESCALATION_SAMPLE_HINT =
+  'Recent analytics sample (the API returns up to about 100 bids, oldest-first; shown newest-first here).';
+
+export const ADMIN_ANALYTICS_READ_METHODS = ['GET'] as const;
 
 export type AdminCategoryBreakdownRow = {
   category: string;
@@ -53,6 +67,114 @@ function asMoney(value: unknown): string | number | null {
   if (value === null || value === undefined) return null;
   if (typeof value === 'number' || typeof value === 'string') return value;
   return null;
+}
+
+function formatMoneyLike(value: string | number | null | undefined): string {
+  if (value === null || value === undefined || value === '') return '—';
+  const n = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(n)) return String(value);
+  return formatAuctionMoney(n);
+}
+
+/**
+ * Backend: Avg(current_highest_bid - starting_bid) — monetary difference, not %.
+ */
+export function formatAdminPriceGrowth(
+  value: string | number | null | undefined,
+): string {
+  return formatMoneyLike(value);
+}
+
+export type AdminAnalyticsCategoryDisplayRow = {
+  category: string;
+  auctionCount: number;
+  avgStartingPrice: string;
+  avgHighestBid: string;
+  avgPriceGrowth: string;
+};
+
+export function mapAdminAnalyticsCategoryRows(
+  rows: readonly AdminCategoryBreakdownRow[],
+): AdminAnalyticsCategoryDisplayRow[] {
+  return rows.map((row) => ({
+    category: row.category,
+    auctionCount: row.auction_count,
+    avgStartingPrice: formatMoneyLike(row.avg_starting_price),
+    avgHighestBid: formatMoneyLike(row.avg_highest_bid),
+    avgPriceGrowth: formatAdminPriceGrowth(row.avg_price_growth),
+  }));
+}
+
+export type AdminAnalyticsTopBidderDisplayRow = {
+  username: string;
+  bidCount: number;
+  totalBidAmount: string;
+};
+
+export function mapAdminAnalyticsTopBidders(
+  rows: readonly AdminTopBidderRow[],
+): AdminAnalyticsTopBidderDisplayRow[] {
+  return rows.map((row) => ({
+    username: row.username || 'Unknown',
+    bidCount: row.bid_count,
+    totalBidAmount: formatMoneyLike(row.total_bid_amount),
+  }));
+}
+
+export type AdminAnalyticsEscalationDisplayRow = {
+  bidId: number;
+  auctionId: number;
+  amount: string;
+  timestamp: string;
+  bidderUsername: string;
+};
+
+/**
+ * Full escalation sample for Analytics page (newest first).
+ * Does not mutate the source array.
+ */
+export function mapAdminAnalyticsEscalationRows(
+  rows: readonly AdminBidEscalationRow[],
+): AdminAnalyticsEscalationDisplayRow[] {
+  const copy = rows.slice();
+  copy.reverse();
+  return copy.map((row) => ({
+    bidId: row.bid_id,
+    auctionId: row.auction_id,
+    amount: formatMoneyLike(row.amount),
+    timestamp: row.timestamp,
+    bidderUsername: row.bidder_username || 'Unknown',
+  }));
+}
+
+export type AdminAnalyticsSummary = {
+  activeAuctions: number;
+  totalBidsPlaced: number;
+  biddingVolume: string | number;
+  categoriesRepresented: number;
+};
+
+export function getAdminAnalyticsSummary(
+  analytics: AdminAnalytics,
+): AdminAnalyticsSummary {
+  return {
+    activeAuctions: analytics.total_active_auctions,
+    totalBidsPlaced: analytics.total_bids_placed,
+    biddingVolume: analytics.total_bidding_volume,
+    categoriesRepresented: analytics.category_breakdown.length,
+  };
+}
+
+/** Guard: bidding volume must never be labeled as revenue in UI copy maps. */
+export function isAnalyticsRevenueLabel(label: string): boolean {
+  const normalized = label.trim().toLowerCase();
+  return (
+    normalized === 'revenue' ||
+    normalized === 'sales' ||
+    normalized === 'gmv' ||
+    normalized === 'platform revenue' ||
+    normalized === 'settled gmv'
+  );
 }
 
 /**
