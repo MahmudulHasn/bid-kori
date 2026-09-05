@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import { getRoleHome, isSafeNextPath, resolvePostAuthPath } from './authRouting.ts';
 import {
+  ADMIN_PRODUCTS_PATH,
   ADMIN_PROFILE_PATH,
   ADMIN_SETTINGS_PATH,
   BUYER_PROFILE_PATH,
@@ -173,7 +174,8 @@ test('admin config does not contain buyer/seller-only items', () => {
   assert.ok(ids.has('categories'));
   assert.ok(ids.has('reports'));
   const adminProducts = WORKSPACE_CONFIGS.ADMIN.navItems.find((item) => item.id === 'products');
-  assert.equal(adminProducts?.enabled, false);
+  assert.equal(adminProducts?.enabled, true);
+  assert.equal(adminProducts?.href, ADMIN_PRODUCTS_PATH);
   assert.equal(WORKSPACE_CONFIGS.ADMIN.brandTitle, 'BidKori Admin');
   const adminProfile = WORKSPACE_CONFIGS.ADMIN.navItems.find((item) => item.id === 'profile');
   assert.equal(adminProfile?.enabled, true);

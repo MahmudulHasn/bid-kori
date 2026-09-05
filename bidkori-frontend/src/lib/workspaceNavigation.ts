@@ -9,6 +9,7 @@ import {
   ADMIN_PROFILE_PATH,
   ADMIN_SETTINGS_PATH,
 } from './adminAccount.ts';
+import { ADMIN_PRODUCTS_PATH } from './adminProducts.ts';
 
 export type WorkspaceNavItem = {
   id: string;
@@ -36,7 +37,7 @@ export const BUYER_PROFILE_PATH = '/buyer/profile';
 export const BUYER_SETTINGS_PATH = '/buyer/settings';
 export const SELLER_PROFILE_PATH = '/seller/profile';
 export const SELLER_SETTINGS_PATH = '/seller/settings';
-export { ADMIN_PROFILE_PATH, ADMIN_SETTINGS_PATH };
+export { ADMIN_PROFILE_PATH, ADMIN_SETTINGS_PATH, ADMIN_PRODUCTS_PATH };
 export const SELLER_PRODUCTS_PATH = '/seller/products';
 export const SELLER_PRODUCT_CREATE_PATH = '/seller/products/create';
 export const SELLER_AUCTIONS_PATH = '/seller/auctions';
@@ -93,7 +94,7 @@ const SELLER_NAV: readonly WorkspaceNavItem[] = [
 const ADMIN_NAV: readonly WorkspaceNavItem[] = [
   { id: 'dashboard', label: 'Dashboard', href: '/admin', enabled: true },
   { id: 'users', label: 'Users', enabled: false },
-  { id: 'products', label: 'Products', enabled: false },
+  { id: 'products', label: 'Products', href: ADMIN_PRODUCTS_PATH, enabled: true },
   { id: 'auctions', label: 'Auctions', enabled: false },
   { id: 'bids', label: 'Bids', enabled: false },
   { id: 'categories', label: 'Categories', enabled: false },
