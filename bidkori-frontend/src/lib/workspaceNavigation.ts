@@ -5,6 +5,10 @@
 
 import type { UserRole } from './types.ts';
 import { getRoleHome } from './authRouting.ts';
+import {
+  ADMIN_PROFILE_PATH,
+  ADMIN_SETTINGS_PATH,
+} from './adminAccount.ts';
 
 export type WorkspaceNavItem = {
   id: string;
@@ -32,6 +36,7 @@ export const BUYER_PROFILE_PATH = '/buyer/profile';
 export const BUYER_SETTINGS_PATH = '/buyer/settings';
 export const SELLER_PROFILE_PATH = '/seller/profile';
 export const SELLER_SETTINGS_PATH = '/seller/settings';
+export { ADMIN_PROFILE_PATH, ADMIN_SETTINGS_PATH };
 export const SELLER_PRODUCTS_PATH = '/seller/products';
 export const SELLER_PRODUCT_CREATE_PATH = '/seller/products/create';
 export const SELLER_AUCTIONS_PATH = '/seller/auctions';
@@ -94,7 +99,8 @@ const ADMIN_NAV: readonly WorkspaceNavItem[] = [
   { id: 'categories', label: 'Categories', enabled: false },
   { id: 'reports', label: 'Reports', enabled: false },
   { id: 'analytics', label: 'Analytics', enabled: false },
-  { id: 'settings', label: 'Settings', enabled: false },
+  { id: 'profile', label: 'Profile', href: ADMIN_PROFILE_PATH, enabled: true },
+  { id: 'settings', label: 'Settings', href: ADMIN_SETTINGS_PATH, enabled: true },
 ];
 
 export const WORKSPACE_CONFIGS: Record<UserRole, WorkspaceConfig> = {
@@ -145,8 +151,7 @@ export function getWorkspaceConfig(role: UserRole): WorkspaceConfig {
 
 /**
  * Account-area paths that currently exist for a workspace.
- * Admin profile/settings are not implemented — omit hrefs rather than linking
- * to missing routes.
+ * Profile/Settings hrefs must match enabled sidebar account routes.
  */
 export function getWorkspaceAccountPaths(role: UserRole): {
   profile?: string;
@@ -164,7 +169,10 @@ export function getWorkspaceAccountPaths(role: UserRole): {
       settings: SELLER_SETTINGS_PATH,
     };
   }
-  return {};
+  return {
+    profile: ADMIN_PROFILE_PATH,
+    settings: ADMIN_SETTINGS_PATH,
+  };
 }
 
 export function sellerProductDetailPath(id: string | number): string {

@@ -56,6 +56,12 @@ export async function myListingsFetcher(url: string): Promise<Product[]> {
   return unwrapProductList(data);
 }
 
+/** SWR-compatible fetcher for `GET /products/` (full catalog; unpaginated MVP). */
+export async function productListFetcher(url: string): Promise<Product[]> {
+  const { data } = await api.get<unknown>(url);
+  return unwrapProductList(data);
+}
+
 export async function createProduct(
   payload: ProductWritePayload,
 ): Promise<Product> {

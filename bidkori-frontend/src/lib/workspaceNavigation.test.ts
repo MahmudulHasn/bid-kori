@@ -3,6 +3,8 @@ import test from 'node:test';
 
 import { getRoleHome, isSafeNextPath, resolvePostAuthPath } from './authRouting.ts';
 import {
+  ADMIN_PROFILE_PATH,
+  ADMIN_SETTINGS_PATH,
   BUYER_PROFILE_PATH,
   BUYER_SETTINGS_PATH,
   SELLER_AUCTIONS_PATH,
@@ -173,8 +175,12 @@ test('admin config does not contain buyer/seller-only items', () => {
   const adminProducts = WORKSPACE_CONFIGS.ADMIN.navItems.find((item) => item.id === 'products');
   assert.equal(adminProducts?.enabled, false);
   assert.equal(WORKSPACE_CONFIGS.ADMIN.brandTitle, 'BidKori Admin');
+  const adminProfile = WORKSPACE_CONFIGS.ADMIN.navItems.find((item) => item.id === 'profile');
+  assert.equal(adminProfile?.enabled, true);
+  assert.equal(adminProfile?.href, ADMIN_PROFILE_PATH);
   const adminSettings = WORKSPACE_CONFIGS.ADMIN.navItems.find((item) => item.id === 'settings');
-  assert.equal(adminSettings?.enabled, false);
+  assert.equal(adminSettings?.enabled, true);
+  assert.equal(adminSettings?.href, ADMIN_SETTINGS_PATH);
 });
 
 test('active-route detection handles nested paths', () => {
@@ -300,6 +306,32 @@ test('active-route detection handles nested paths', () => {
     isNavItemActive('/seller/profile', sellerSettings, sellerHome),
     false,
   );
+
+  const adminHome = getRoleHome('ADMIN');
+  const adminDashboard = { href: '/admin', enabled: true as const };
+  const adminProfile = { href: ADMIN_PROFILE_PATH, enabled: true as const };
+  const adminSettings = { href: ADMIN_SETTINGS_PATH, enabled: true as const };
+  assert.equal(isNavItemActive('/admin/profile', adminProfile, adminHome), true);
+  assert.equal(
+    isNavItemActive('/admin/profile', adminDashboard, adminHome),
+    false,
+  );
+  assert.equal(
+    isNavItemActive('/admin/settings', adminSettings, adminHome),
+    true,
+  );
+  assert.equal(
+    isNavItemActive('/admin/settings', adminDashboard, adminHome),
+    false,
+  );
+  assert.equal(
+    isNavItemActive('/admin/settings', adminProfile, adminHome),
+    false,
+  );
+  assert.equal(
+    isNavItemActive('/admin/profile', adminSettings, adminHome),
+    false,
+  );
 });
 
 test('disabled items cannot be treated as navigable', () => {
@@ -356,6 +388,8 @@ test('workspace account paths are role-aware', () => {
   assert.equal(BUYER_SETTINGS_PATH, '/buyer/settings');
   assert.equal(SELLER_PROFILE_PATH, '/seller/profile');
   assert.equal(SELLER_SETTINGS_PATH, '/seller/settings');
+  assert.equal(ADMIN_PROFILE_PATH, '/admin/profile');
+  assert.equal(ADMIN_SETTINGS_PATH, '/admin/settings');
   assert.deepEqual(getWorkspaceAccountPaths('BUYER'), {
     profile: '/buyer/profile',
     settings: '/buyer/settings',
@@ -364,7 +398,18 @@ test('workspace account paths are role-aware', () => {
     profile: '/seller/profile',
     settings: '/seller/settings',
   });
-  assert.deepEqual(getWorkspaceAccountPaths('ADMIN'), {});
+  assert.deepEqual(getWorkspaceAccountPaths('ADMIN'), {
+    profile: '/admin/profile',
+    settings: '/admin/settings',
+  });
+  assert.notEqual(
+    getWorkspaceAccountPaths('ADMIN').profile,
+    getWorkspaceAccountPaths('BUYER').profile,
+  );
+  assert.notEqual(
+    getWorkspaceAccountPaths('ADMIN').settings,
+    getWorkspaceAccountPaths('SELLER').settings,
+  );
   assert.equal(getRoleDisplayLabel('BUYER'), 'Buyer');
   assert.equal(getRoleDisplayLabel('SELLER'), 'Seller');
   assert.equal(getRoleDisplayLabel('ADMIN'), 'Admin');
