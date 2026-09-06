@@ -201,6 +201,48 @@ USE_TZ = True
 
 
 # ---------------------------------------------------------------------------
+# Celery — periodic expired-auction finalization (Beat + worker)
+# ---------------------------------------------------------------------------
+
+def _redis_url_with_db(url: str, db: int) -> str:
+    """Swap the Redis DB index while preserving host/auth from ``url``."""
+    from urllib.parse import urlparse, urlunparse
+
+    parsed = urlparse(url)
+    return urlunparse(parsed._replace(path=f'/{int(db)}'))
+
+
+# Channels typically uses Redis DB 0 (REDIS_URL). Celery defaults to DB 1.
+CELERY_BROKER_URL = (
+    os.getenv('CELERY_BROKER_URL', '').strip()
+    or _redis_url_with_db(REDIS_URL, 1)
+)
+CELERY_RESULT_BACKEND = (
+    os.getenv('CELERY_RESULT_BACKEND', '').strip() or CELERY_BROKER_URL
+)
+CELERY_TIMEZONE = TIME_ZONE
+CELERY_ENABLE_UTC = True
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TASK_TRACK_STARTED = False
+CELERY_TASK_IGNORE_RESULT = True
+# Periodic close latency target for MVP (~10s after end_time without HTTP traffic).
+CELERY_CLOSE_EXPIRED_INTERVAL_SECONDS = float(
+    os.getenv('CELERY_CLOSE_EXPIRED_INTERVAL_SECONDS', '10') or '10'
+)
+CELERY_BEAT_SCHEDULE = {
+    'close-expired-auctions': {
+        'task': 'auctions.tasks.close_expired_auctions_task',
+        'schedule': CELERY_CLOSE_EXPIRED_INTERVAL_SECONDS,
+    },
+}
+# Eager mode keeps unit tests free of a live broker/worker.
+CELERY_TASK_ALWAYS_EAGER = RUNNING_TESTS
+CELERY_TASK_EAGER_PROPAGATES = True
+
+
+# ---------------------------------------------------------------------------
 # Static / media
 # ---------------------------------------------------------------------------
 

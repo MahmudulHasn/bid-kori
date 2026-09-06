@@ -13,7 +13,11 @@ from .realtime import auction_group_name
 
 
 class AuctionConsumer(AsyncJsonWebsocketConsumer):
-    """Subscribe to live ``bid.accepted`` events for one auction."""
+    """Subscribe to live auction events for one auction room.
+
+    Forwards server ``bid.accepted`` and ``auction.closed`` payloads.
+    Clients must place bids via REST, never over WebSocket.
+    """
 
     auction_id: int
     group_name: str
@@ -54,6 +58,12 @@ class AuctionConsumer(AsyncJsonWebsocketConsumer):
 
     async def bid_accepted(self, event):
         """Channels handler for group_send type ``bid.accepted``."""
+        payload = event.get('payload')
+        if isinstance(payload, dict):
+            await self.send_json(payload)
+
+    async def auction_closed(self, event):
+        """Channels handler for group_send type ``auction.closed``."""
         payload = event.get('payload')
         if isinstance(payload, dict):
             await self.send_json(payload)

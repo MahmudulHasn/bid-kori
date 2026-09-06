@@ -74,6 +74,11 @@ class AuctionLifecycleService:
         else:
             auction.winning_bidder = None
             auction.save(update_fields=['status', 'winning_bidder'])
+
+        # Real ACTIVE → CLOSED only (callers never invoke this on already-CLOSED).
+        from .realtime import schedule_auction_closed_broadcast
+
+        schedule_auction_closed_broadcast(auction)
         return auction
 
     @classmethod
@@ -279,6 +284,78 @@ class BidService:
             raise ValidationError('Auction is not active.')
 
         return bid
+
+
+def close_all_expired_auctions(*, now=None):
+    """Finalize every ACTIVE auction whose ``end_time`` has passed.
+
+    Reused by the management command and the Celery Beat task. Each auction is
+    closed in its own lifecycle transaction so one failure cannot roll back
+    the rest. Winner / reserve logic remains in ``AuctionLifecycleService``.
+
+    Returns:
+        dict with keys ``found``, ``closed``, ``failed``, ``closed_ids``,
+        and ``errors`` (list of ``{auction_id, error}``).
+    """
+    import logging
+
+    logger = logging.getLogger(__name__)
+    reference_time = now if now is not None else timezone.now()
+    expired_ids = list(
+        Auction.objects.filter(
+            status=Auction.Status.ACTIVE,
+            end_time__lte=reference_time,
+        )
+        .order_by('id')
+        .values_list('pk', flat=True)
+    )
+
+    closed_ids: list[int] = []
+    errors: list[dict] = []
+
+    for auction_id in expired_ids:
+        try:
+            _, closed = AuctionLifecycleService.close_auction(
+                auction_id,
+                source='expired',
+            )
+            if closed:
+                closed_ids.append(auction_id)
+        except Exception as exc:  # noqa: BLE001 — isolate batch failures
+            errors.append({'auction_id': auction_id, 'error': str(exc)})
+            logger.exception(
+                'Failed to close expired auction_id=%s',
+                auction_id,
+            )
+
+    result = {
+        'found': len(expired_ids),
+        'closed': len(closed_ids),
+        'failed': len(errors),
+        'closed_ids': closed_ids,
+        'errors': errors,
+    }
+
+    if result['failed']:
+        logger.warning(
+            'Expired auction close batch: found=%s closed=%s failed=%s',
+            result['found'],
+            result['closed'],
+            result['failed'],
+        )
+    elif result['closed']:
+        logger.info(
+            'Expired auction close batch: found=%s closed=%s',
+            result['found'],
+            result['closed'],
+        )
+    else:
+        logger.debug(
+            'Expired auction close batch: found=%s closed=0',
+            result['found'],
+        )
+
+    return result
 
 
 # Backwards-compatible alias for imports that reference AuctionStateMachine.
