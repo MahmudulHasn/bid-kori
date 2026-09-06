@@ -3,16 +3,21 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useMemo, useState } from 'react';
 import { Clock3, Gavel, ImageOff, Shield } from 'lucide-react';
 import toast from 'react-hot-toast';
 import useSWR from 'swr';
 
 import { useAuth } from '@/context/AuthContext';
+import { useAuctionRealtime } from '@/hooks/useAuctionRealtime';
 import { useAuctionTimer } from '@/hooks/useAuctionTimer';
 import api from '@/lib/api';
 import { getApiErrorMessage, getApiStatus } from '@/lib/apiErrors';
 import { isAuctionOwnedByUser } from '@/lib/auctionOwnership';
+import {
+  applyBidAcceptedToAuction,
+  type BidAcceptedEvent,
+} from '@/lib/auctionRealtime';
 import { buildLoginHref } from '@/lib/authRouting';
 import { getAuctionTitle } from '@/lib/auctionDisplay';
 import { MARKETPLACE_ROUTES } from '@/lib/marketplace';
@@ -43,6 +48,36 @@ export default function AuctionDetailPage() {
     fetcher,
     { refreshInterval: 3000 },
   );
+
+  const handleBidAccepted = useCallback(
+    (event: BidAcceptedEvent) => {
+      if (!auctionId) return;
+      void mutate(
+        (current) => {
+          const result = applyBidAcceptedToAuction(current, event, auctionId);
+          if (result.revalidate) {
+            queueMicrotask(() => {
+              void mutate();
+            });
+          }
+          return result.auction;
+        },
+        { revalidate: false },
+      );
+    },
+    [auctionId, mutate],
+  );
+
+  const handleRealtimeReconnect = useCallback(() => {
+    void mutate();
+  }, [mutate]);
+
+  const { status: realtimeStatus } = useAuctionRealtime({
+    auctionId,
+    enabled: Boolean(auctionId),
+    onBidAccepted: handleBidAccepted,
+    onReconnect: handleRealtimeReconnect,
+  });
 
   const timer = useAuctionTimer(auction?.end_time);
   const isAuctionClosed =
@@ -246,7 +281,19 @@ export default function AuctionDetailPage() {
           </div>
 
           <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">Current highest bid</p>
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                Current highest bid
+              </p>
+              {realtimeStatus === 'connected' ? (
+                <span
+                  className="shrink-0 rounded-md bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-emerald-800 dark:text-emerald-300"
+                  title="WebSocket connected for live bid updates"
+                >
+                  Live updates
+                </span>
+              ) : null}
+            </div>
             <p className="mt-1 text-3xl font-semibold text-amber-700 dark:text-amber-300">
               ৳{currentBid.toLocaleString(undefined, { minimumFractionDigits: 2 })}
             </p>
