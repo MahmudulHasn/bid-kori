@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useId, useRef, useState } from 'react';
 import { ChevronDown, LogOut, Menu, Store, X } from 'lucide-react';
 
+import NotificationBell from '@/components/notifications/NotificationBell';
 import { useAuth } from '@/context/AuthContext';
 import {
   getRoleDisplayLabel,
@@ -106,6 +107,8 @@ export default function WorkspaceHeader({
             <Store className="h-4 w-4" aria-hidden />
             {config.marketplaceLabel}
           </Link>
+
+          <NotificationBell role={config.role} />
 
           <div className="relative" ref={menuRef}>
             <button

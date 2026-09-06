@@ -91,6 +91,11 @@ test('buyer config does not contain seller/admin-only items', () => {
   const won = WORKSPACE_CONFIGS.BUYER.navItems.find((item) => item.id === 'won-auctions');
   assert.equal(won?.enabled, true);
   assert.equal(won?.href, '/buyer/won');
+  const notifications = WORKSPACE_CONFIGS.BUYER.navItems.find(
+    (item) => item.id === 'notifications',
+  );
+  assert.equal(notifications?.enabled, true);
+  assert.equal(notifications?.href, '/buyer/notifications');
   const dashboard = WORKSPACE_CONFIGS.BUYER.navItems.find((item) => item.id === 'dashboard');
   assert.equal(dashboard?.href, '/buyer');
   const profile = WORKSPACE_CONFIGS.BUYER.navItems.find((item) => item.id === 'profile');
@@ -136,6 +141,11 @@ test('seller config does not contain buyer/admin-only items', () => {
   assert.equal(SELLER_AUCTION_CREATE_PATH, '/seller/auctions/create');
   assert.equal(sellerAuctionCreatePath(), '/seller/auctions/create');
   assert.equal(sellerAuctionCreatePath(42), '/seller/auctions/create?product=42');
+  const sellerNotifications = WORKSPACE_CONFIGS.SELLER.navItems.find(
+    (item) => item.id === 'notifications',
+  );
+  assert.equal(sellerNotifications?.enabled, true);
+  assert.equal(sellerNotifications?.href, '/seller/notifications');
   const sellerEditNav = WORKSPACE_CONFIGS.SELLER.navItems.find(
     (item) => item.href?.includes('/edit'),
   );
@@ -172,6 +182,7 @@ test('admin config does not contain buyer/seller-only items', () => {
   assert.equal(ids.has('my-bids'), false);
   assert.equal(ids.has('won-auctions'), false);
   assert.equal(ids.has('watchlist'), false);
+  assert.equal(ids.has('notifications'), false);
   assert.ok(ids.has('users'));
   assert.ok(ids.has('bids'));
   assert.ok(ids.has('categories'));
