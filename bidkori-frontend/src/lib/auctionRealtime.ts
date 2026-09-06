@@ -1,5 +1,6 @@
 /**
- * Pure helpers for Auction detail live updates (Channels `bid.accepted`).
+ * Pure helpers for Auction detail live updates (Channels).
+ * Supported receive events: `bid.accepted`, `auction.closed`.
  * WebSocket is receive-only — bids remain REST POST /place-bid/.
  */
 
@@ -7,6 +8,7 @@ import { getApiBaseUrl } from './config.ts';
 import type { Auction } from './types.ts';
 
 export const BID_ACCEPTED_EVENT_TYPE = 'bid.accepted' as const;
+export const AUCTION_CLOSED_EVENT_TYPE = 'auction.closed' as const;
 
 export type BidAcceptedBidPayload = {
   id: number;
@@ -22,9 +24,38 @@ export type BidAcceptedEvent = {
   current_highest_bid: string;
 };
 
+/** Public winner object from backend `build_auction_closed_payload`. */
+export type AuctionClosedWinningBidder = {
+  id: number;
+  username: string;
+};
+
+/**
+ * Exact public `auction.closed` payload from `auctions.realtime`.
+ * `winning_bidder` is null when there were no bids or reserve was not met.
+ */
+export type AuctionClosedEvent = {
+  type: typeof AUCTION_CLOSED_EVENT_TYPE;
+  auction_id: number;
+  status: 'CLOSED';
+  current_highest_bid: string;
+  winning_bidder: AuctionClosedWinningBidder | null;
+  is_paid: boolean;
+  closed_at: string;
+};
+
+export type AuctionRealtimeEvent = BidAcceptedEvent | AuctionClosedEvent;
+
 export type ApplyBidAcceptedResult = {
   auction: Auction | undefined;
   /** True when the event could not be applied safely — trigger REST revalidate. */
+  revalidate: boolean;
+  applied: boolean;
+};
+
+export type ApplyAuctionClosedResult = {
+  auction: Auction | undefined;
+  /** Always true after a matching close so REST can reconcile compact WS state. */
   revalidate: boolean;
   applied: boolean;
 };
@@ -71,6 +102,11 @@ function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0;
 }
 
+function isAuctionTerminalStatus(status: string | undefined): boolean {
+  const normalized = String(status ?? '').toUpperCase();
+  return normalized === 'CLOSED' || normalized === 'CANCELLED';
+}
+
 /** Runtime guard for backend `bid.accepted` WebSocket payloads. */
 export function isBidAcceptedEvent(value: unknown): value is BidAcceptedEvent {
   if (!isRecord(value)) return false;
@@ -85,8 +121,34 @@ export function isBidAcceptedEvent(value: unknown): value is BidAcceptedEvent {
   return true;
 }
 
+function isAuctionClosedWinningBidder(
+  value: unknown,
+): value is AuctionClosedWinningBidder {
+  if (!isRecord(value)) return false;
+  if (!isFiniteNumber(value.id)) return false;
+  if (typeof value.username !== 'string') return false;
+  return true;
+}
+
+/** Runtime guard for backend `auction.closed` WebSocket payloads. */
+export function isAuctionClosedEvent(
+  value: unknown,
+): value is AuctionClosedEvent {
+  if (!isRecord(value)) return false;
+  if (value.type !== AUCTION_CLOSED_EVENT_TYPE) return false;
+  if (!isFiniteNumber(value.auction_id)) return false;
+  if (value.status !== 'CLOSED') return false;
+  if (!isNonEmptyString(value.current_highest_bid)) return false;
+  if (value.winning_bidder !== null && !isAuctionClosedWinningBidder(value.winning_bidder)) {
+    return false;
+  }
+  if (typeof value.is_paid !== 'boolean') return false;
+  if (typeof value.closed_at !== 'string') return false;
+  return true;
+}
+
 export function eventMatchesAuctionId(
-  event: Pick<BidAcceptedEvent, 'auction_id'>,
+  event: Pick<AuctionRealtimeEvent, 'auction_id'>,
   auctionId: number | string,
 ): boolean {
   return Number(event.auction_id) === Number(auctionId);
@@ -126,6 +188,7 @@ function moneyToScaledInteger(value: string | number): bigint | null {
 /**
  * Apply a validated `bid.accepted` event to Auction SWR cache data.
  * Does not mutate `auction`. Ignores wrong auction IDs and stale lower prices.
+ * Once CLOSED/CANCELLED, bid events never reopen the auction.
  */
 export function applyBidAcceptedToAuction(
   auction: Auction | undefined,
@@ -140,6 +203,11 @@ export function applyBidAcceptedToAuction(
   }
   if (Number(auction.id) !== Number(auctionId)) {
     return { auction, revalidate: false, applied: false };
+  }
+
+  if (isAuctionTerminalStatus(auction.status)) {
+    // Stale bid after close — do not regress final state; reconcile via REST.
+    return { auction, revalidate: true, applied: false };
   }
 
   const current = auction.current_highest_bid;
@@ -162,6 +230,45 @@ export function applyBidAcceptedToAuction(
       current_highest_bid: event.current_highest_bid,
     },
     revalidate: false,
+    applied: true,
+  };
+}
+
+/**
+ * Apply a validated `auction.closed` event to Auction SWR cache data.
+ * Maps WS winner `{ id, username }` into REST Auction fields without inventing
+ * reserve or private contact data. Does not mutate `auction`.
+ */
+export function applyAuctionClosedToAuction(
+  auction: Auction | undefined,
+  event: AuctionClosedEvent,
+  auctionId: number | string,
+): ApplyAuctionClosedResult {
+  if (!auction) {
+    return { auction, revalidate: true, applied: false };
+  }
+  if (!eventMatchesAuctionId(event, auctionId)) {
+    return { auction, revalidate: false, applied: false };
+  }
+  if (Number(auction.id) !== Number(auctionId)) {
+    return { auction, revalidate: false, applied: false };
+  }
+
+  const winner = event.winning_bidder;
+  const next: Auction = {
+    ...auction,
+    status: 'CLOSED',
+    current_highest_bid: event.current_highest_bid,
+    winning_bidder: winner ? winner.id : null,
+    winning_bidder_username: winner
+      ? winner.username.trim() || null
+      : null,
+    is_paid: event.is_paid,
+  };
+
+  return {
+    auction: next,
+    revalidate: true,
     applied: true,
   };
 }

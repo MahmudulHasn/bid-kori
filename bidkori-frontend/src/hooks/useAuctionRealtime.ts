@@ -4,8 +4,10 @@ import { useEffect, useRef, useState } from 'react';
 
 import {
   buildAuctionWebSocketUrl,
+  isAuctionClosedEvent,
   isBidAcceptedEvent,
   parseWebSocketJson,
+  type AuctionClosedEvent,
   type BidAcceptedEvent,
 } from '@/lib/auctionRealtime';
 
@@ -20,6 +22,7 @@ type UseAuctionRealtimeOptions = {
   auctionId: string | number | null | undefined;
   enabled?: boolean;
   onBidAccepted: (event: BidAcceptedEvent) => void;
+  onAuctionClosed?: (event: AuctionClosedEvent) => void;
   /** Called after an unexpected disconnect reconnects successfully. */
   onReconnect?: () => void;
 };
@@ -32,13 +35,14 @@ function nextBackoffMs(attempt: number): number {
 }
 
 /**
- * Subscribe to `/ws/auctions/<id>/` for `bid.accepted` events.
+ * Subscribe to `/ws/auctions/<id>/` for `bid.accepted` and `auction.closed`.
  * Receive-only — place bids via REST. Safe under Next.js (browser-only).
  */
 export function useAuctionRealtime({
   auctionId,
   enabled = true,
   onBidAccepted,
+  onAuctionClosed,
   onReconnect,
 }: UseAuctionRealtimeOptions): { status: AuctionRealtimeStatus } {
   const inactive =
@@ -46,11 +50,16 @@ export function useAuctionRealtime({
   const [liveStatus, setLiveStatus] =
     useState<AuctionRealtimeStatus>('connecting');
   const onBidAcceptedRef = useRef(onBidAccepted);
+  const onAuctionClosedRef = useRef(onAuctionClosed);
   const onReconnectRef = useRef(onReconnect);
 
   useEffect(() => {
     onBidAcceptedRef.current = onBidAccepted;
   }, [onBidAccepted]);
+
+  useEffect(() => {
+    onAuctionClosedRef.current = onAuctionClosed;
+  }, [onAuctionClosed]);
 
   useEffect(() => {
     onReconnectRef.current = onReconnect;
@@ -111,6 +120,16 @@ export function useAuctionRealtime({
             ? message.data
             : String(message.data ?? '');
         const parsed = parseWebSocketJson(raw);
+        if (parsed == null) return;
+
+        if (isAuctionClosedEvent(parsed)) {
+          if (Number(parsed.auction_id) !== Number(auctionId)) {
+            return;
+          }
+          onAuctionClosedRef.current?.(parsed);
+          return;
+        }
+
         if (!isBidAcceptedEvent(parsed)) {
           return;
         }

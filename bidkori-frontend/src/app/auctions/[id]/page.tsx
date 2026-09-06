@@ -15,11 +15,13 @@ import api from '@/lib/api';
 import { getApiErrorMessage, getApiStatus } from '@/lib/apiErrors';
 import { isAuctionOwnedByUser } from '@/lib/auctionOwnership';
 import {
+  applyAuctionClosedToAuction,
   applyBidAcceptedToAuction,
+  type AuctionClosedEvent,
   type BidAcceptedEvent,
 } from '@/lib/auctionRealtime';
 import { buildLoginHref } from '@/lib/authRouting';
-import { getAuctionTitle } from '@/lib/auctionDisplay';
+import { getAuctionPriceLabel, getAuctionTitle } from '@/lib/auctionDisplay';
 import { MARKETPLACE_ROUTES } from '@/lib/marketplace';
 import { resolveMediaUrl } from '@/lib/media';
 import { sellerAuctionDetailPath } from '@/lib/workspaceNavigation';
@@ -68,6 +70,25 @@ export default function AuctionDetailPage() {
     [auctionId, mutate],
   );
 
+  const handleAuctionClosed = useCallback(
+    (event: AuctionClosedEvent) => {
+      if (!auctionId) return;
+      void mutate(
+        (current) => {
+          const result = applyAuctionClosedToAuction(current, event, auctionId);
+          if (result.revalidate) {
+            queueMicrotask(() => {
+              void mutate();
+            });
+          }
+          return result.auction;
+        },
+        { revalidate: false },
+      );
+    },
+    [auctionId, mutate],
+  );
+
   const handleRealtimeReconnect = useCallback(() => {
     void mutate();
   }, [mutate]);
@@ -76,12 +97,28 @@ export default function AuctionDetailPage() {
     auctionId,
     enabled: Boolean(auctionId),
     onBidAccepted: handleBidAccepted,
+    onAuctionClosed: handleAuctionClosed,
     onReconnect: handleRealtimeReconnect,
   });
 
   const timer = useAuctionTimer(auction?.end_time);
-  const isAuctionClosed =
-    timer.isClosed || auction?.status === 'CLOSED' || auction?.status === 'CANCELLED';
+  /** Local timer may hit zero before Beat closes; do not invent CLOSED status. */
+  const biddingUnavailable =
+    timer.isClosed ||
+    auction?.status === 'CLOSED' ||
+    auction?.status === 'CANCELLED';
+  const isBackendClosed = auction?.status === 'CLOSED';
+  const priceLabel = auction ? getAuctionPriceLabel(auction) : null;
+
+  const winnerLabel = (() => {
+    if (!isBackendClosed) return null;
+    const username = auction?.winning_bidder_username?.trim();
+    if (username) return username;
+    if (auction?.winning_bidder != null) {
+      return `Bidder #${auction.winning_bidder}`;
+    }
+    return null;
+  })();
 
   const isOwner = isAuctionOwnedByUser(auction, user);
   const showSellerWorkspaceLink = isOwner && !authLoading;
@@ -120,7 +157,7 @@ export default function AuctionDetailPage() {
       toast.error('You cannot bid on your own auction.');
       return;
     }
-    if (!auctionId || isAuctionClosed) {
+    if (!auctionId || biddingUnavailable) {
       toast.error('This auction is closed.');
       return;
     }
@@ -256,7 +293,7 @@ export default function AuctionDetailPage() {
           <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
             <div className="mb-3 flex items-center gap-2 text-sm font-medium text-zinc-500 dark:text-zinc-400">
               <Clock3 className="h-4 w-4" aria-hidden />
-              {isAuctionClosed ? 'Auction ended' : 'Time remaining'}
+              {biddingUnavailable ? 'Auction ended' : 'Time remaining'}
             </div>
             <div className="grid grid-cols-4 gap-2 text-center">
               {[
@@ -283,12 +320,12 @@ export default function AuctionDetailPage() {
           <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
             <div className="flex items-start justify-between gap-2">
               <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                Current highest bid
+                {priceLabel?.label ?? 'Current highest bid'}
               </p>
               {realtimeStatus === 'connected' ? (
                 <span
                   className="shrink-0 rounded-md bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-emerald-800 dark:text-emerald-300"
-                  title="WebSocket connected for live bid updates"
+                  title="WebSocket connected — live bid and close updates"
                 >
                   Live updates
                 </span>
@@ -306,6 +343,20 @@ export default function AuctionDetailPage() {
                 Status: {auction.status}
               </p>
             )}
+            {isBackendClosed ? (
+              <p className="mt-3 text-sm text-zinc-700 dark:text-zinc-300">
+                {winnerLabel ? (
+                  <>
+                    Winner:{' '}
+                    <span className="font-semibold text-zinc-900 dark:text-white">
+                      {winnerLabel}
+                    </span>
+                  </>
+                ) : (
+                  <span className="font-medium">No winner</span>
+                )}
+              </p>
+            ) : null}
           </div>
 
           {showSellerWorkspaceLink && auction ? (
@@ -337,7 +388,7 @@ export default function AuctionDetailPage() {
               </h2>
             </div>
 
-            {isAuctionClosed ? (
+            {biddingUnavailable ? (
               <p className="text-sm text-zinc-500 dark:text-zinc-400">
                 Bidding is closed for this auction.
               </p>
