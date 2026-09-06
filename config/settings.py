@@ -285,6 +285,19 @@ PRODUCT_IMAGE_MAX_PER_REQUEST = int(
 )
 PRODUCT_IMAGE_ALLOWED_FORMATS = ('JPEG', 'PNG', 'WEBP', 'GIF')
 
+# ---------------------------------------------------------------------------
+# AI listing description generation (AI-B01) — backend-only secrets
+# ---------------------------------------------------------------------------
+# Django boots without these; only POST /api/products/generate-description/
+# fails clearly when generation is attempted without configuration.
+AI_API_KEY = os.getenv('AI_API_KEY', '').strip()
+AI_MODEL = os.getenv('AI_MODEL', '').strip()
+AI_TIMEOUT_SECONDS = int(os.getenv('AI_TIMEOUT_SECONDS', '20') or '20')
+AI_LISTING_RATE = os.getenv('AI_LISTING_RATE', '5/minute').strip() or '5/minute'
+AI_LISTING_MAX_OUTPUT_TOKENS = int(
+    os.getenv('AI_LISTING_MAX_OUTPUT_TOKENS', '450') or '450'
+)
+
 STORAGES = {
     'default': {
         'BACKEND': 'django.core.files.storage.FileSystemStorage',
@@ -335,6 +348,7 @@ REST_FRAMEWORK = {
         'anon': '100/day',
         'user': '1000/day',
         'bids': '10/minute',
+        'ai_listing': AI_LISTING_RATE,
     },
     'EXCEPTION_HANDLER': 'config.exceptions.custom_exception_handler',
 }

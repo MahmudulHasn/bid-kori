@@ -76,3 +76,33 @@ class ProductSerializer(serializers.ModelSerializer):
             'updated_at',
         ]
         read_only_fields = ['seller', 'images', 'created_at', 'updated_at']
+
+
+class ProductDescriptionGenerationSerializer(serializers.Serializer):
+    """Multipart payload for AI draft description generation (no persistence)."""
+
+    title = serializers.CharField(max_length=255, allow_blank=False, trim_whitespace=True)
+    image = ProductImageUploadField(allow_empty_file=False)
+    condition = serializers.ChoiceField(
+        choices=Product.Condition.choices,
+        required=False,
+        allow_null=True,
+    )
+    category = serializers.PrimaryKeyRelatedField(
+        queryset=Category.objects.all(),
+        required=False,
+        allow_null=True,
+    )
+
+    def to_internal_value(self, data):
+        # Multipart may omit optional keys; treat blank condition as omitted.
+        mutable = data
+        if hasattr(data, 'copy'):
+            mutable = data.copy()
+        condition = mutable.get('condition')
+        if condition in ('', None):
+            mutable.pop('condition', None)
+        category = mutable.get('category')
+        if category in ('', None):
+            mutable.pop('category', None)
+        return super().to_internal_value(mutable)

@@ -39,3 +39,21 @@ class IsSellerOrAdminForProductCreate(BasePermission):
             return False
         role = resolve_user_role(request.user)
         return role in ('SELLER', 'ADMIN')
+
+
+class IsSellerOrAdminForAIListing(BasePermission):
+    """Restrict AI listing description generation to SELLER or ADMIN.
+
+    Matches Product-create role policy. BUYER receives 403; unauthenticated
+    callers are rejected by ``IsAuthenticated`` (401).
+    """
+
+    message = (
+        'Action forbidden: Only sellers can generate AI product descriptions.'
+    )
+
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+        role = resolve_user_role(request.user)
+        return role in ('SELLER', 'ADMIN')

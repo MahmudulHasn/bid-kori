@@ -1,6 +1,7 @@
 from django.urls import path
 
 from .views import (
+    ProductDescriptionGenerateView,
     ProductDetailView,
     ProductImageDestroyView,
     ProductImageListCreateView,
@@ -12,6 +13,11 @@ app_name = 'products'
 
 urlpatterns = [
     path('my-listings/', UserListingsView.as_view(), name='my-listings'),
+    path(
+        'generate-description/',
+        ProductDescriptionGenerateView.as_view(),
+        name='product-generate-description',
+    ),
     path('', ProductListCreateView.as_view(), name='product-list-create'),
     path(
         '<int:product_id>/images/',

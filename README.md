@@ -120,6 +120,11 @@ pip install -r requirements.txt
 # Ensure `.env` includes:
 #   REDIS_URL=redis://127.0.0.1:6379/0
 #   CELERY_BROKER_URL=redis://127.0.0.1:6379/1
+# Optional AI listing drafts (backend-only; leave blank to boot without AI):
+#   AI_API_KEY=
+#   AI_MODEL=
+#   AI_TIMEOUT_SECONDS=20
+#   AI_LISTING_RATE=5/minute
 python manage.py migrate
 python manage.py seed_data
 ```
@@ -170,6 +175,7 @@ Ensure the Django API is reachable at `http://127.0.0.1:8000`.
 | `GET` | `/api/categories/<id>/` | Category detail (read-only) |
 | `GET` | `/api/products/` | List products (includes nested `images`) |
 | `POST` | `/api/products/` | Create product (JSON catalog fields; images via dedicated upload) |
+| `POST` | `/api/products/generate-description/` | Seller/Admin AI draft description (multipart title + image; no persistence) |
 | `GET` | `/api/products/<id>/images/` | List Product images (ordered by `uploaded_at`, `id`) |
 | `POST` | `/api/products/<id>/images/` | Upload Product images (multipart field `images`; owner; freeze-aware) |
 | `DELETE` | `/api/products/<id>/images/<image_id>/` | Delete Product image (owner; freeze-aware) |
@@ -197,6 +203,35 @@ Authorization: Token <your-token>
 - Formats: JPEG / PNG / WEBP / GIF (Pillow content validation).
 - Upload/delete: Product **owner only**; blocked when Product mutation is frozen.
 - Default display image = first by `uploaded_at`, then `id` (no primary API).
+
+### AI listing description draft
+
+`POST /api/products/generate-description/` (multipart):
+
+| Field | Required | Notes |
+| --- | --- | --- |
+| `title` | yes | max 255 |
+| `image` | yes | same Product image validation (JPEG/PNG/WEBP/GIF, ≤5MB, ≤4096×4096) |
+| `condition` | no | `NEW` / `USED_LIKE_NEW` / `USED_GOOD` / `FAIR` |
+| `category` | no | existing Category PK |
+
+Success response: `{ "description": "..." }`.
+
+- **Auth:** Seller or Admin only (same create roles). Buyer → 403; anonymous → 401.
+- **Throttle:** scoped `ai_listing` (default `5/minute`).
+- AI text is a **draft** — Sellers must review/edit before Product create/PATCH.
+- Generation does **not** create or update Product / ProductImage rows.
+- Provider API key stays **backend-only** (`AI_API_KEY`). Do not use `NEXT_PUBLIC_*`.
+- Title, condition, category, and image bytes are sent to the configured external AI provider.
+
+Required backend env (see `.env.example`):
+
+```text
+AI_API_KEY=
+AI_MODEL=
+AI_TIMEOUT_SECONDS=20
+AI_LISTING_RATE=5/minute
+```
 
 ### Notification WebSocket handshake
 

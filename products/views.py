@@ -21,13 +21,20 @@ from .mutation_policy import (
     PRODUCT_IMAGE_FROZEN_MESSAGE,
     ProductMutationPolicy,
 )
-from .permissions import IsSellerOrAdminForProductCreate, IsSellerOrReadOnly
+from .ai_listing import AIListingError, AIListingService
+from .permissions import (
+    IsSellerOrAdminForAIListing,
+    IsSellerOrAdminForProductCreate,
+    IsSellerOrReadOnly,
+)
 from .serializers import (
     CategorySerializer,
+    ProductDescriptionGenerationSerializer,
     ProductImageSerializer,
     ProductImageUploadSerializer,
     ProductSerializer,
 )
+from .throttling import AIListingBurstThrottle
 
 
 class CategoryListView(generics.ListAPIView):
@@ -97,6 +104,61 @@ class ProductListCreateView(generics.ListCreateAPIView):
 
 # Alias matching Samira's ProductListView naming for the list/create endpoint.
 ProductListView = ProductListCreateView
+
+
+class ProductDescriptionGenerateView(APIView):
+    """Generate a draft Product description from title + image (AI-B01).
+
+    Multipart only. Does not create or update Product / ProductImage rows.
+    Seller/Admin only; scoped ``ai_listing`` throttle.
+    """
+
+    parser_classes = (MultiPartParser, FormParser)
+    permission_classes = [IsAuthenticated, IsSellerOrAdminForAIListing]
+    throttle_classes = [AIListingBurstThrottle]
+    throttle_scope = 'ai_listing'
+    http_method_names = ['post', 'head', 'options']
+
+    def post(self, request):
+        serializer = ProductDescriptionGenerationSerializer(
+            data=request.data,
+            context={'request': request},
+        )
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        condition_value = data.get('condition')
+        condition_label = None
+        if condition_value:
+            condition_label = dict(Product.Condition.choices).get(condition_value)
+
+        category = data.get('category')
+        category_name = category.name if category is not None else None
+
+        try:
+            description = AIListingService.generate_description(
+                title=data['title'],
+                image_file=data['image'],
+                condition_label=condition_label,
+                category_name=category_name,
+                user_id=getattr(request.user, 'pk', None),
+            )
+        except AIListingError as exc:
+            return Response(
+                {'error': exc.message},
+                status=exc.status_code,
+            )
+
+        return Response({'description': description}, status=status.HTTP_200_OK)
+
+    def permission_denied(self, request, message=None, code=None):
+        if not request.user or not request.user.is_authenticated:
+            return super().permission_denied(request, message=message, code=code)
+        raise PermissionDenied(
+            detail={
+                'error': message or IsSellerOrAdminForAIListing.message,
+            }
+        )
 
 
 class ProductDetailView(generics.RetrieveUpdateDestroyAPIView):
