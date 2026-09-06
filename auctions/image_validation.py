@@ -4,10 +4,25 @@ from __future__ import annotations
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from PIL import Image, UnidentifiedImageError
 
-# Pillow format names (JPEG, not JPG).
-DEFAULT_ALLOWED_FORMATS = frozenset({'JPEG', 'PNG', 'WEBP', 'GIF'})
+from config.image_validation import (
+    DEFAULT_ALLOWED_FORMATS,
+    validate_image_file,
+)
+
+__all__ = [
+    'DEFAULT_ALLOWED_FORMATS',
+    'allowed_image_formats',
+    'max_image_bytes',
+    'max_image_width',
+    'max_image_height',
+    'min_image_width',
+    'min_image_height',
+    'max_images_per_auction',
+    'max_images_per_request',
+    'validate_auction_image',
+    'validate_auction_image_quota',
+]
 
 
 def _setting(name: str, default):
@@ -48,75 +63,16 @@ def max_images_per_request() -> int:
 
 
 def validate_auction_image(uploaded_file) -> None:
-    """Validate an uploaded file is a real, bounded image.
-
-    Uses Pillow to inspect file *content* (format + dimensions). Filename
-    extensions and declared content-types are not trusted as proof of type.
-    """
-    size = getattr(uploaded_file, 'size', None)
-    if size is not None and size <= 0:
-        raise ValidationError('Uploaded image file is empty.')
-    if size is not None and size > max_image_bytes():
-        raise ValidationError(
-            f'Image file exceeds the maximum size of {max_image_bytes()} bytes.'
-        )
-
-    if not hasattr(uploaded_file, 'open') and not hasattr(uploaded_file, 'read'):
-        raise ValidationError('Uploaded image file is unreadable.')
-
-    # Ensure we can re-read after Pillow consumes the stream.
-    if hasattr(uploaded_file, 'seek'):
-        uploaded_file.seek(0)
-
-    try:
-        with Image.open(uploaded_file) as verified:
-            verified.verify()
-    except UnidentifiedImageError as exc:
-        raise ValidationError(
-            'File is not a valid image. Supported formats: JPEG, PNG, WEBP, GIF.'
-        ) from exc
-    except (OSError, ValueError, SyntaxError) as exc:
-        raise ValidationError('Malformed or unreadable image file.') from exc
-    finally:
-        if hasattr(uploaded_file, 'seek'):
-            uploaded_file.seek(0)
-
-    try:
-        with Image.open(uploaded_file) as image:
-            fmt = (image.format or '').upper()
-            if fmt == 'JPG':
-                fmt = 'JPEG'
-            if fmt not in allowed_image_formats():
-                raise ValidationError(
-                    f'Unsupported image format "{fmt or "unknown"}". '
-                    f'Allowed: {", ".join(sorted(allowed_image_formats()))}.'
-                )
-
-            width, height = image.size
-            if width < min_image_width() or height < min_image_height():
-                raise ValidationError(
-                    f'Image dimensions must be at least '
-                    f'{min_image_width()}x{min_image_height()} pixels.'
-                )
-            if width > max_image_width() or height > max_image_height():
-                raise ValidationError(
-                    f'Image dimensions must not exceed '
-                    f'{max_image_width()}x{max_image_height()} pixels.'
-                )
-
-            # Decode pixels to catch truncated / corrupt payloads that verify() misses.
-            image.load()
-    except ValidationError:
-        raise
-    except UnidentifiedImageError as exc:
-        raise ValidationError(
-            'File is not a valid image. Supported formats: JPEG, PNG, WEBP, GIF.'
-        ) from exc
-    except (OSError, ValueError, SyntaxError) as exc:
-        raise ValidationError('Malformed or unreadable image file.') from exc
-    finally:
-        if hasattr(uploaded_file, 'seek'):
-            uploaded_file.seek(0)
+    """Validate an uploaded file is a real, bounded image for AuctionImage."""
+    validate_image_file(
+        uploaded_file,
+        max_bytes=max_image_bytes(),
+        max_width=max_image_width(),
+        max_height=max_image_height(),
+        min_width=min_image_width(),
+        min_height=min_image_height(),
+        allowed_formats=allowed_image_formats(),
+    )
 
 
 def validate_auction_image_quota(*, auction, incoming_count: int) -> None:

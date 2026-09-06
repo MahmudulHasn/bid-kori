@@ -1,6 +1,8 @@
 from django.contrib.auth.models import User
 from django.db import models
 
+from .image_validation import validate_product_image
+
 
 class Category(models.Model):
     """A grouping for products (e.g. Electronics, Vehicles, Art)."""
@@ -51,3 +53,40 @@ class Product(models.Model):
 
     def __str__(self):
         return self.title
+
+
+class ProductImage(models.Model):
+    """An uploaded image attached to a Product catalog item.
+
+    Default / cover image for display and future AI is the first row by
+    ``uploaded_at``, then ``id`` (no separate primary flag in MVP).
+    """
+
+    product = models.ForeignKey(
+        Product,
+        related_name='images',
+        on_delete=models.CASCADE,
+    )
+    image = models.ImageField(
+        upload_to='product_images/',
+        validators=[validate_product_image],
+    )
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['uploaded_at', 'id']
+
+    def __str__(self):
+        return f'ProductImage {self.pk} for {self.product_id}'
+
+    def delete(self, using=None, keep_parents=False):
+        """Remove the DB row and the underlying storage object."""
+        name = self.image.name if self.image else ''
+        storage = self.image.storage if self.image else None
+        super().delete(using=using, keep_parents=keep_parents)
+        if name and storage is not None:
+            try:
+                storage.delete(name)
+            except Exception:
+                # Storage cleanup must not undo a successful DB delete.
+                pass

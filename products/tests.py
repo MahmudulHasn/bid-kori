@@ -1,15 +1,22 @@
 from datetime import timedelta
+from io import BytesIO
 
 from django.contrib.auth.models import User
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import override_settings
 from django.utils import timezone
+from PIL import Image
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APITestCase
 
 from auctions.models import Auction, AuctionImage, Bid, Payment
 from users.models import UserProfile, ensure_user_profile
 
-from .models import Category, Product
-from .mutation_policy import PRODUCT_EDIT_FROZEN_MESSAGE
+from .models import Category, Product, ProductImage
+from .mutation_policy import (
+    PRODUCT_EDIT_FROZEN_MESSAGE,
+    PRODUCT_IMAGE_FROZEN_MESSAGE,
+)
 
 
 class ProductAuthorizationTests(APITestCase):
@@ -820,3 +827,352 @@ class CategoryBootstrapTests(APITestCase):
 
         names = set(Category.objects.values_list('name', flat=True))
         self.assertEqual(names, set(MVP_CATEGORY_NAMES))
+
+
+def _make_product_test_image(name='test.png', *, size=(10, 10), fmt='PNG'):
+    buffer = BytesIO()
+    Image.new('RGB', size, color='red').save(buffer, format=fmt)
+    buffer.seek(0)
+    content_type = {
+        'PNG': 'image/png',
+        'JPEG': 'image/jpeg',
+        'WEBP': 'image/webp',
+        'GIF': 'image/gif',
+    }.get(fmt, 'application/octet-stream')
+    return SimpleUploadedFile(name, buffer.read(), content_type=content_type)
+
+
+class ProductImageAPITests(APITestCase):
+    """ProductImage GET/POST/DELETE foundation (IMG-B01)."""
+
+    def setUp(self):
+        self.owner = User.objects.create_user(
+            username='img_owner',
+            email='img_owner@test.com',
+            password='pass12345',
+        )
+        self.other = User.objects.create_user(
+            username='img_other',
+            email='img_other@test.com',
+            password='pass12345',
+        )
+        self.buyer = User.objects.create_user(
+            username='img_buyer',
+            email='img_buyer@test.com',
+            password='pass12345',
+        )
+        ensure_user_profile(self.owner, role=UserProfile.Role.SELLER)
+        ensure_user_profile(self.other, role=UserProfile.Role.SELLER)
+        ensure_user_profile(self.buyer, role=UserProfile.Role.BUYER)
+        self.owner_token = Token.objects.create(user=self.owner)
+        self.other_token = Token.objects.create(user=self.other)
+        self.buyer_token = Token.objects.create(user=self.buyer)
+        self.product = Product.objects.create(
+            seller=self.owner,
+            title='Catalog camera',
+            description='Desc',
+            condition=Product.Condition.USED_GOOD,
+        )
+
+    def _auth(self, token):
+        if token is None:
+            self.client.credentials()
+        else:
+            self.client.credentials(HTTP_AUTHORIZATION=f'Token {token.key}')
+
+    def _upload(self, *, token, files, product=None):
+        self._auth(token)
+        target = product or self.product
+        payload = {}
+        if files is not None:
+            payload['images'] = files
+        return self.client.post(
+            f'/api/products/{target.pk}/images/',
+            payload,
+            format='multipart',
+        )
+
+    def test_product_image_belongs_to_product_and_orders_deterministically(self):
+        first = ProductImage.objects.create(
+            product=self.product,
+            image=_make_product_test_image('a.png'),
+        )
+        second = ProductImage.objects.create(
+            product=self.product,
+            image=_make_product_test_image('b.png'),
+        )
+        ordered = list(
+            ProductImage.objects.filter(product=self.product).values_list(
+                'id',
+                flat=True,
+            )
+        )
+        self.assertEqual(ordered, [first.pk, second.pk])
+        self.assertEqual(first.product_id, self.product.pk)
+
+    def test_product_delete_cascades_product_image_rows(self):
+        image = ProductImage.objects.create(
+            product=self.product,
+            image=_make_product_test_image('cascade.png'),
+        )
+        image_id = image.pk
+        self._auth(self.owner_token)
+        response = self.client.delete(f'/api/products/{self.product.pk}/')
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(ProductImage.objects.filter(pk=image_id).exists())
+
+    def test_public_get_images_ordered_with_expected_fields(self):
+        ProductImage.objects.create(
+            product=self.product,
+            image=_make_product_test_image('one.png'),
+        )
+        ProductImage.objects.create(
+            product=self.product,
+            image=_make_product_test_image('two.png'),
+        )
+        response = self.client.get(f'/api/products/{self.product.pk}/images/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 2)
+        self.assertEqual(set(response.data[0].keys()), {'id', 'image', 'uploaded_at'})
+        self.assertLessEqual(
+            response.data[0]['uploaded_at'],
+            response.data[1]['uploaded_at'],
+        )
+
+    def test_owner_upload_persists_and_nested_product_serializer_exposes_image(self):
+        response = self._upload(
+            token=self.owner_token,
+            files=_make_product_test_image(),
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(self.product.images.count(), 1)
+        detail = self.client.get(f'/api/products/{self.product.pk}/')
+        self.assertEqual(detail.status_code, 200)
+        self.assertEqual(len(detail.data['images']), 1)
+        self.assertIn('image', detail.data['images'][0])
+
+    def test_owner_multi_upload_persists_all(self):
+        files = [
+            _make_product_test_image('one.png'),
+            _make_product_test_image('two.png'),
+        ]
+        response = self._upload(token=self.owner_token, files=files)
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(len(response.data), 2)
+        self.assertEqual(self.product.images.count(), 2)
+
+    def test_buyer_cannot_upload(self):
+        response = self._upload(
+            token=self.buyer_token,
+            files=_make_product_test_image(),
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(self.product.images.count(), 0)
+
+    def test_other_seller_cannot_upload(self):
+        response = self._upload(
+            token=self.other_token,
+            files=_make_product_test_image(),
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(self.product.images.count(), 0)
+
+    def test_unauthenticated_upload_rejected(self):
+        response = self._upload(token=None, files=_make_product_test_image())
+        self.assertIn(response.status_code, (401, 403))
+        self.assertEqual(self.product.images.count(), 0)
+
+    def test_invalid_image_bytes_rejected(self):
+        fake = SimpleUploadedFile(
+            'fake.png',
+            b'this is not an image payload',
+            content_type='image/png',
+        )
+        response = self._upload(token=self.owner_token, files=fake)
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(self.product.images.count(), 0)
+
+    def test_supported_formats_accepted(self):
+        for fmt, name in (
+            ('JPEG', 'a.jpg'),
+            ('PNG', 'b.png'),
+            ('WEBP', 'c.webp'),
+            ('GIF', 'd.gif'),
+        ):
+            with self.subTest(fmt=fmt):
+                ProductImage.objects.filter(product=self.product).delete()
+                response = self._upload(
+                    token=self.owner_token,
+                    files=_make_product_test_image(name, fmt=fmt),
+                )
+                self.assertEqual(response.status_code, 201, response.data)
+
+    @override_settings(PRODUCT_IMAGE_MAX_BYTES=200)
+    def test_oversized_file_rejected(self):
+        buffer = BytesIO()
+        Image.new('RGB', (120, 120), color='blue').save(buffer, format='PNG')
+        buffer.seek(0)
+        payload = buffer.read()
+        self.assertGreater(len(payload), 200)
+        oversized = SimpleUploadedFile(
+            'big.png',
+            payload,
+            content_type='image/png',
+        )
+        response = self._upload(token=self.owner_token, files=oversized)
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(self.product.images.count(), 0)
+
+    @override_settings(
+        PRODUCT_IMAGE_MAX_WIDTH=50,
+        PRODUCT_IMAGE_MAX_HEIGHT=50,
+    )
+    def test_oversized_dimensions_rejected(self):
+        response = self._upload(
+            token=self.owner_token,
+            files=_make_product_test_image('large.png', size=(80, 80)),
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(self.product.images.count(), 0)
+
+    @override_settings(PRODUCT_IMAGE_MAX_COUNT=5, PRODUCT_IMAGE_MAX_PER_REQUEST=5)
+    def test_total_quota_rejects_when_full(self):
+        for i in range(5):
+            ProductImage.objects.create(
+                product=self.product,
+                image=_make_product_test_image(f'full-{i}.png'),
+            )
+        response = self._upload(
+            token=self.owner_token,
+            files=_make_product_test_image('overflow.png'),
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(self.product.images.count(), 5)
+
+    @override_settings(PRODUCT_IMAGE_MAX_COUNT=5, PRODUCT_IMAGE_MAX_PER_REQUEST=5)
+    def test_batch_overflow_is_all_or_nothing(self):
+        for i in range(3):
+            ProductImage.objects.create(
+                product=self.product,
+                image=_make_product_test_image(f'exist-{i}.png'),
+            )
+        files = [
+            _make_product_test_image('n1.png'),
+            _make_product_test_image('n2.png'),
+            _make_product_test_image('n3.png'),
+        ]
+        response = self._upload(token=self.owner_token, files=files)
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(self.product.images.count(), 3)
+
+    @override_settings(PRODUCT_IMAGE_MAX_PER_REQUEST=5)
+    def test_per_request_limit_rejected(self):
+        files = [
+            _make_product_test_image(f'r{i}.png') for i in range(6)
+        ]
+        response = self._upload(token=self.owner_token, files=files)
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(self.product.images.count(), 0)
+
+    def test_frozen_product_rejects_upload(self):
+        now = timezone.now()
+        Auction.objects.create(
+            product=self.product,
+            starting_bid=100,
+            current_highest_bid=100,
+            min_increment=10,
+            start_time=now - timedelta(hours=1),
+            end_time=now + timedelta(days=1),
+            status=Auction.Status.ACTIVE,
+        )
+        response = self._upload(
+            token=self.owner_token,
+            files=_make_product_test_image(),
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data.get('error'), PRODUCT_IMAGE_FROZEN_MESSAGE)
+        self.assertEqual(self.product.images.count(), 0)
+
+    def test_owner_can_delete_image_and_storage_object(self):
+        image = ProductImage.objects.create(
+            product=self.product,
+            image=_make_product_test_image('del.png'),
+        )
+        name = image.image.name
+        storage = image.image.storage
+        self.assertTrue(storage.exists(name))
+        self._auth(self.owner_token)
+        response = self.client.delete(
+            f'/api/products/{self.product.pk}/images/{image.pk}/',
+        )
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(ProductImage.objects.filter(pk=image.pk).exists())
+        self.assertFalse(storage.exists(name))
+
+    def test_other_seller_cannot_delete(self):
+        image = ProductImage.objects.create(
+            product=self.product,
+            image=_make_product_test_image('keep.png'),
+        )
+        self._auth(self.other_token)
+        response = self.client.delete(
+            f'/api/products/{self.product.pk}/images/{image.pk}/',
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(ProductImage.objects.filter(pk=image.pk).exists())
+
+    def test_buyer_cannot_delete(self):
+        image = ProductImage.objects.create(
+            product=self.product,
+            image=_make_product_test_image('buyer.png'),
+        )
+        self._auth(self.buyer_token)
+        response = self.client.delete(
+            f'/api/products/{self.product.pk}/images/{image.pk}/',
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(ProductImage.objects.filter(pk=image.pk).exists())
+
+    def test_frozen_product_rejects_delete(self):
+        image = ProductImage.objects.create(
+            product=self.product,
+            image=_make_product_test_image('frozen.png'),
+        )
+        name = image.image.name
+        storage = image.image.storage
+        now = timezone.now()
+        Auction.objects.create(
+            product=self.product,
+            starting_bid=100,
+            current_highest_bid=100,
+            min_increment=10,
+            start_time=now - timedelta(hours=1),
+            end_time=now + timedelta(days=1),
+            status=Auction.Status.ACTIVE,
+        )
+        self._auth(self.owner_token)
+        response = self.client.delete(
+            f'/api/products/{self.product.pk}/images/{image.pk}/',
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data.get('error'), PRODUCT_IMAGE_FROZEN_MESSAGE)
+        self.assertTrue(ProductImage.objects.filter(pk=image.pk).exists())
+        self.assertTrue(storage.exists(name))
+
+    def test_wrong_product_image_pair_returns_404(self):
+        other_product = Product.objects.create(
+            seller=self.owner,
+            title='Other listing',
+            description='',
+            condition=Product.Condition.NEW,
+        )
+        image = ProductImage.objects.create(
+            product=other_product,
+            image=_make_product_test_image('other.png'),
+        )
+        self._auth(self.owner_token)
+        response = self.client.delete(
+            f'/api/products/{self.product.pk}/images/{image.pk}/',
+        )
+        self.assertEqual(response.status_code, 404)
+        self.assertTrue(ProductImage.objects.filter(pk=image.pk).exists())

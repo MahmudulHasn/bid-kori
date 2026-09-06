@@ -26,6 +26,11 @@ PRODUCT_EDIT_FROZEN_MESSAGE = (
     'or received bids.'
 )
 
+PRODUCT_IMAGE_FROZEN_MESSAGE = (
+    'Product images cannot be changed after the linked auction has started '
+    'or received bids.'
+)
+
 
 class ProductMutationPolicy:
     """Central checks for whether Product catalog metadata may be updated."""

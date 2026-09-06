@@ -262,6 +262,29 @@ AUCTION_IMAGE_MAX_PER_AUCTION = int(os.getenv('AUCTION_IMAGE_MAX_PER_AUCTION', '
 AUCTION_IMAGE_MAX_PER_REQUEST = int(os.getenv('AUCTION_IMAGE_MAX_PER_REQUEST', '5'))
 AUCTION_IMAGE_ALLOWED_FORMATS = ('JPEG', 'PNG', 'WEBP', 'GIF')
 
+# Product catalog images (IMG-B01). Content validation mirrors Auction rules;
+# Product caps are intentionally lower (max 5) for Seller catalog MVP.
+PRODUCT_IMAGE_MAX_BYTES = int(
+    os.getenv('PRODUCT_IMAGE_MAX_BYTES', str(AUCTION_IMAGE_MAX_BYTES))
+)
+PRODUCT_IMAGE_MAX_WIDTH = int(
+    os.getenv('PRODUCT_IMAGE_MAX_WIDTH', str(AUCTION_IMAGE_MAX_WIDTH))
+)
+PRODUCT_IMAGE_MAX_HEIGHT = int(
+    os.getenv('PRODUCT_IMAGE_MAX_HEIGHT', str(AUCTION_IMAGE_MAX_HEIGHT))
+)
+PRODUCT_IMAGE_MIN_WIDTH = int(
+    os.getenv('PRODUCT_IMAGE_MIN_WIDTH', str(AUCTION_IMAGE_MIN_WIDTH))
+)
+PRODUCT_IMAGE_MIN_HEIGHT = int(
+    os.getenv('PRODUCT_IMAGE_MIN_HEIGHT', str(AUCTION_IMAGE_MIN_HEIGHT))
+)
+PRODUCT_IMAGE_MAX_COUNT = int(os.getenv('PRODUCT_IMAGE_MAX_COUNT', '5'))
+PRODUCT_IMAGE_MAX_PER_REQUEST = int(
+    os.getenv('PRODUCT_IMAGE_MAX_PER_REQUEST', '5')
+)
+PRODUCT_IMAGE_ALLOWED_FORMATS = ('JPEG', 'PNG', 'WEBP', 'GIF')
+
 STORAGES = {
     'default': {
         'BACKEND': 'django.core.files.storage.FileSystemStorage',
