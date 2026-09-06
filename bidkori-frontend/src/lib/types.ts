@@ -19,6 +19,13 @@ export type AuctionImage = {
   uploaded_at?: string;
 };
 
+/** Catalog ProductImage from GET /products/ and image upload endpoints. */
+export type ProductImage = {
+  id: number;
+  image: string;
+  uploaded_at: string;
+};
+
 export type AuctionProduct = {
   id?: number;
   title: string;
@@ -37,6 +44,8 @@ export type Product = {
   condition?: string;
   category?: number | null;
   seller?: number | string | null;
+  /** Nested Product images ordered by uploaded_at, id (first = display default). */
+  images?: ProductImage[];
   created_at?: string;
   updated_at?: string;
 };

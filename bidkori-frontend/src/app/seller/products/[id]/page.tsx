@@ -24,6 +24,7 @@ import {
   categoriesFetcher,
 } from '@/lib/categoriesApi';
 import { resolveCategoryLabel } from '@/lib/categories';
+import ProductPhotosSection from '@/components/seller/ProductPhotosSection';
 import {
   canOfferSellerProductEdit,
   canSellerDeleteProduct,
@@ -57,12 +58,14 @@ function OwnedProductDetail({
   auctions,
   onDeleted,
   onDeleteRejected,
+  onPhotosChanged,
 }: {
   product: Product;
   user: AuthUser;
   auctions: readonly Auction[];
   onDeleted: () => Promise<void>;
   onDeleteRejected: () => Promise<void>;
+  onPhotosChanged: () => Promise<void>;
 }) {
   const { data: categories = [] } = useSWR(
     CATEGORIES_API_PATH,
@@ -200,13 +203,11 @@ function OwnedProductDetail({
         )}
       </header>
 
-      <div
-        className="flex h-40 items-center justify-center rounded-2xl border border-dashed border-zinc-300 bg-zinc-50 text-sm text-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400"
-        role="img"
-        aria-label="No product image available"
-      >
-        No product image
-      </div>
+      <ProductPhotosSection
+        product={product}
+        canMutate={canEdit}
+        onChanged={onPhotosChanged}
+      />
 
       <section
         aria-labelledby="product-details-heading"
@@ -297,6 +298,12 @@ export default function SellerProductDetailPage() {
     await mutateGlobal(MY_LISTINGS_API_PATH);
   };
 
+  const handlePhotosChanged = async () => {
+    await mutate();
+    await mutateAuctions();
+    await mutateGlobal(MY_LISTINGS_API_PATH);
+  };
+
   return (
     <div className="space-y-8">
       <p>
@@ -367,6 +374,7 @@ export default function SellerProductDetailPage() {
           auctions={auctions}
           onDeleted={handleDeleted}
           onDeleteRejected={handleDeleteRejected}
+          onPhotosChanged={handlePhotosChanged}
         />
       ) : null}
     </div>

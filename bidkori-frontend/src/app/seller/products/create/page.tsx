@@ -77,8 +77,9 @@ export default function SellerCreateProductPage() {
           Create Product
         </h1>
         <p className="mt-2 max-w-2xl text-sm text-zinc-600 dark:text-zinc-400">
-          Add a catalog item you own. Auction pricing is set later when you
-          list it for bidding.
+          Add a catalog item you own. After creation you can upload photos on
+          the product page. Auction pricing is set later when you list it for
+          bidding.
         </p>
       </header>
 

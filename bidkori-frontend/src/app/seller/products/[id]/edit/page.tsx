@@ -230,7 +230,15 @@ export default function SellerEditProductPage() {
             </h1>
             <p className="mt-2 max-w-2xl text-sm text-zinc-600 dark:text-zinc-400">
               Update catalog details for this item. Auction pricing is not
-              edited here.
+              edited here. Manage photos from the product detail page.
+            </p>
+            <p className="mt-3">
+              <Link
+                href={sellerProductDetailPath(product.id)}
+                className="text-sm font-medium text-sky-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:text-sky-300"
+              >
+                Manage photos →
+              </Link>
             </p>
           </header>
 
