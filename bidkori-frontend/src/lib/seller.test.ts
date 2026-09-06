@@ -366,17 +366,17 @@ test('product create and update API paths and methods are catalog-only', () => {
   assert.equal(PRODUCT_UPDATE_METHOD, 'PATCH');
 });
 
-test('serializeProductWritePayload includes only allowed product fields', () => {
+test('serializeProductWritePayload includes catalog fields with optional category', () => {
   const source = {
     title: '  Oak Chair  ',
     description: ' Vintage wood ',
     condition: 'USED_GOOD' as const,
+    category: 3,
     seller: 7,
     starting_bid: '100.00',
     current_highest_bid: '150.00',
     reserve_price: '200.00',
     min_increment: '10.00',
-    category: 3,
   };
   const snapshot = { ...source };
   const payload = serializeProductWritePayload(source);
@@ -384,6 +384,7 @@ test('serializeProductWritePayload includes only allowed product fields', () => 
     title: 'Oak Chair',
     description: 'Vintage wood',
     condition: 'USED_GOOD',
+    category: 3,
   });
   assert.deepEqual(productWritePayloadKeys(payload).sort(), [
     ...PRODUCT_WRITE_FIELDS,
@@ -393,8 +394,22 @@ test('serializeProductWritePayload includes only allowed product fields', () => 
   assert.equal('current_highest_bid' in payload, false);
   assert.equal('reserve_price' in payload, false);
   assert.equal('min_increment' in payload, false);
-  assert.equal('category' in payload, false);
   assert.deepEqual(source, snapshot);
+
+  assert.deepEqual(
+    serializeProductWritePayload({
+      title: 'X',
+      description: '',
+      condition: 'NEW',
+      category: null,
+    }),
+    {
+      title: 'X',
+      description: '',
+      condition: 'NEW',
+      category: null,
+    },
+  );
 });
 
 test('product form helpers do not mutate source product data', () => {
@@ -403,15 +418,27 @@ test('product form helpers do not mutate source product data', () => {
     title: 'Lamp',
     description: 'Brass',
     condition: 'NEW',
+    category: 9,
   });
   const snapshot = { ...item };
   const values = productFormValuesFromProduct(item);
+  assert.equal(values.category, 9);
   values.title = 'Changed';
+  values.category = null;
   assert.equal(item.title, 'Lamp');
+  assert.equal(item.category, 9);
   assert.deepEqual(item, snapshot);
   const empty = emptyProductFormValues();
   empty.title = 'X';
   assert.equal(emptyProductFormValues().title, '');
+  assert.equal(emptyProductFormValues().category, null);
+});
+
+test('productFormValuesFromProduct maps null category to empty select state', () => {
+  const values = productFormValuesFromProduct(
+    product({ id: 1, title: 'A', category: null }),
+  );
+  assert.equal(values.category, null);
 });
 
 test('validateProductForm requires a title and a known condition', () => {
@@ -419,9 +446,11 @@ test('validateProductForm requires a title and a known condition', () => {
     title: '   ',
     description: '',
     condition: 'USED_GOOD',
+    category: null,
   });
   assert.equal(errors.title, 'Title is required.');
   assert.equal(errors.description, undefined);
+  assert.equal(errors.category, undefined);
 });
 
 test('product delete may be offered only for owned unused products', () => {

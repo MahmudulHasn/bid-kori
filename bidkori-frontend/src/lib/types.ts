@@ -41,6 +41,13 @@ export type Product = {
   updated_at?: string;
 };
 
+/** Public Category catalog row from GET /categories/. */
+export type Category = {
+  id: number;
+  name: string;
+  slug: string;
+};
+
 export type Auction = {
   id: number;
   /**

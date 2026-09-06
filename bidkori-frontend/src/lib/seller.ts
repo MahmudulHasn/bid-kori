@@ -273,7 +273,12 @@ export function isProductEditFrozenError(error: unknown): boolean {
   );
 }
 
-export const PRODUCT_WRITE_FIELDS = ['title', 'description', 'condition'] as const;
+export const PRODUCT_WRITE_FIELDS = [
+  'title',
+  'description',
+  'condition',
+  'category',
+] as const;
 
 /** POST create lives on the product collection. PATCH update uses the detail path. */
 export const PRODUCT_CREATE_API_PATH = '/products/';
@@ -297,12 +302,15 @@ export type ProductFormValues = {
   title: string;
   description: string;
   condition: ProductCondition;
+  /** Product.category PK; null = no category. */
+  category: number | null;
 };
 
 export type ProductWritePayload = {
   title: string;
   description: string;
   condition: ProductCondition;
+  category: number | null;
 };
 
 export const PRODUCT_CONDITION_OPTIONS: {
@@ -321,11 +329,22 @@ export function isProductCondition(value: string | undefined): value is ProductC
   return PRODUCT_CONDITION_VALUES.some((item) => item === value);
 }
 
+function normalizeProductCategory(
+  value: number | null | undefined,
+): number | null {
+  if (value == null) return null;
+  if (!Number.isFinite(value) || !Number.isInteger(value) || value <= 0) {
+    return null;
+  }
+  return value;
+}
+
 export function emptyProductFormValues(): ProductFormValues {
   return {
     title: '',
     description: '',
     condition: DEFAULT_PRODUCT_CONDITION,
+    category: null,
   };
 }
 
@@ -336,6 +355,7 @@ export function productFormValuesFromProduct(product: Product): ProductFormValue
     condition: isProductCondition(product.condition)
       ? product.condition
       : DEFAULT_PRODUCT_CONDITION,
+    category: normalizeProductCategory(product.category),
   };
 }
 
@@ -355,8 +375,8 @@ export function validateProductForm(
 }
 
 /**
- * Catalog write payload only. Drops seller, category, and auction pricing.
- * Does not mutate the source object.
+ * Catalog write payload only. Drops seller and auction pricing.
+ * Includes optional category PK (null clears). Does not mutate the source.
  */
 export function serializeProductWritePayload(
   values: ProductFormValues,
@@ -365,6 +385,7 @@ export function serializeProductWritePayload(
     title: values.title.trim(),
     description: values.description.trim(),
     condition: values.condition,
+    category: normalizeProductCategory(values.category),
   };
 }
 

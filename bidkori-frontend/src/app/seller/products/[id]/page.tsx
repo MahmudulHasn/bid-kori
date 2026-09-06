@@ -20,6 +20,11 @@ import {
   productDetailFetcher,
 } from '@/lib/productsApi';
 import {
+  CATEGORIES_API_PATH,
+  categoriesFetcher,
+} from '@/lib/categoriesApi';
+import { resolveCategoryLabel } from '@/lib/categories';
+import {
   canOfferSellerProductEdit,
   canSellerDeleteProduct,
   formatSellerProductCondition,
@@ -59,6 +64,12 @@ function OwnedProductDetail({
   onDeleted: () => Promise<void>;
   onDeleteRejected: () => Promise<void>;
 }) {
+  const { data: categories = [] } = useSWR(
+    CATEGORIES_API_PATH,
+    categoriesFetcher,
+    { revalidateOnFocus: false },
+  );
+  const categoryLabel = resolveCategoryLabel(product.category, categories);
   const created = formatTimestamp(product.created_at);
   const title = product.title.trim() ? product.title : 'Untitled product';
   const canDelete = canSellerDeleteProduct(product, user, auctions);
@@ -214,6 +225,14 @@ function OwnedProductDetail({
             </dt>
             <dd className="text-sm text-zinc-900 dark:text-white">
               {formatSellerProductCondition(product.condition)}
+            </dd>
+          </div>
+          <div className="flex flex-col gap-1 py-3 sm:flex-row sm:justify-between sm:gap-6">
+            <dt className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
+              Category
+            </dt>
+            <dd className="text-sm text-zinc-900 dark:text-white">
+              {categoryLabel}
             </dd>
           </div>
           <div className="flex flex-col gap-1 py-3 sm:flex-row sm:justify-between sm:gap-6">
