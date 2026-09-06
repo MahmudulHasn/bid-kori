@@ -17,6 +17,7 @@ def api_root(request):
         "endpoints": {
             "admin": "/admin/",
             "products": "/api/products/",
+            "categories": "/api/categories/",
             "auctions": "/api/auctions/",
             "register": "/api/users/register/",
             "login": "/api/users/login/",
@@ -33,6 +34,7 @@ urlpatterns = [
     path('', api_root, name='api-root'),
     path('admin/', bidkori_admin_site.urls),
     path('api/products/', include('products.urls')),
+    path('api/categories/', include('products.category_urls')),
     path('api/auctions/', include('auctions.urls')),
     path('api/users/', include('users.urls')),
     path('api/notifications/', include('notifications.urls')),

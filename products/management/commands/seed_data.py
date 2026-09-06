@@ -7,7 +7,8 @@ from django.db import transaction
 from django.utils import timezone
 
 from auctions.models import Auction, Bid
-from products.models import Product
+from products.category_bootstrap import ensure_mvp_categories
+from products.models import Category, Product
 
 
 class Command(BaseCommand):
@@ -48,6 +49,7 @@ class Command(BaseCommand):
                 '50mm prime lens. Fully mechanical, tested, and ready to shoot.'
             ),
             'condition': Product.Condition.USED_GOOD,
+            'category_name': 'Electronics',
             'starting_bid': Decimal('4500.00'),
         },
         {
@@ -57,6 +59,7 @@ class Command(BaseCommand):
                 'brown switches, PBT keycaps, and per-key RGB lighting.'
             ),
             'condition': Product.Condition.USED_LIKE_NEW,
+            'category_name': 'Electronics',
             'starting_bid': Decimal('3200.00'),
         },
         {
@@ -66,6 +69,7 @@ class Command(BaseCommand):
                 'Size M, minimal wear, with a soft quilted inner lining.'
             ),
             'condition': Product.Condition.USED_GOOD,
+            'category_name': 'Fashion',
             'starting_bid': Decimal('6000.00'),
         },
         {
@@ -75,6 +79,7 @@ class Command(BaseCommand):
                 'restored dial, sapphire crystal, and a genuine leather strap.'
             ),
             'condition': Product.Condition.FAIR,
+            'category_name': 'Collectibles',
             'starting_bid': Decimal('15000.00'),
         },
     ]
@@ -82,6 +87,18 @@ class Command(BaseCommand):
     @transaction.atomic
     def handle(self, *args, **options):
         User = get_user_model()
+
+        created_categories, existing_categories = ensure_mvp_categories()
+        for category in created_categories:
+            self.stdout.write(
+                self.style.SUCCESS(f"Created category '{category.name}'.")
+            )
+        if existing_categories and not created_categories:
+            self.stdout.write('MVP categories already present.')
+
+        categories_by_name = {
+            category.name: category for category in Category.objects.all()
+        }
 
         created_users = {}
         for data in self.USERS:
@@ -111,6 +128,7 @@ class Command(BaseCommand):
 
         for data in self.PRODUCTS:
             starting_bid = data['starting_bid']
+            category = categories_by_name.get(data['category_name'])
 
             product, created = Product.objects.get_or_create(
                 title=data['title'],
@@ -118,6 +136,7 @@ class Command(BaseCommand):
                 defaults={
                     'description': data['description'],
                     'condition': data['condition'],
+                    'category': category,
                 },
             )
             if created:

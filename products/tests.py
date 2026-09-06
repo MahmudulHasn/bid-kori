@@ -553,3 +553,270 @@ class ProductAuctionContractTests(APITestCase):
         )
         self.assertNotIn('starting_price', response.data.get('product', {}))
         self.assertNotIn('starting_bid', response.data.get('product', {}))
+
+
+class CategoryCatalogTests(APITestCase):
+    """Read-only Category REST catalog (CAT-B01)."""
+
+    def setUp(self):
+        self.seller = User.objects.create_user(
+            username='cat_seller',
+            email='cat_seller@test.com',
+            password='pass12345',
+        )
+        self.buyer = User.objects.create_user(
+            username='cat_buyer',
+            email='cat_buyer@test.com',
+            password='pass12345',
+        )
+        ensure_user_profile(self.seller, role=UserProfile.Role.SELLER)
+        ensure_user_profile(self.buyer, role=UserProfile.Role.BUYER)
+        self.seller_token = Token.objects.create(user=self.seller)
+        self.buyer_token = Token.objects.create(user=self.buyer)
+        # Create out of name order to assert deterministic sorting.
+        self.zeta = Category.objects.create(name='Zeta', slug='zeta')
+        self.alpha = Category.objects.create(name='Alpha', slug='alpha')
+        self.mid = Category.objects.create(name='Mid', slug='mid')
+
+    def _auth(self, token):
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {token.key}')
+
+    def test_unauthenticated_can_list_categories(self):
+        response = self.client.get('/api/categories/')
+        self.assertEqual(response.status_code, 200)
+        self.assertIsInstance(response.data, list)
+        self.assertEqual(len(response.data), 3)
+
+    def test_buyer_and_seller_can_list_categories(self):
+        self._auth(self.buyer_token)
+        buyer_response = self.client.get('/api/categories/')
+        self.assertEqual(buyer_response.status_code, 200)
+
+        self._auth(self.seller_token)
+        seller_response = self.client.get('/api/categories/')
+        self.assertEqual(seller_response.status_code, 200)
+
+    def test_category_list_is_ordered_by_name_then_id(self):
+        response = self.client.get('/api/categories/')
+        self.assertEqual(response.status_code, 200)
+        names = [row['name'] for row in response.data]
+        self.assertEqual(names, ['Alpha', 'Mid', 'Zeta'])
+
+    def test_category_list_exposes_only_safe_fields(self):
+        response = self.client.get('/api/categories/')
+        self.assertEqual(response.status_code, 200)
+        for row in response.data:
+            self.assertEqual(set(row.keys()), {'id', 'name', 'slug'})
+
+    def test_category_detail_is_public(self):
+        response = self.client.get(f'/api/categories/{self.alpha.pk}/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['id'], self.alpha.pk)
+        self.assertEqual(response.data['name'], 'Alpha')
+        self.assertEqual(response.data['slug'], 'alpha')
+
+    def test_category_mutations_are_unavailable(self):
+        payload = {'name': 'Hacked', 'slug': 'hacked'}
+        cases = [
+            ('post', '/api/categories/', payload),
+            ('put', f'/api/categories/{self.alpha.pk}/', payload),
+            ('patch', f'/api/categories/{self.alpha.pk}/', {'name': 'X'}),
+            ('delete', f'/api/categories/{self.alpha.pk}/', None),
+        ]
+        actors = [None, self.buyer_token, self.seller_token]
+        before = Category.objects.count()
+        for token in actors:
+            if token is None:
+                self.client.credentials()
+            else:
+                self._auth(token)
+            for method, url, body in cases:
+                request = getattr(self.client, method)
+                response = (
+                    request(url, body, format='json')
+                    if body is not None
+                    else request(url)
+                )
+                self.assertIn(
+                    response.status_code,
+                    (401, 403, 405),
+                    msg=f'{method} {url} as {token} -> {response.status_code}',
+                )
+        self.assertEqual(Category.objects.count(), before)
+        self.alpha.refresh_from_db()
+        self.assertEqual(self.alpha.name, 'Alpha')
+
+
+class ProductCategoryContractTests(APITestCase):
+    """Product create/update category write contract + freeze/ownership."""
+
+    def setUp(self):
+        self.owner = User.objects.create_user(
+            username='pc_owner',
+            email='pc_owner@test.com',
+            password='pass12345',
+        )
+        self.other = User.objects.create_user(
+            username='pc_other',
+            email='pc_other@test.com',
+            password='pass12345',
+        )
+        self.buyer = User.objects.create_user(
+            username='pc_buyer',
+            email='pc_buyer@test.com',
+            password='pass12345',
+        )
+        ensure_user_profile(self.owner, role=UserProfile.Role.SELLER)
+        ensure_user_profile(self.other, role=UserProfile.Role.SELLER)
+        ensure_user_profile(self.buyer, role=UserProfile.Role.BUYER)
+        self.owner_token = Token.objects.create(user=self.owner)
+        self.other_token = Token.objects.create(user=self.other)
+        self.buyer_token = Token.objects.create(user=self.buyer)
+        self.electronics = Category.objects.create(
+            name='Electronics',
+            slug='electronics',
+        )
+        self.fashion = Category.objects.create(name='Fashion', slug='fashion')
+
+    def _auth(self, token):
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {token.key}')
+
+    def test_seller_creates_product_with_valid_category(self):
+        self._auth(self.owner_token)
+        response = self.client.post(
+            '/api/products/',
+            {
+                'title': 'Categorized item',
+                'description': 'Has category',
+                'condition': 'USED_GOOD',
+                'category': self.electronics.pk,
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(response.data['category'], self.electronics.pk)
+        product = Product.objects.get(pk=response.data['id'])
+        self.assertEqual(product.category_id, self.electronics.pk)
+
+    def test_invalid_category_id_returns_400_and_skips_create(self):
+        self._auth(self.owner_token)
+        before = Product.objects.count()
+        response = self.client.post(
+            '/api/products/',
+            {
+                'title': 'Bad category',
+                'description': 'Should fail',
+                'condition': 'USED_GOOD',
+                'category': 999999,
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, 400)
+        error_payload = response.data.get('error', response.data)
+        self.assertIn('category', error_payload)
+        self.assertEqual(Product.objects.count(), before)
+
+    def test_buyer_cannot_create_product_even_with_valid_category(self):
+        self._auth(self.buyer_token)
+        before = Product.objects.count()
+        response = self.client.post(
+            '/api/products/',
+            {
+                'title': 'Buyer categorized',
+                'description': 'No',
+                'condition': 'NEW',
+                'category': self.electronics.pk,
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(Product.objects.count(), before)
+
+    def test_seller_can_change_category_on_standalone_product(self):
+        product = Product.objects.create(
+            seller=self.owner,
+            title='Standalone',
+            description='Editable',
+            condition=Product.Condition.USED_GOOD,
+            category=self.electronics,
+        )
+        self._auth(self.owner_token)
+        response = self.client.patch(
+            f'/api/products/{product.pk}/',
+            {'category': self.fashion.pk},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        product.refresh_from_db()
+        self.assertEqual(product.category_id, self.fashion.pk)
+        self.assertEqual(response.data['category'], self.fashion.pk)
+
+    def test_frozen_product_rejects_category_patch(self):
+        product = Product.objects.create(
+            seller=self.owner,
+            title='Live catalog',
+            description='Frozen',
+            condition=Product.Condition.USED_GOOD,
+            category=self.electronics,
+        )
+        now = timezone.now()
+        Auction.objects.create(
+            product=product,
+            starting_bid=100,
+            current_highest_bid=100,
+            min_increment=10,
+            start_time=now - timedelta(hours=1),
+            end_time=now + timedelta(days=1),
+            status=Auction.Status.ACTIVE,
+        )
+        self._auth(self.owner_token)
+        response = self.client.patch(
+            f'/api/products/{product.pk}/',
+            {'category': self.fashion.pk},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data.get('error'), PRODUCT_EDIT_FROZEN_MESSAGE)
+        product.refresh_from_db()
+        self.assertEqual(product.category_id, self.electronics.pk)
+
+    def test_seller_cannot_change_another_sellers_product_category(self):
+        product = Product.objects.create(
+            seller=self.owner,
+            title='Owned by owner',
+            description='x',
+            condition=Product.Condition.USED_GOOD,
+            category=self.electronics,
+        )
+        self._auth(self.other_token)
+        response = self.client.patch(
+            f'/api/products/{product.pk}/',
+            {'category': self.fashion.pk},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 403)
+        product.refresh_from_db()
+        self.assertEqual(product.category_id, self.electronics.pk)
+
+
+class CategoryBootstrapTests(APITestCase):
+    """Idempotent MVP category bootstrap."""
+
+    def test_ensure_mvp_categories_is_idempotent(self):
+        from products.category_bootstrap import (
+            MVP_CATEGORY_NAMES,
+            ensure_mvp_categories,
+        )
+
+        created_first, existing_first = ensure_mvp_categories()
+        self.assertEqual(len(created_first), len(MVP_CATEGORY_NAMES))
+        self.assertEqual(len(existing_first), 0)
+        self.assertEqual(Category.objects.count(), len(MVP_CATEGORY_NAMES))
+
+        created_second, existing_second = ensure_mvp_categories()
+        self.assertEqual(len(created_second), 0)
+        self.assertEqual(len(existing_second), len(MVP_CATEGORY_NAMES))
+        self.assertEqual(Category.objects.count(), len(MVP_CATEGORY_NAMES))
+
+        names = set(Category.objects.values_list('name', flat=True))
+        self.assertEqual(names, set(MVP_CATEGORY_NAMES))

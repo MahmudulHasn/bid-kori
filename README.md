@@ -166,6 +166,8 @@ Ensure the Django API is reachable at `http://127.0.0.1:8000`.
 | `POST` | `/api/users/register/` | Register + token |
 | `POST` | `/api/users/login/` | Login + token |
 | `GET` | `/api/auctions/` | List auctions (`status`, `category`, `search` filters) |
+| `GET` | `/api/categories/` | Public Category catalog (`id`, `name`, `slug`; read-only) |
+| `GET` | `/api/categories/<id>/` | Category detail (read-only) |
 | `POST` | `/api/auctions/` | Create auction (JSON or multipart + images) |
 | `POST` | `/api/auctions/<id>/images/` | Upload auction images |
 | `POST` | `/api/auctions/<id>/place-bid/` | Place bid (atomic + rate limited; broadcasts `bid.accepted` after commit) |
@@ -201,7 +203,8 @@ Read / read-all remain REST-only. Offline users recover via `GET /api/notificati
 
 | Script / command | Purpose |
 | --- | --- |
-| `python manage.py seed_data` | Demo users, products, auctions, bids |
+| `python manage.py seed_data` | Demo users, MVP categories, products, auctions, bids |
+| `python manage.py seed_categories` | Idempotent MVP Category catalog only |
 | `python manage.py close_expired_auctions` | Close expired ACTIVE auctions + assign winners (manual / recovery; same logic as Celery) |
 | `celery -A config worker -l INFO` | Process scheduled close tasks |
 | `celery -A config beat -l INFO` | Enqueue expired-auction closing every ~10s |

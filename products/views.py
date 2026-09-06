@@ -1,6 +1,10 @@
 from django.db import transaction
 from rest_framework import generics, status
-from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
+from rest_framework.permissions import (
+    AllowAny,
+    IsAuthenticated,
+    IsAuthenticatedOrReadOnly,
+)
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 
@@ -8,13 +12,37 @@ from .deletion_policy import (
     PRODUCT_DELETE_BLOCKED_MESSAGE,
     ProductDeletionPolicy,
 )
-from .models import Product
+from .models import Category, Product
 from .mutation_policy import (
     PRODUCT_EDIT_FROZEN_MESSAGE,
     ProductMutationPolicy,
 )
 from .permissions import IsSellerOrAdminForProductCreate, IsSellerOrReadOnly
-from .serializers import ProductSerializer
+from .serializers import CategorySerializer, ProductSerializer
+
+
+class CategoryListView(generics.ListAPIView):
+    """Public read-only Category catalog for Seller/Buyer/marketplace UIs.
+
+    Returns an unpaginated list (same shape as ``GET /api/products/``) ordered
+    by ``name``, then ``id``. Mutations are intentionally unavailable — Admin
+    Category CRUD is a later phase.
+    """
+
+    queryset = Category.objects.all().order_by('name', 'id')
+    serializer_class = CategorySerializer
+    permission_classes = [AllowAny]
+    pagination_class = None
+    http_method_names = ['get', 'head', 'options']
+
+
+class CategoryDetailView(generics.RetrieveAPIView):
+    """Public read-only Category detail by primary key."""
+
+    queryset = Category.objects.all()
+    serializer_class = CategorySerializer
+    permission_classes = [AllowAny]
+    http_method_names = ['get', 'head', 'options']
 
 
 class ProductListCreateView(generics.ListCreateAPIView):
