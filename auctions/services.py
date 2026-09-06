@@ -79,7 +79,41 @@ class AuctionLifecycleService:
         from .realtime import schedule_auction_closed_broadcast
 
         schedule_auction_closed_broadcast(auction)
+
+        # Terminal inbox rows (won/lost) — only when a winner exists.
+        product_title = cls._product_title(auction)
+        winner_id = auction.winning_bidder_id
+        loser_ids: list[int] = []
+        if winner_id is not None:
+            loser_ids = list(
+                Bid.objects.filter(auction=auction)
+                .exclude(bidder_id=winner_id)
+                .values_list('bidder_id', flat=True)
+                .distinct()
+            )
+
+        from notifications.services import schedule_auction_closed_notifications
+
+        schedule_auction_closed_notifications(
+            auction_id=auction.pk,
+            winning_bidder_id=winner_id,
+            final_amount=auction.current_highest_bid,
+            product_title=product_title,
+            loser_user_ids=loser_ids,
+        )
         return auction
+
+    @classmethod
+    def _product_title(cls, auction) -> str:
+        product = getattr(auction, 'product', None)
+        title = getattr(product, 'title', None) if product is not None else None
+        if title:
+            return str(title)
+        # Product may not be select_related on every close path.
+        try:
+            return str(auction.product.title)
+        except Exception:
+            return f'Auction #{auction.pk}'
 
     @classmethod
     def close_auction(cls, auction_id, *, source='manual'):
@@ -198,17 +232,22 @@ class BidService:
         return value
 
     @classmethod
+    def _current_highest_bid_row(cls, auction):
+        """Return the current highest Bid row under lock, or None."""
+        return (
+            Bid.objects.filter(auction=auction)
+            .order_by('-amount', 'timestamp')
+            .first()
+        )
+
+    @classmethod
     def _minimum_to_beat(cls, auction):
         """Derive the amount a new bid must exceed from Bid rows under lock.
 
         Falls back to ``starting_bid`` when no bids exist. Preferring Bid rows
         keeps increment checks consistent even if ``current_highest_bid`` drifts.
         """
-        highest = (
-            Bid.objects.filter(auction=auction)
-            .order_by('-amount', 'timestamp')
-            .first()
-        )
+        highest = cls._current_highest_bid_row(auction)
         if highest is not None:
             return highest.amount
         if auction.current_highest_bid and auction.current_highest_bid > 0:
@@ -251,7 +290,15 @@ class BidService:
             elif not auction.is_biddable(now):
                 reject_bid = True
             else:
-                minimum_to_beat = cls._minimum_to_beat(auction)
+                highest_row = cls._current_highest_bid_row(auction)
+                previous_bidder_id = (
+                    highest_row.bidder_id if highest_row is not None else None
+                )
+                minimum_to_beat = (
+                    highest_row.amount
+                    if highest_row is not None
+                    else cls._minimum_to_beat(auction)
+                )
 
                 if amount <= minimum_to_beat:
                     raise ValidationError(
@@ -279,6 +326,18 @@ class BidService:
                 from .realtime import schedule_bid_accepted_broadcast
 
                 schedule_bid_accepted_broadcast(bid, auction)
+
+                product_title = AuctionLifecycleService._product_title(auction)
+                from notifications.services import schedule_bid_placed_notifications
+
+                schedule_bid_placed_notifications(
+                    auction_id=auction.pk,
+                    bidder_id=bidder.pk,
+                    seller_id=auction.product.seller_id,
+                    previous_bidder_id=previous_bidder_id,
+                    amount=amount,
+                    product_title=product_title,
+                )
 
         if reject_bid:
             raise ValidationError('Auction is not active.')
