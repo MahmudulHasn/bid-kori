@@ -106,6 +106,7 @@ describe('auction deep links', () => {
     );
     assert.equal(getNotificationAuctionHref('BUYER', null), null);
     assert.equal(getNotificationAuctionHref('SELLER', null), null);
+    assert.equal(getNotificationAuctionHref('ADMIN', 42), null);
   });
 });
 

@@ -5,6 +5,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 
 import WorkspaceHeader from '@/components/layout/WorkspaceHeader';
 import WorkspaceSidebar from '@/components/layout/WorkspaceSidebar';
+import NotificationRealtimeBridge from '@/components/notifications/NotificationRealtimeBridge';
 import { getWorkspaceConfig } from '@/lib/workspaceNavigation';
 import type { UserRole } from '@/lib/types';
 
@@ -68,6 +69,9 @@ export default function RoleWorkspaceLayout({
           menuOpen={mobileNavOpen}
           onMenuToggle={() => setMobileNavOpen((open) => !open)}
         />
+        {role === 'BUYER' || role === 'SELLER' ? (
+          <NotificationRealtimeBridge role={role} />
+        ) : null}
         <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 sm:px-6">
           {children}
         </main>

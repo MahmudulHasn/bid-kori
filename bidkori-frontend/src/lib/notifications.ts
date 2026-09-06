@@ -1,6 +1,6 @@
 /**
- * Pure notification helpers and types for NT-F01 inbox UX.
- * REST is the source of truth; no WebSocket client in this phase.
+ * Pure notification helpers and types for inbox + live push UX.
+ * REST remains source of truth; WebSocket delivers notification.created.
  */
 
 import type { UserRole } from './types.ts';
@@ -91,10 +91,13 @@ export function getNotificationAuctionHref(
   if (auctionId == null || !Number.isFinite(auctionId) || auctionId <= 0) {
     return null;
   }
+  if (role === 'BUYER') {
+    return MARKETPLACE_ROUTES.auctionDetail(auctionId);
+  }
   if (role === 'SELLER') {
     return sellerAuctionDetailPath(auctionId);
   }
-  return MARKETPLACE_ROUTES.auctionDetail(auctionId);
+  return null;
 }
 
 /** True when the loaded page contains at least one unread row. */
