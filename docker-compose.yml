@@ -1,6 +1,9 @@
 # Local / developer Docker stack.
 # Requires a root `.env` (copy from `.env.example`) with SECRET_KEY and POSTGRES_PASSWORD.
 # Compose does not embed production secrets; values are substituted from the environment.
+#
+# Real-time bid broadcasts use Django Channels + Redis (REDIS_URL).
+# WebSockets require the ASGI server (Daphne), not gunicorn/WSGI.
 
 services:
   db:
@@ -25,14 +28,28 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    container_name: bidkori_redis
+    ports:
+      - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   web:
     build: .
     container_name: bidkori_web
-    command: sh -c "python manage.py migrate && gunicorn config.wsgi:application --bind 0.0.0.0:8000"
+    command: >-
+      sh -c "python manage.py migrate &&
+      daphne -b 0.0.0.0 -p 8000 config.asgi:application"
     ports:
       - "8000:8000"
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgres://${POSTGRES_USER:-bidkori_user}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-bidkori}}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in .env}
       DEBUG: ${DEBUG:-True}
       ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1,web}
@@ -41,6 +58,8 @@ services:
       EMAIL_BACKEND: ${EMAIL_BACKEND:-django.core.mail.backends.console.EmailBackend}
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     volumes:
       - media_data:/app/media

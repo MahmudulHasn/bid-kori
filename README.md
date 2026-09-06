@@ -14,14 +14,15 @@ BidKori handles product catalogs, authenticated buyer/seller workflows, atomic l
 
 | Layer | Technology |
 | --- | --- |
-| Framework | Django, Django REST Framework |
+| Framework | Django, Django REST Framework, Django Channels |
 | Database | PostgreSQL 15 |
+| Real-time | Redis 7 (Channels channel layer) + Daphne ASGI |
 | Containers | Docker & Docker Compose |
 | Static files | WhiteNoise |
 | API docs | drf-spectacular (OpenAPI 3.0) — Swagger UI & ReDoc |
 | Media | Pillow (`ImageField` uploads) |
 | Auth | DRF Token Authentication |
-| Supporting | `django-cors-headers`, `python-dotenv`, `dj-database-url`, `psycopg2-binary`, `gunicorn`, `requests` |
+| Supporting | `django-cors-headers`, `python-dotenv`, `dj-database-url`, `psycopg2-binary`, `gunicorn` (optional WSGI), `daphne`, `channels`, `channels-redis`, `requests` |
 
 ### Frontend (`bidkori-frontend/`)
 
@@ -77,9 +78,20 @@ docker compose exec web python manage.py seed_data
 docker compose exec web python manage.py createsuperuser
 ```
 
+Services:
+
+| Service | Role |
+| --- | --- |
+| `db` | PostgreSQL |
+| `redis` | Channels channel layer (required for live `bid.accepted` WebSocket broadcasts) |
+| `web` | Django ASGI via **Daphne** (`config.asgi:application`) — HTTP + WebSockets |
+
 API: [http://127.0.0.1:8000/](http://127.0.0.1:8000/)  
+WebSocket (auction room): `ws://127.0.0.1:8000/ws/auctions/<auction_id>/`  
 Swagger: [http://127.0.0.1:8000/api/schema/swagger-ui/](http://127.0.0.1:8000/api/schema/swagger-ui/)  
 Admin: [http://127.0.0.1:8000/admin/](http://127.0.0.1:8000/admin/)
+
+**Real-time note:** Bids are still placed only via REST `POST /api/auctions/<id>/place-bid/`. WebSockets are **subscribe/broadcast only** (`bid.accepted` after a successful commit). Production must use Redis (`REDIS_URL`); the test suite uses an in-memory channel layer and does not need Redis.
 
 Useful commands:
 
@@ -97,11 +109,15 @@ cd G:\bid-kori
 python -m venv venv
 .\venv\Scripts\Activate.ps1
 pip install -r requirements.txt
+# Start Redis locally (required for live WebSocket broadcasts outside tests), e.g.:
+#   docker run --rm -p 6379:6379 redis:7-alpine
+# Ensure `.env` includes REDIS_URL=redis://127.0.0.1:6379/0
 python manage.py migrate
 python manage.py seed_data
 python manage.py runserver
 ```
 
+`runserver` uses Daphne/Channels (ASGI) when `daphne` is installed.  
 Optional Postgres via `.env` / `DATABASE_URL` (used automatically by `dj-database-url`).
 
 ### C. Next.js frontend
@@ -115,6 +131,7 @@ npm run dev
 Frontend: [http://localhost:3000/](http://localhost:3000/)  
 Ensure the Django API is reachable at `http://127.0.0.1:8000`.
 
+**Local real-time stack:** PostgreSQL (or SQLite) + **Redis** + Django ASGI (`runserver` / Daphne) + Next.js. Celery is not required yet. The frontend still polls auction detail (~3s) until a WebSocket client is added in a later phase.
 ---
 
 ## API Endpoint Reference (selected)
@@ -126,7 +143,8 @@ Ensure the Django API is reachable at `http://127.0.0.1:8000`.
 | `GET` | `/api/auctions/` | List auctions (`status`, `category`, `search` filters) |
 | `POST` | `/api/auctions/` | Create auction (JSON or multipart + images) |
 | `POST` | `/api/auctions/<id>/images/` | Upload auction images |
-| `POST` | `/api/auctions/<id>/place-bid/` | Place bid (atomic + rate limited) |
+| `POST` | `/api/auctions/<id>/place-bid/` | Place bid (atomic + rate limited; broadcasts `bid.accepted` after commit) |
+| `WS` | `/ws/auctions/<id>/` | Subscribe to live `bid.accepted` events (read-only; no bid submission) |
 | `POST` | `/api/auctions/<id>/checkout/` | Winner mock payment checkout |
 | `GET` | `/api/auctions/my-bids/` | Buyer bid dashboard data |
 | `GET` | `/api/schema/swagger-ui/` | Interactive OpenAPI docs |

@@ -143,16 +143,15 @@ export type RecentBidDisplayRow = {
 };
 
 /**
- * Most recent first for dashboard "Recent Bid Activity".
- * Backend history is chronological; reverse copy without mutating source.
+ * Dashboard "Recent Bid Activity": newest first, at most `limit` rows.
+ * Backend `bid_escalation_history` is already newest-first — preserve order.
+ * Does not mutate the source array.
  */
 export function mapRecentBidActivity(
   rows: readonly AdminBidEscalationRow[],
   limit = 12,
 ): RecentBidDisplayRow[] {
-  const copy = rows.slice();
-  copy.reverse();
-  return copy.slice(0, limit).map((row) => ({
+  return rows.slice(0, limit).map((row) => ({
     bidId: row.bid_id,
     auctionId: row.auction_id,
     amount: formatAdminMoney(row.amount),

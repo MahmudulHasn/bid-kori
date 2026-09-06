@@ -80,12 +80,15 @@ if '*' in ALLOWED_HOSTS and not DEBUG:
 # ---------------------------------------------------------------------------
 
 INSTALLED_APPS = [
+    # Daphne must be listed before django.contrib.staticfiles for `runserver` ASGI.
+    'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'channels',
     'rest_framework',
     'corsheaders',
     'rest_framework.authtoken',
@@ -125,6 +128,32 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'config.wsgi.application'
+ASGI_APPLICATION = 'config.asgi.application'
+
+
+# ---------------------------------------------------------------------------
+# Django Channels — Redis in real environments; in-memory for tests only
+# ---------------------------------------------------------------------------
+
+# Live bid broadcasts require Redis when not running the test suite.
+# Production must set REDIS_URL (never rely on InMemoryChannelLayer).
+REDIS_URL = os.getenv('REDIS_URL', 'redis://127.0.0.1:6379/0').strip()
+
+if RUNNING_TESTS:
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels.layers.InMemoryChannelLayer',
+        }
+    }
+else:
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels_redis.core.RedisChannelLayer',
+            'CONFIG': {
+                'hosts': [REDIS_URL],
+            },
+        }
+    }
 
 
 # ---------------------------------------------------------------------------

@@ -111,21 +111,22 @@ test('top active bidders map username/count/amount without user routes', () => {
   }
 });
 
-test('bid escalation maps auction deep links and sample semantics', () => {
+test('bid escalation preserves newest-first sample and does not mutate', () => {
+  // Backend contract: newest-first
   const source = [
-    {
-      bid_id: 1,
-      auction_id: 7,
-      amount: '10.00',
-      timestamp: '2026-01-01T00:00:00Z',
-      bidder_username: 'a',
-    },
     {
       bid_id: 2,
       auction_id: 8,
       amount: '20.00',
       timestamp: '2026-01-02T00:00:00Z',
       bidder_username: 'b',
+    },
+    {
+      bid_id: 1,
+      auction_id: 7,
+      amount: '10.00',
+      timestamp: '2026-01-01T00:00:00Z',
+      bidder_username: 'a',
     },
   ];
   const frozen = source.map((r) => ({ ...r }));
@@ -136,15 +137,29 @@ test('bid escalation maps auction deep links and sample semantics', () => {
   assert.equal(rows[0]?.bidderUsername, 'b');
   assert.match(rows[0]?.amount ?? '', /^৳/);
   assert.equal(rows[0]?.timestamp, '2026-01-02T00:00:00Z');
+  assert.equal(rows[1]?.bidId, 1);
+  assert.equal(rows[1]?.timestamp, '2026-01-01T00:00:00Z');
   assert.equal(adminAuctionDetailPath(rows[0]!.auctionId), '/admin/auctions/8');
   assert.deepEqual(source, frozen);
-  assert.match(ANALYTICS_ESCALATION_SAMPLE_HINT.toLowerCase(), /sample|100/);
-  assert.doesNotMatch(ANALYTICS_ESCALATION_SAMPLE_HINT, /all bids|complete ledger/i);
+  assert.equal(source[0]?.bid_id, 2);
   assert.deepEqual(mapAdminAnalyticsEscalationRows([]), []);
   for (const row of rows) {
     assert.equal('actions' in row, false);
     assert.equal('canDelete' in row, false);
   }
+});
+
+test('escalation sample copy is newest/capped and not oldest-first or complete ledger', () => {
+  assert.match(ANALYTICS_ESCALATION_SAMPLE_HINT.toLowerCase(), /sample|100|newest|recent/);
+  assert.doesNotMatch(ANALYTICS_ESCALATION_SAMPLE_HINT, /oldest-first|oldest first/i);
+  assert.doesNotMatch(
+    ANALYTICS_ESCALATION_SAMPLE_HINT,
+    /all bids|complete global bid ledger is shown|complete ledger\./i,
+  );
+  assert.match(
+    ANALYTICS_ESCALATION_SAMPLE_HINT.toLowerCase(),
+    /capped|not the complete/,
+  );
 });
 
 test('normalizeAdminAnalytics tolerates empty collections', () => {

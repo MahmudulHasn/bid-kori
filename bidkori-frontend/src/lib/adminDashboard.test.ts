@@ -184,28 +184,35 @@ test('category snapshot and top bidder mapping', () => {
   assert.match(top[0]?.totalBidAmount ?? '', /^৳/);
 });
 
-test('recent bid activity reverses chronological sample without mutating', () => {
-  const rows = [
-    {
-      bid_id: 1,
+test('recent bid activity preserves newest-first order and takes first 12', () => {
+  const rows = Array.from({ length: 15 }, (_, index) => {
+    const n = 15 - index; // newest first: 15, 14, … 1
+    return {
+      bid_id: n,
       auction_id: 1,
-      amount: '10',
-      timestamp: '2026-01-01T00:00:00Z',
-      bidder_username: 'a',
-    },
-    {
-      bid_id: 2,
-      auction_id: 1,
-      amount: '20',
-      timestamp: '2026-01-02T00:00:00Z',
-      bidder_username: 'b',
-    },
-  ];
+      amount: String(n * 10),
+      timestamp: `2026-01-${String(n).padStart(2, '0')}T00:00:00Z`,
+      bidder_username: `u${n}`,
+    };
+  });
   const frozen = rows.map((r) => ({ ...r }));
-  const recent = mapRecentBidActivity(rows, 1);
-  assert.equal(recent.length, 1);
-  assert.equal(recent[0]?.bidId, 2);
+
+  const recent = mapRecentBidActivity(rows);
+  assert.equal(recent.length, 12);
+  assert.equal(recent[0]?.bidId, 15);
+  assert.equal(recent[0]?.bidderUsername, 'u15');
+  assert.equal(recent[11]?.bidId, 4);
+  assert.equal(
+    recent.some((row) => row.bidId <= 3),
+    false,
+  );
+
+  const limited = mapRecentBidActivity(rows, 1);
+  assert.equal(limited.length, 1);
+  assert.equal(limited[0]?.bidId, 15);
+
   assert.deepEqual(rows, frozen);
+  assert.equal(rows[0]?.bid_id, 15);
 });
 
 test('partial failure leaves catalog metrics when analytics missing', () => {

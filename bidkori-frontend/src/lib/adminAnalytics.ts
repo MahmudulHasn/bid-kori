@@ -22,7 +22,7 @@ export const ANALYTICS_PAGE_VOLUME_HINT =
   'Sum of bid activity reported by the analytics API; this is not platform revenue.';
 
 export const ANALYTICS_ESCALATION_SAMPLE_HINT =
-  'Recent analytics sample (the API returns up to about 100 bids, oldest-first; shown newest-first here).';
+  'Newest bid activity sample (up to 100 bids). This is a capped analytics sample, not the complete global bid ledger.';
 
 export const ADMIN_ANALYTICS_READ_METHODS = ['GET'] as const;
 
@@ -130,15 +130,13 @@ export type AdminAnalyticsEscalationDisplayRow = {
 };
 
 /**
- * Full escalation sample for Analytics page (newest first).
- * Does not mutate the source array.
+ * Full escalation sample for Analytics page.
+ * Backend order is newest-first — preserve it; do not reverse or mutate.
  */
 export function mapAdminAnalyticsEscalationRows(
   rows: readonly AdminBidEscalationRow[],
 ): AdminAnalyticsEscalationDisplayRow[] {
-  const copy = rows.slice();
-  copy.reverse();
-  return copy.map((row) => ({
+  return rows.map((row) => ({
     bidId: row.bid_id,
     auctionId: row.auction_id,
     amount: formatMoneyLike(row.amount),

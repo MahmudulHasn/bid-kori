@@ -268,6 +268,12 @@ class BidService:
                 auction.current_highest_bid = amount
                 # Do not set winning_bidder here — final winner is assigned at close.
                 auction.save(update_fields=['current_highest_bid'])
+                # Attach bidder for payload (same in-memory user used for create).
+                bid.bidder = bidder
+                # Broadcast only after this atomic block commits successfully.
+                from .realtime import schedule_bid_accepted_broadcast
+
+                schedule_bid_accepted_broadcast(bid, auction)
 
         if reject_bid:
             raise ValidationError('Auction is not active.')
