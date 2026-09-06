@@ -1,5 +1,6 @@
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError, transaction
+from django.utils import timezone
 from rest_framework import serializers
 
 from products.models import Product
@@ -14,7 +15,6 @@ from .mutation_policy import (
     PROTECTED_CONFIGURATION_FIELDS,
     AuctionMutationPolicy,
 )
-
 
 class ProductSerializer(serializers.ModelSerializer):
     """Serializes the core details of a product listing.
@@ -80,6 +80,15 @@ class AuctionSerializer(serializers.ModelSerializer):
         write_only=True,
     )
 
+    # Response-only clock for client countdown offset (RT-B03). Not a model field.
+    server_time = serializers.SerializerMethodField(
+        help_text=(
+            'Authoritative server timestamp (timezone-aware ISO-8601) at '
+            'response generation. Use with end_time for countdown sync; '
+            'not writable and not persisted.'
+        ),
+    )
+
     class Meta:
         model = Auction
         fields = [
@@ -97,6 +106,7 @@ class AuctionSerializer(serializers.ModelSerializer):
             'is_paid',
             'images',
             'uploaded_images',
+            'server_time',
         ]
         read_only_fields = [
             'current_highest_bid',
@@ -105,7 +115,12 @@ class AuctionSerializer(serializers.ModelSerializer):
             'is_paid',
             # Featured placement is a platform capability (Django admin / staff).
             'is_featured',
+            'server_time',
         ]
+
+    def get_server_time(self, obj):
+        """Return timezone.now() at serialization — zero DB work."""
+        return timezone.now()
 
     def validate_starting_bid(self, value):
         if value <= 0:

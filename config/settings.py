@@ -96,6 +96,7 @@ INSTALLED_APPS = [
     'products',
     'auctions',
     'users',
+    'notifications',
 ]
 
 MIDDLEWARE = [

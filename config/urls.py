@@ -22,6 +22,7 @@ def api_root(request):
             "login": "/api/users/login/",
             "logout": "/api/users/logout/",
             "me": "/api/users/me/",
+            "notifications": "/api/notifications/",
             "schema": "/api/schema/",
             "swagger": "/api/schema/swagger-ui/",
             "redoc": "/api/schema/redoc/",
@@ -34,6 +35,7 @@ urlpatterns = [
     path('api/products/', include('products.urls')),
     path('api/auctions/', include('auctions.urls')),
     path('api/users/', include('users.urls')),
+    path('api/notifications/', include('notifications.urls')),
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path(
         'api/schema/swagger-ui/',

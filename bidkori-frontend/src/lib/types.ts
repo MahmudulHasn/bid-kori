@@ -55,6 +55,12 @@ export type Auction = {
   min_increment?: string | number;
   end_time?: string;
   start_time?: string;
+  /**
+   * Authoritative backend clock at response generation (RT-B03).
+   * Present on AuctionSerializer responses (detail/list); may be absent on
+   * some alternate payloads (e.g. active-list detail serializer).
+   */
+  server_time?: string;
   status?: string;
   is_paid?: boolean;
   is_featured?: boolean;

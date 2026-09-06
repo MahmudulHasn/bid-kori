@@ -101,8 +101,11 @@ export default function AuctionDetailPage() {
     onReconnect: handleRealtimeReconnect,
   });
 
-  const timer = useAuctionTimer(auction?.end_time);
-  /** Local timer may hit zero before Beat closes; do not invent CLOSED status. */
+  const timer = useAuctionTimer(auction?.end_time, auction?.server_time, {
+    forceExpired:
+      auction?.status === 'CLOSED' || auction?.status === 'CANCELLED',
+  });
+  /** Local/server-adjusted timer may hit zero before Beat closes; do not invent CLOSED. */
   const biddingUnavailable =
     timer.isClosed ||
     auction?.status === 'CLOSED' ||

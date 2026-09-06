@@ -224,6 +224,160 @@ class AuctionAuthorizationTests(APITestCase):
         self.assertEqual(auction.images.count(), 0)
 
 
+class AuctionServerTimeContractTests(APITestCase):
+    """RT-B03: authoritative server_time on Auction detail (and shared serializer)."""
+
+    def setUp(self):
+        self.seller = User.objects.create_user(
+            username='server_time_seller',
+            email='server_time_seller@test.com',
+            password='pass12345',
+        )
+        now = timezone.now()
+        self.product = Product.objects.create(
+            seller=self.seller,
+            title='Server Time Lot',
+            description='Desc',
+        )
+        self.auction = Auction.objects.create(
+            product=self.product,
+            starting_bid=100,
+            current_highest_bid=100,
+            min_increment=10,
+            start_time=now - timedelta(hours=1),
+            end_time=now + timedelta(days=1),
+            status=Auction.Status.ACTIVE,
+        )
+
+    def _parse_server_time(self, raw):
+        from datetime import datetime
+
+        if isinstance(raw, datetime):
+            return raw
+        text = str(raw).replace('Z', '+00:00')
+        return datetime.fromisoformat(text)
+
+    def test_retrieve_includes_server_time_iso_timezone_aware(self):
+        before = timezone.now()
+        response = self.client.get(f'/api/auctions/{self.auction.pk}/')
+        after = timezone.now()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('server_time', response.data)
+
+        parsed = self._parse_server_time(response.data['server_time'])
+        if timezone.is_naive(parsed):
+            self.fail('server_time must be timezone-aware')
+        self.assertIsNotNone(parsed.tzinfo)
+        self.assertGreaterEqual(parsed, before - timedelta(seconds=2))
+        self.assertLessEqual(parsed, after + timedelta(seconds=2))
+
+    def test_server_time_is_fresh_across_requests(self):
+        first = self.client.get(f'/api/auctions/{self.auction.pk}/')
+        second = self.client.get(f'/api/auctions/{self.auction.pk}/')
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(second.status_code, 200)
+
+        p1 = self._parse_server_time(first.data['server_time'])
+        p2 = self._parse_server_time(second.data['server_time'])
+        self.assertGreaterEqual(p2, p1)
+
+    def test_server_time_does_not_mutate_auction_row(self):
+        self.auction.refresh_from_db()
+        before = {
+            'created_at': self.auction.created_at,
+            'status': self.auction.status,
+            'end_time': self.auction.end_time,
+            'current_highest_bid': self.auction.current_highest_bid,
+            'starting_bid': self.auction.starting_bid,
+            'is_paid': self.auction.is_paid,
+            'is_featured': self.auction.is_featured,
+            'winning_bidder_id': self.auction.winning_bidder_id,
+        }
+
+        response = self.client.get(f'/api/auctions/{self.auction.pk}/')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('server_time', response.data)
+
+        self.auction.refresh_from_db()
+        self.assertEqual(self.auction.created_at, before['created_at'])
+        self.assertEqual(self.auction.status, before['status'])
+        self.assertEqual(self.auction.end_time, before['end_time'])
+        self.assertEqual(
+            self.auction.current_highest_bid,
+            before['current_highest_bid'],
+        )
+        self.assertEqual(self.auction.starting_bid, before['starting_bid'])
+        self.assertEqual(self.auction.is_paid, before['is_paid'])
+        self.assertEqual(self.auction.is_featured, before['is_featured'])
+        self.assertEqual(
+            self.auction.winning_bidder_id,
+            before['winning_bidder_id'],
+        )
+
+    def test_server_time_not_writable_via_patch(self):
+        # Pre-start auction so configuration PATCH is allowed by mutation policy.
+        now = timezone.now()
+        future = Auction.objects.create(
+            product=Product.objects.create(
+                seller=self.seller,
+                title='Future Server Time Lot',
+                description='Desc',
+            ),
+            starting_bid=100,
+            current_highest_bid=100,
+            min_increment=10,
+            start_time=now + timedelta(hours=1),
+            end_time=now + timedelta(days=1),
+            status=Auction.Status.ACTIVE,
+        )
+        token = Token.objects.create(user=self.seller)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {token.key}')
+        forged = (timezone.now() - timedelta(days=365)).isoformat()
+        response = self.client.patch(
+            f'/api/auctions/{future.pk}/',
+            {'server_time': forged, 'min_increment': '15.00'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('server_time', response.data)
+        parsed = self._parse_server_time(response.data['server_time'])
+        self.assertGreater(parsed, timezone.now() - timedelta(minutes=1))
+        self.assertNotEqual(str(response.data['server_time']), forged)
+        future.refresh_from_db()
+        self.assertEqual(float(future.min_increment), 15.0)
+
+    def test_detail_keeps_core_fields_and_hides_reserve(self):
+        self.auction.reserve_price = 500
+        self.auction.save(update_fields=['reserve_price'])
+        response = self.client.get(f'/api/auctions/{self.auction.pk}/')
+        self.assertEqual(response.status_code, 200)
+        for key in (
+            'status',
+            'start_time',
+            'end_time',
+            'current_highest_bid',
+            'winning_bidder',
+            'is_paid',
+            'is_featured',
+            'images',
+            'server_time',
+        ):
+            self.assertIn(key, response.data)
+        self.assertNotIn('reserve_price', response.data)
+
+    def test_list_may_include_server_time_without_db_side_effects(self):
+        """Shared AuctionSerializer may emit server_time on list rows (zero DB cost)."""
+        before = self.auction.created_at
+        response = self.client.get('/api/auctions/')
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(len(response.data) >= 1)
+        row = next(r for r in response.data if r['id'] == self.auction.pk)
+        self.assertIn('server_time', row)
+        self.auction.refresh_from_db()
+        self.assertEqual(self.auction.created_at, before)
+
+
 class AnalyticsAuthorizationTests(APITestCase):
     """Staff-only access for analytics API and dashboard."""
 

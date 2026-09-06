@@ -34,7 +34,10 @@ export default function AuctionCard({ auction }: AuctionCardProps) {
   const title = getAuctionTitle(auction);
   const imageUrl = resolveMediaUrl(auction.images?.[0]?.image);
   const price = getAuctionPriceLabel(auction);
-  const timer = useAuctionTimer(auction.end_time);
+  const timer = useAuctionTimer(auction.end_time, auction.server_time, {
+    forceExpired:
+      auction.status === 'CLOSED' || auction.status === 'CANCELLED',
+  });
   const statusLabel = formatAuctionStatus(auction.status);
   const closed =
     timer.isClosed ||

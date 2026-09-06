@@ -53,6 +53,7 @@ BidKori handles product catalogs, authenticated buyer/seller workflows, atomic l
 - **`products`** — Product listings, categories, seller catalog endpoints
 - **`auctions`** — Auction lifecycle, bidding engine, media, payments, analytics
 - **`users`** — Registration, login, authenticated profile (`/me/`)
+- **`notifications`** — Persistent in-app inbox (list / read / read-all); server-created only
 - **`bidkori-frontend`** — Next.js App Router client for marketplace UX
 
 ---
@@ -171,6 +172,9 @@ Ensure the Django API is reachable at `http://127.0.0.1:8000`.
 | `WS` | `/ws/auctions/<id>/` | Subscribe to live `bid.accepted` / `auction.closed` events (read-only; no bid submission) |
 | `POST` | `/api/auctions/<id>/checkout/` | Winner mock payment checkout |
 | `GET` | `/api/auctions/my-bids/` | Buyer bid dashboard data |
+| `GET` | `/api/notifications/` | Authenticated user's notifications (paginated, newest first) |
+| `POST` | `/api/notifications/<id>/read/` | Mark one own notification read |
+| `POST` | `/api/notifications/read-all/` | Mark all own notifications read |
 | `GET` | `/api/schema/swagger-ui/` | Interactive OpenAPI docs |
 
 Auth header:
