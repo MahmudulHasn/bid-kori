@@ -1,9 +1,12 @@
 """
-Authoritative in-app notification creation (NT-B02).
+Authoritative in-app notification creation (NT-B02) + live push (NT-B03).
 
 Persistent Notification rows are the source of truth. Creation is scheduled via
 ``transaction.on_commit`` from bid/close domain services so rolled-back
 transactions never leave orphan rows, and failures never affect auction state.
+
+After a row is persisted, best-effort Channels push delivers
+``notification.created`` to ``user_<id>``. Push failure never deletes the row.
 """
 
 from __future__ import annotations
@@ -15,6 +18,7 @@ from typing import Iterable
 from django.db import transaction
 
 from .models import Notification
+from .realtime import broadcast_notification_created
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +41,22 @@ def _safe_create(**kwargs) -> Notification | None:
         return None
 
 
+def _safe_create_and_push(**kwargs) -> Notification | None:
+    """Persist then best-effort push. Push never undoes persistence."""
+    notification = _safe_create(**kwargs)
+    if notification is not None:
+        try:
+            broadcast_notification_created(notification)
+        except Exception:
+            logger.exception(
+                'notification.created push raised after persist '
+                'notification_id=%s user_id=%s',
+                notification.pk,
+                notification.user_id,
+            )
+    return notification
+
+
 class NotificationService:
     """Create durable inbox rows for MVP auction notification types."""
 
@@ -52,7 +72,7 @@ class NotificationService:
         message = (
             f'Another bidder placed a higher bid on {product_title}.'
         )
-        return _safe_create(
+        return _safe_create_and_push(
             user_id=user_id,
             type=Notification.Type.OUTBID,
             title=title,
@@ -74,7 +94,7 @@ class NotificationService:
         message = (
             f'A new bid of {_format_money(amount)} was placed on {product_title}.'
         )
-        return _safe_create(
+        return _safe_create_and_push(
             user_id=seller_id,
             type=Notification.Type.SELLER_NEW_BID,
             title=title,
@@ -92,7 +112,7 @@ class NotificationService:
         product_title: str,
         final_amount: Decimal | str | int | float,
     ) -> Notification | None:
-        """Idempotent for (user, AUCTION_WON, auction)."""
+        """Idempotent for (user, AUCTION_WON, auction). Push only on first create."""
         existing = Notification.objects.filter(
             user_id=user_id,
             type=Notification.Type.AUCTION_WON,
@@ -106,7 +126,7 @@ class NotificationService:
             f'You won {product_title} with a final bid of '
             f'{_format_money(final_amount)}.'
         )
-        return _safe_create(
+        return _safe_create_and_push(
             user_id=user_id,
             type=Notification.Type.AUCTION_WON,
             title=title,
@@ -125,7 +145,8 @@ class NotificationService:
     ) -> int:
         """Create one AUCTION_LOST per unique loser; skip existing rows.
 
-        Returns the number of newly created rows.
+        Returns the number of newly created rows. Each new row is pushed to
+        that loser's private group only.
         """
         unique_ids = sorted({int(uid) for uid in loser_user_ids if uid is not None})
         if not unique_ids:
@@ -153,8 +174,7 @@ class NotificationService:
         if not to_create:
             return 0
         try:
-            Notification.objects.bulk_create(to_create)
-            return len(to_create)
+            created = Notification.objects.bulk_create(to_create)
         except Exception:
             logger.exception(
                 'Failed to bulk-create AUCTION_LOST notifications '
@@ -163,6 +183,18 @@ class NotificationService:
                 len(to_create),
             )
             return 0
+
+        for note in created:
+            try:
+                broadcast_notification_created(note)
+            except Exception:
+                logger.exception(
+                    'AUCTION_LOST push raised after persist '
+                    'notification_id=%s user_id=%s',
+                    getattr(note, 'pk', None),
+                    getattr(note, 'user_id', None),
+                )
+        return len(created)
 
     @classmethod
     def notify_after_successful_bid(

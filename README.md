@@ -170,6 +170,7 @@ Ensure the Django API is reachable at `http://127.0.0.1:8000`.
 | `POST` | `/api/auctions/<id>/images/` | Upload auction images |
 | `POST` | `/api/auctions/<id>/place-bid/` | Place bid (atomic + rate limited; broadcasts `bid.accepted` after commit) |
 | `WS` | `/ws/auctions/<id>/` | Subscribe to live `bid.accepted` / `auction.closed` events (read-only; no bid submission) |
+| `WS` | `/ws/notifications/` | Authenticated private inbox push (`notification.created`); first message auth with DRF token (no token in URL) |
 | `POST` | `/api/auctions/<id>/checkout/` | Winner mock payment checkout |
 | `GET` | `/api/auctions/my-bids/` | Buyer bid dashboard data |
 | `GET` | `/api/notifications/` | Authenticated user's notifications (paginated, newest first) |
@@ -182,6 +183,17 @@ Auth header:
 ```http
 Authorization: Token <your-token>
 ```
+
+### Notification WebSocket handshake
+
+```text
+1. Connect to /ws/notifications/  (no query token)
+2. Send: {"type": "authenticate", "token": "<your-drf-token>"}
+3. Receive: {"type": "authenticated", "user_id": <id>}
+4. Receive live: {"type": "notification.created", "notification": {...}}
+```
+
+Read / read-all remain REST-only. Offline users recover via `GET /api/notifications/`.
 
 ---
 
