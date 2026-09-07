@@ -4,6 +4,7 @@ import { Toaster } from 'react-hot-toast';
 import type { ReactNode } from 'react';
 
 import Navbar from '@/components/Navbar';
+import SupportChatHost from '@/components/support/SupportChatHost';
 import { AuthProvider } from '@/context/AuthContext';
 import './globals.css';
 
@@ -32,6 +33,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <AuthProvider>
           <Navbar />
           {children}
+          <SupportChatHost />
           <Toaster position="top-right" />
         </AuthProvider>
       </body>
