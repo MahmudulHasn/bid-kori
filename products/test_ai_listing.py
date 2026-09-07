@@ -239,11 +239,13 @@ class ProductAIListingAPITests(APITestCase):
         self.assertIsNone(mock_generate.call_args.kwargs['category_name'])
 
     def test_nonexistent_category_rejected(self):
-        response = self._post(
-            token=self.seller_token,
-            files=self._valid_payload(category='999999'),
-        )
+        with patch.object(AIListingService, '_call_provider') as mock_call:
+            response = self._post(
+                token=self.seller_token,
+                files=self._valid_payload(category='999999'),
+            )
         self.assertEqual(response.status_code, 400)
+        mock_call.assert_not_called()
 
     # --- Image validation ---
 
@@ -271,11 +273,13 @@ class ProductAIListingAPITests(APITestCase):
             b'this is not an image payload',
             content_type='image/png',
         )
-        response = self._post(
-            token=self.seller_token,
-            files={'title': 'Fake', 'image': fake},
-        )
+        with patch.object(AIListingService, '_call_provider') as mock_call:
+            response = self._post(
+                token=self.seller_token,
+                files={'title': 'Fake', 'image': fake},
+            )
         self.assertEqual(response.status_code, 400)
+        mock_call.assert_not_called()
 
     @override_settings(
         AI_API_KEY='test-ai-key-not-real',
@@ -564,3 +568,59 @@ class AIListingServiceUnitTests(APITestCase):
         self.assertIn('Electronics', text_part)
         self.assertEqual(content[1]['type'], 'input_image')
         self.assertTrue(content[1]['image_url'].startswith('data:image/'))
+
+    @override_settings(AI_API_KEY='test-key', AI_MODEL='gpt-test', AI_TIMEOUT_SECONDS=20)
+    def test_build_client_disables_sdk_retries_and_applies_timeout(self):
+        with patch('openai.OpenAI') as mock_openai:
+            mock_openai.return_value = MagicMock()
+            AIListingService._build_client()
+            kwargs = mock_openai.call_args.kwargs
+            self.assertEqual(kwargs['max_retries'], 0)
+            self.assertEqual(kwargs['timeout'], 20.0)
+            self.assertEqual(kwargs['api_key'], 'test-key')
+
+    def test_ai_image_reencode_strips_exif_and_uses_jpeg_data_url(self):
+        from products.ai_listing import encode_uploaded_image_as_data_url
+
+        buffer = BytesIO()
+        image = Image.new('RGB', (32, 32), color='green')
+        # Embed a recognizable EXIF UserComment-like payload via Pillow info is
+        # unreliable across formats; stamp raw JPEG APP1-ish bytes instead by
+        # saving then verifying re-encode drops GPS IFD marker patterns.
+        exif = image.getexif()
+        # 0x0001 is a generic tag; GPS IFD pointer is 0x8825 when present.
+        exif[0x010E] = 'AI-H01-EXIF-MARKER'
+        image.save(buffer, format='JPEG', exif=exif)
+        buffer.seek(0)
+        original = buffer.getvalue()
+        self.assertIn(b'AI-H01-EXIF-MARKER', original)
+
+        uploaded = SimpleUploadedFile(
+            'phone.jpg',
+            original,
+            content_type='image/jpeg',
+        )
+        data_url = encode_uploaded_image_as_data_url(uploaded)
+        self.assertTrue(data_url.startswith('data:image/jpeg;base64,'))
+        encoded = data_url.split(',', 1)[1]
+        import base64
+
+        sanitized = base64.b64decode(encoded)
+        self.assertNotIn(b'AI-H01-EXIF-MARKER', sanitized)
+        with Image.open(BytesIO(sanitized)) as out:
+            self.assertEqual(out.format, 'JPEG')
+            self.assertEqual(out.getexif().get(0x010E), None)
+
+    def test_gif_ai_input_uses_static_jpeg_first_frame(self):
+        from products.ai_listing import encode_uploaded_image_as_data_url
+
+        buffer = BytesIO()
+        frame = Image.new('RGB', (16, 16), color='blue')
+        frame.save(buffer, format='GIF')
+        uploaded = SimpleUploadedFile(
+            'anim.gif',
+            buffer.getvalue(),
+            content_type='image/gif',
+        )
+        data_url = encode_uploaded_image_as_data_url(uploaded)
+        self.assertTrue(data_url.startswith('data:image/jpeg;base64,'))

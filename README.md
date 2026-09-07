@@ -233,6 +233,8 @@ AI_TIMEOUT_SECONDS=20
 AI_LISTING_RATE=5/minute
 ```
 
+`AI_MODEL` must be a vision-capable model that accepts image input via the OpenAI Responses API. Leave key/model blank to boot without AI; generation then returns 503.
+
 ### Notification WebSocket handshake
 
 ```text

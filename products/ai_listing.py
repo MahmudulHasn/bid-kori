@@ -10,9 +10,10 @@ import base64
 import logging
 import time
 from dataclasses import dataclass
+from io import BytesIO
 
 from django.conf import settings
-from PIL import Image
+from PIL import Image, ImageOps
 
 logger = logging.getLogger(__name__)
 
@@ -31,14 +32,6 @@ AI_LISTING_EMPTY_MESSAGE = (
 AI_LISTING_RATE_LIMIT_MESSAGE = (
     'AI description generation is rate limited. Please try again shortly.'
 )
-
-PILLOW_FORMAT_TO_MIME = {
-    'JPEG': 'image/jpeg',
-    'JPG': 'image/jpeg',
-    'PNG': 'image/png',
-    'WEBP': 'image/webp',
-    'GIF': 'image/gif',
-}
 
 SERVER_INSTRUCTIONS = """You are helping a Seller draft an online marketplace Product description for BidKori.
 
@@ -136,26 +129,50 @@ def build_user_product_data_text(
 
 
 def encode_uploaded_image_as_data_url(uploaded_file) -> str:
-    """Read validated image bytes into a data URL for the provider."""
+    """Sanitize validated image bytes into a data URL for the provider.
+
+    AI-only preprocessing (does not mutate persisted ProductImage files):
+    - derive MIME from Pillow-validated content (not client Content-Type)
+    - apply EXIF orientation, then strip EXIF/GPS by re-encoding
+    - use the first frame only for animated GIF/WEBP
+    - seek-reset the upload so callers can re-read if needed
+    """
     if hasattr(uploaded_file, 'seek'):
         uploaded_file.seek(0)
 
-    with Image.open(uploaded_file) as image:
-        fmt = (image.format or 'JPEG').upper()
-        if fmt == 'JPG':
-            fmt = 'JPEG'
+    with Image.open(uploaded_file) as opened:
+        image = ImageOps.exif_transpose(opened)
+        # First frame only — avoid sending multi-frame GIF/WEBP to the provider.
+        try:
+            image.seek(0)
+        except EOFError:
+            pass
+        image = image.copy()
+        image.load()
+
+        if image.mode in ('RGBA', 'LA') or (
+            image.mode == 'P' and 'transparency' in image.info
+        ):
+            rgba = image.convert('RGBA')
+            background = Image.new('RGB', rgba.size, (255, 255, 255))
+            background.paste(rgba, mask=rgba.split()[-1])
+            image = background
+        else:
+            image = image.convert('RGB')
+
+        buffer = BytesIO()
+        # Re-encode without EXIF/IPTC — GPS and device metadata are not forwarded.
+        image.save(buffer, format='JPEG', quality=85, optimize=True)
+        raw = buffer.getvalue()
+
     if hasattr(uploaded_file, 'seek'):
         uploaded_file.seek(0)
 
-    mime = PILLOW_FORMAT_TO_MIME.get(fmt, 'image/jpeg')
-    raw = uploaded_file.read()
-    if hasattr(uploaded_file, 'seek'):
-        uploaded_file.seek(0)
     if not raw:
         raise AIListingProviderError('Uploaded image could not be read for AI.')
 
     encoded = base64.b64encode(raw).decode('ascii')
-    return f'data:{mime};base64,{encoded}'
+    return f'data:image/jpeg;base64,{encoded}'
 
 
 def clean_description_output(text: str) -> str:
@@ -228,12 +245,12 @@ class AIListingService:
                 int((time.monotonic() - started) * 1000),
             )
             return description
-        except AIListingError:
+        except AIListingError as exc:
             logger.info(
                 'AI listing generation failed user_id=%s duration_ms=%s error_class=%s',
                 user_id,
                 int((time.monotonic() - started) * 1000),
-                'ai_listing_error',
+                type(exc).__name__,
             )
             raise
         except Exception:
@@ -249,9 +266,11 @@ class AIListingService:
         from openai import OpenAI
 
         timeout = float(getattr(settings, 'AI_TIMEOUT_SECONDS', 20) or 20)
+        # One Generate click ≈ one provider attempt (no silent billable retries).
         return OpenAI(
             api_key=settings.AI_API_KEY,
             timeout=timeout,
+            max_retries=0,
         )
 
     @classmethod
