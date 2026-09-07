@@ -22,6 +22,8 @@ x-app-environment: &app-environment
   AI_MODEL: ${AI_MODEL:-}
   AI_TIMEOUT_SECONDS: ${AI_TIMEOUT_SECONDS:-20}
   AI_LISTING_RATE: ${AI_LISTING_RATE:-5/minute}
+  AI_CHAT_MODEL: ${AI_CHAT_MODEL:-}
+  AI_CHAT_RATE: ${AI_CHAT_RATE:-10/minute}
 
 services:
   db:

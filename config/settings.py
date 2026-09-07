@@ -97,6 +97,7 @@ INSTALLED_APPS = [
     'auctions',
     'users',
     'notifications',
+    'ai',
 ]
 
 MIDDLEWARE = [
@@ -297,6 +298,12 @@ AI_LISTING_RATE = os.getenv('AI_LISTING_RATE', '5/minute').strip() or '5/minute'
 AI_LISTING_MAX_OUTPUT_TOKENS = int(
     os.getenv('AI_LISTING_MAX_OUTPUT_TOKENS', '450') or '450'
 )
+# Support chatbot (AI-B02) — text-only model, separate from listing vision model.
+AI_CHAT_MODEL = os.getenv('AI_CHAT_MODEL', '').strip()
+AI_CHAT_RATE = os.getenv('AI_CHAT_RATE', '10/minute').strip() or '10/minute'
+AI_CHAT_MAX_OUTPUT_TOKENS = int(
+    os.getenv('AI_CHAT_MAX_OUTPUT_TOKENS', '400') or '400'
+)
 
 STORAGES = {
     'default': {
@@ -349,6 +356,7 @@ REST_FRAMEWORK = {
         'user': '1000/day',
         'bids': '10/minute',
         'ai_listing': AI_LISTING_RATE,
+        'ai_chat': AI_CHAT_RATE,
     },
     'EXCEPTION_HANDLER': 'config.exceptions.custom_exception_handler',
 }

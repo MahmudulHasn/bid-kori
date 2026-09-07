@@ -120,11 +120,13 @@ pip install -r requirements.txt
 # Ensure `.env` includes:
 #   REDIS_URL=redis://127.0.0.1:6379/0
 #   CELERY_BROKER_URL=redis://127.0.0.1:6379/1
-# Optional AI listing drafts (backend-only; leave blank to boot without AI):
+# Optional AI (backend-only; leave blank to boot without AI):
 #   AI_API_KEY=
 #   AI_MODEL=
 #   AI_TIMEOUT_SECONDS=20
 #   AI_LISTING_RATE=5/minute
+#   AI_CHAT_MODEL=
+#   AI_CHAT_RATE=10/minute
 python manage.py migrate
 python manage.py seed_data
 ```
@@ -176,6 +178,7 @@ Ensure the Django API is reachable at `http://127.0.0.1:8000`.
 | `GET` | `/api/products/` | List products (includes nested `images`) |
 | `POST` | `/api/products/` | Create product (JSON catalog fields; images via dedicated upload) |
 | `POST` | `/api/products/generate-description/` | Seller/Admin AI draft description (multipart title + image; no persistence) |
+| `POST` | `/api/ai/chat/` | Stateless BidKori support chat (`{ "message": "..." }` → `{ "answer": "..." }`) |
 | `GET` | `/api/products/<id>/images/` | List Product images (ordered by `uploaded_at`, `id`) |
 | `POST` | `/api/products/<id>/images/` | Upload Product images (multipart field `images`; owner; freeze-aware) |
 | `DELETE` | `/api/products/<id>/images/<image_id>/` | Delete Product image (owner; freeze-aware) |
@@ -234,6 +237,39 @@ AI_LISTING_RATE=5/minute
 ```
 
 `AI_MODEL` must be a vision-capable model that accepts image input via the OpenAI Responses API. Leave key/model blank to boot without AI; generation then returns 503.
+
+### BidKori support chatbot (stateless)
+
+`POST /api/ai/chat/`
+
+Request:
+
+```json
+{ "message": "How do I place a bid?" }
+```
+
+Success response:
+
+```json
+{ "answer": "..." }
+```
+
+- **Public** (`AllowAny`) — optional login only flavors Buyer/Seller navigation hints.
+- **Informational only** — no account-specific data, no marketplace search tools, no actions, no chat persistence.
+- **Throttle:** scoped `ai_chat` (default `10/minute`), independent of `ai_listing`.
+- One message in → one answer out. No conversation history/thread IDs.
+- Provider key stays **backend-only** (`AI_API_KEY`). Do not use `NEXT_PUBLIC_*`.
+
+Chat env (see `.env.example`):
+
+```text
+AI_API_KEY=
+AI_CHAT_MODEL=
+AI_CHAT_RATE=10/minute
+AI_TIMEOUT_SECONDS=20
+```
+
+Leave `AI_CHAT_MODEL` / `AI_API_KEY` blank to boot without chat; the endpoint then returns 503.
 
 ### Notification WebSocket handshake
 
