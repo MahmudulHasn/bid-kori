@@ -13,6 +13,26 @@ export type AuthUser = {
   is_staff: boolean;
 };
 
+/** Staff Admin user directory row from GET /admin/users/. */
+export type AdminUser = {
+  id: number;
+  username: string;
+  email: string;
+  role: UserRole;
+  is_active: boolean;
+  is_staff: boolean;
+  is_superuser: boolean;
+  date_joined: string;
+};
+
+/** DRF page payload for Admin Users list (page size 20). */
+export type PaginatedAdminUsers = {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: AdminUser[];
+};
+
 export type AuctionImage = {
   id: number;
   image: string;

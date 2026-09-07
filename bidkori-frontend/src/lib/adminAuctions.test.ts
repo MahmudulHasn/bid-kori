@@ -184,6 +184,7 @@ test('admin auctions navigation is enabled with nested active state', () => {
 
   for (const id of [
     'dashboard',
+    'users',
     'products',
     'auctions',
     'bids',
@@ -193,7 +194,7 @@ test('admin auctions navigation is enabled with nested active state', () => {
   ]) {
     assert.equal(admin.navItems.find((item) => item.id === id)?.enabled, true);
   }
-  for (const id of ['users', 'categories', 'reports']) {
+  for (const id of ['categories', 'reports']) {
     assert.equal(admin.navItems.find((item) => item.id === id)?.enabled, false);
   }
   assert.deepEqual(getWorkspaceAccountPaths('ADMIN'), {

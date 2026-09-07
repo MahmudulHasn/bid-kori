@@ -177,7 +177,7 @@ test('normalizeAdminAnalytics tolerates empty collections', () => {
   assert.equal(getAdminAnalyticsSummary(empty).categoriesRepresented, 0);
 });
 
-test('admin Analytics nav enabled; management routes stay disabled', () => {
+test('admin Analytics nav enabled; Categories/Reports stay disabled', () => {
   const admin = WORKSPACE_CONFIGS.ADMIN;
   const analytics = admin.navItems.find((item) => item.id === 'analytics');
   assert.equal(analytics?.enabled, true);
@@ -196,6 +196,7 @@ test('admin Analytics nav enabled; management routes stay disabled', () => {
 
   for (const id of [
     'dashboard',
+    'users',
     'products',
     'auctions',
     'bids',
@@ -205,7 +206,7 @@ test('admin Analytics nav enabled; management routes stay disabled', () => {
   ]) {
     assert.equal(admin.navItems.find((item) => item.id === id)?.enabled, true);
   }
-  for (const id of ['users', 'categories', 'reports']) {
+  for (const id of ['categories', 'reports']) {
     assert.equal(admin.navItems.find((item) => item.id === id)?.enabled, false);
   }
 });

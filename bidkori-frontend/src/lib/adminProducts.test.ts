@@ -146,6 +146,7 @@ test('admin products navigation is enabled with nested active state', () => {
 
   for (const id of [
     'dashboard',
+    'users',
     'profile',
     'settings',
     'products',
@@ -155,7 +156,7 @@ test('admin products navigation is enabled with nested active state', () => {
   ]) {
     assert.equal(admin.navItems.find((item) => item.id === id)?.enabled, true);
   }
-  for (const id of ['users', 'categories', 'reports']) {
+  for (const id of ['categories', 'reports']) {
     assert.equal(admin.navItems.find((item) => item.id === id)?.enabled, false);
   }
 

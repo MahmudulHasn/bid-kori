@@ -27,8 +27,11 @@ test('admin profile/settings copy does not imply unsupported capabilities', () =
   assert.ok(ADMIN_UNSUPPORTED_ACCOUNT_ACTIONS.includes('role editing'));
   assert.ok(ADMIN_UNSUPPORTED_ACCOUNT_ACTIONS.includes('password change'));
   assert.ok(ADMIN_UNSUPPORTED_ACCOUNT_ACTIONS.includes('2FA'));
-  assert.ok(ADMIN_UNSUPPORTED_ACCOUNT_ACTIONS.includes('user management'));
   assert.ok(ADMIN_UNSUPPORTED_ACCOUNT_ACTIONS.includes('platform settings'));
+  assert.equal(
+    ADMIN_UNSUPPORTED_ACCOUNT_ACTIONS.includes('user management' as never),
+    false,
+  );
 
   assert.equal(
     adminAccountImpliesUnsupportedAction(ADMIN_PROFILE_LIMITATION_COPY),
@@ -53,7 +56,7 @@ test('admin profile/settings copy does not imply unsupported capabilities', () =
   );
   assert.equal(
     adminAccountImpliesUnsupportedAction('Manage users in /admin/users'),
-    true,
+    false,
   );
   assert.equal(
     adminAccountImpliesUnsupportedAction('Set commission rate'),

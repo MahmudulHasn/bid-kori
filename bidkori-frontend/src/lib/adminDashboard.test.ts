@@ -231,24 +231,27 @@ test('partial failure leaves catalog metrics when analytics missing', () => {
   assert.equal(metrics.paidAuctions, 1);
 });
 
-test('admin dashboard keeps management nav disabled; products/auctions/analytics/profile/settings enabled', () => {
+test('admin dashboard keeps Categories/Reports disabled; Users and core routes enabled', () => {
   const admin = WORKSPACE_CONFIGS.ADMIN;
   const dashboard = admin.navItems.find((item) => item.id === 'dashboard');
   assert.equal(dashboard?.enabled, true);
   assert.equal(dashboard?.href, '/admin');
 
-  for (const id of ['users', 'categories', 'reports']) {
+  for (const id of ['categories', 'reports']) {
     const item = admin.navItems.find((nav) => nav.id === id);
     assert.ok(item, id);
     assert.equal(item?.enabled, false);
   }
 
+  const users = admin.navItems.find((item) => item.id === 'users');
   const products = admin.navItems.find((item) => item.id === 'products');
   const auctions = admin.navItems.find((item) => item.id === 'auctions');
   const bids = admin.navItems.find((item) => item.id === 'bids');
   const analytics = admin.navItems.find((item) => item.id === 'analytics');
   const profile = admin.navItems.find((item) => item.id === 'profile');
   const settings = admin.navItems.find((item) => item.id === 'settings');
+  assert.equal(users?.enabled, true);
+  assert.equal(users?.href, '/admin/users');
   assert.equal(products?.enabled, true);
   assert.equal(products?.href, '/admin/products');
   assert.equal(auctions?.enabled, true);

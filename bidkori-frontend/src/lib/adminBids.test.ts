@@ -161,6 +161,7 @@ test('admin Bids navigation enabled; query keeps Bids active', () => {
 
   for (const id of [
     'dashboard',
+    'users',
     'products',
     'auctions',
     'bids',
@@ -170,7 +171,7 @@ test('admin Bids navigation enabled; query keeps Bids active', () => {
   ]) {
     assert.equal(admin.navItems.find((item) => item.id === id)?.enabled, true);
   }
-  for (const id of ['users', 'categories', 'reports']) {
+  for (const id of ['categories', 'reports']) {
     assert.equal(admin.navItems.find((item) => item.id === id)?.enabled, false);
   }
 });

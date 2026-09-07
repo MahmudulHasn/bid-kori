@@ -18,7 +18,6 @@ export const ADMIN_UNSUPPORTED_ACCOUNT_ACTIONS = [
   'role editing',
   'password change',
   '2FA',
-  'user management',
   'platform settings',
 ] as const;
 
@@ -52,11 +51,6 @@ export function adminAccountImpliesUnsupportedAction(copy: string): boolean {
           lower.includes('2fa') ||
           lower.includes('two-factor') ||
           (lower.includes('multi-factor') && lower.includes('enable'))
-        );
-      case 'user management':
-        return (
-          lower.includes('manage users') ||
-          lower.includes('/admin/users')
         );
       case 'platform settings':
         return (
