@@ -636,3 +636,223 @@ class AdminUserNotificationWebSocketTests(TransactionTestCase):
             await communicator.disconnect()
 
         async_to_sync(scenario_ok)()
+
+
+class AdminUserControlIntegrityTests(APITestCase):
+    """ADM-H09: lifecycle integrity + private-surface enforcement after suspend."""
+
+    def setUp(self):
+        self.password = 'secure-pass-123'
+        self.admin = User.objects.create_user(
+            username='h09_admin',
+            email='h09_admin@test.com',
+            password=self.password,
+            is_staff=True,
+        )
+        self.admin_token = issue_auth_token(self.admin)
+
+        self.buyer = User.objects.create_user(
+            username='h09_buyer',
+            email='h09_buyer@test.com',
+            password=self.password,
+        )
+        ensure_user_profile(self.buyer, role=UserProfile.Role.BUYER)
+        self.buyer_token = issue_auth_token(self.buyer)
+
+        self.seller = User.objects.create_user(
+            username='h09_seller',
+            email='h09_seller@test.com',
+            password=self.password,
+        )
+        ensure_user_profile(self.seller, role=UserProfile.Role.SELLER)
+        self.seller_token = issue_auth_token(self.seller)
+
+        now = timezone.now()
+        self.product = Product.objects.create(
+            seller=self.seller,
+            title='H09 Lifecycle Item',
+            description='integrity',
+        )
+        self.auction = Auction.objects.create(
+            product=self.product,
+            starting_bid=Decimal('100.00'),
+            current_highest_bid=Decimal('150.00'),
+            min_increment=Decimal('10.00'),
+            start_time=now - timedelta(hours=2),
+            end_time=now - timedelta(minutes=1),
+            status=Auction.Status.ACTIVE,
+        )
+        self.bid = Bid.objects.create(
+            auction=self.auction,
+            bidder=self.buyer,
+            amount=Decimal('150.00'),
+        )
+
+    def _admin_client(self):
+        client = APIClient()
+        client.credentials(HTTP_AUTHORIZATION=f'Token {self.admin_token.key}')
+        return client
+
+    def test_put_admin_user_detail_not_allowed(self):
+        client = self._admin_client()
+        response = client.put(
+            _detail_url(self.buyer.pk),
+            {'email': 'hacked@test.com', 'is_staff': True},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+        self.buyer.refresh_from_db()
+        self.assertEqual(self.buyer.email, 'h09_buyer@test.com')
+        self.assertFalse(self.buyer.is_staff)
+
+    def test_staff_with_buyer_profile_cannot_be_suspended(self):
+        staff_buyer = User.objects.create_user(
+            username='h09_staff_buyer_profile',
+            email='h09_staff_buyer@test.com',
+            password=self.password,
+            is_staff=True,
+        )
+        ensure_user_profile(staff_buyer, role=UserProfile.Role.BUYER)
+        token = issue_auth_token(staff_buyer)
+
+        client = self._admin_client()
+        response = client.post(_suspend_url(staff_buyer.pk))
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        staff_buyer.refresh_from_db()
+        self.assertTrue(staff_buyer.is_active)
+        self.assertTrue(Token.objects.filter(key=token.key).exists())
+
+    def test_non_admin_cannot_search_admin_users_email(self):
+        buyer_client = APIClient()
+        buyer_client.credentials(
+            HTTP_AUTHORIZATION=f'Token {self.buyer_token.key}'
+        )
+        response = buyer_client.get(LIST_URL, {'search': 'h09_buyer@test.com'})
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertNotIn('h09_buyer@test.com', str(response.data))
+
+    def test_suspended_buyer_old_token_blocked_from_private_surfaces(self):
+        old_key = self.buyer_token.key
+        self._admin_client().post(_suspend_url(self.buyer.pk))
+        self.assertFalse(Token.objects.filter(key=old_key).exists())
+
+        client = APIClient()
+        client.credentials(HTTP_AUTHORIZATION=f'Token {old_key}')
+
+        me = client.get('/api/users/me/')
+        self.assertEqual(me.status_code, status.HTTP_401_UNAUTHORIZED)
+
+        bid = client.post(
+            f'/api/auctions/{self.auction.pk}/place-bid/',
+            {'amount': '200.00'},
+            format='json',
+        )
+        self.assertEqual(bid.status_code, status.HTTP_401_UNAUTHORIZED)
+
+        notes = client.get('/api/notifications/')
+        self.assertEqual(notes.status_code, status.HTTP_401_UNAUTHORIZED)
+
+        # Keep historical bid intact despite failed new bid attempt.
+        self.assertTrue(
+            Bid.objects.filter(pk=self.bid.pk, amount=Decimal('150.00')).exists()
+        )
+
+    def test_suspended_seller_old_token_blocked_from_private_and_ai(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        old_key = self.seller_token.key
+        self._admin_client().post(_suspend_url(self.seller.pk))
+
+        client = APIClient()
+        client.credentials(HTTP_AUTHORIZATION=f'Token {old_key}')
+
+        listings = client.get('/api/products/my-listings/')
+        self.assertEqual(listings.status_code, status.HTTP_401_UNAUTHORIZED)
+
+        create = client.post(
+            '/api/products/',
+            {
+                'title': 'Should Fail',
+                'description': 'suspended',
+                'condition': 'USED_GOOD',
+            },
+            format='json',
+        )
+        self.assertEqual(create.status_code, status.HTTP_401_UNAUTHORIZED)
+
+        ai = client.post(
+            '/api/products/generate-description/',
+            {
+                'title': 'Camera',
+                'image': SimpleUploadedFile(
+                    'x.jpg',
+                    b'\xff\xd8\xff\xd9',
+                    content_type='image/jpeg',
+                ),
+            },
+            format='multipart',
+        )
+        self.assertEqual(ai.status_code, status.HTTP_401_UNAUTHORIZED)
+
+        self.assertTrue(Product.objects.filter(pk=self.product.pk).exists())
+        self.auction.refresh_from_db()
+        self.assertEqual(self.auction.status, Auction.Status.ACTIVE)
+
+    def test_suspended_seller_auction_still_closes_and_suspended_buyer_can_win(self):
+        from auctions.services import AuctionLifecycleService
+        from notifications.models import Notification
+
+        # Both marketplace parties suspended; server-side close must still run.
+        self._admin_client().post(_suspend_url(self.seller.pk))
+        self._admin_client().post(_suspend_url(self.buyer.pk))
+        self.seller.refresh_from_db()
+        self.buyer.refresh_from_db()
+        self.assertFalse(self.seller.is_active)
+        self.assertFalse(self.buyer.is_active)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            auction, closed = AuctionLifecycleService.close_auction(
+                self.auction.pk,
+                source='expired',
+            )
+        self.assertTrue(closed)
+        self.assertEqual(auction.status, Auction.Status.CLOSED)
+        self.assertEqual(auction.winning_bidder_id, self.buyer.pk)
+        self.assertTrue(
+            Bid.objects.filter(pk=self.bid.pk, amount=Decimal('150.00')).exists()
+        )
+
+        # Durable won notification may still be persisted for later reactivation.
+        self.assertTrue(
+            Notification.objects.filter(
+                user=self.buyer,
+                type=Notification.Type.AUCTION_WON,
+                auction=self.auction,
+            ).exists()
+        )
+
+    def test_suspended_winner_cannot_checkout_with_old_or_no_token(self):
+        from auctions.services import AuctionLifecycleService
+
+        self._admin_client().post(_suspend_url(self.buyer.pk))
+        old_key = self.buyer_token.key
+        AuctionLifecycleService.close_auction(self.auction.pk, source='expired')
+        self.auction.refresh_from_db()
+        self.assertEqual(self.auction.winning_bidder_id, self.buyer.pk)
+
+        client = APIClient()
+        client.credentials(HTTP_AUTHORIZATION=f'Token {old_key}')
+        denied = client.post(f'/api/auctions/{self.auction.pk}/checkout/')
+        self.assertEqual(denied.status_code, status.HTTP_401_UNAUTHORIZED)
+
+        self.auction.refresh_from_db()
+        self.assertFalse(self.auction.is_paid)
+
+    def test_reactivate_does_not_issue_token(self):
+        self._admin_client().post(_suspend_url(self.buyer.pk))
+        self.assertFalse(Token.objects.filter(user=self.buyer).exists())
+        response = self._admin_client().post(_reactivate_url(self.buyer.pk))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data['is_active'])
+        self.assertFalse(Token.objects.filter(user=self.buyer).exists())
+        self.assertNotIn('token', response.data)
