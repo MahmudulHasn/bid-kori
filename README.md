@@ -52,7 +52,7 @@ BidKori handles product catalogs, authenticated buyer/seller workflows, atomic l
 
 - **`products`** — Product listings, categories, seller catalog endpoints
 - **`auctions`** — Auction lifecycle, bidding engine, media, payments, analytics
-- **`users`** — Registration, login, authenticated profile (`/me/`)
+- **`users`** — Registration, login, authenticated profile (`/me/`), Admin user directory + Suspend/Reactivate
 - **`notifications`** — Persistent in-app inbox (list / read / read-all); server-created only
 - **`bidkori-frontend`** — Next.js App Router client for marketplace UX
 
@@ -172,6 +172,10 @@ Ensure the Django API is reachable at `http://127.0.0.1:8000`.
 | --- | --- | --- |
 | `POST` | `/api/users/register/` | Register + token |
 | `POST` | `/api/users/login/` | Login + token |
+| `GET` | `/api/admin/users/` | Staff-only user directory (search / role / is_active; paginated) |
+| `GET` | `/api/admin/users/<id>/` | Staff-only user detail (read-only) |
+| `POST` | `/api/admin/users/<id>/suspend/` | Suspend marketplace BUYER/SELLER (`is_active=false` + revoke token) |
+| `POST` | `/api/admin/users/<id>/reactivate/` | Reactivate marketplace BUYER/SELLER (no token restore) |
 | `GET` | `/api/auctions/` | List auctions (`status`, `category`, `search` filters) |
 | `GET` | `/api/categories/` | Public Category catalog (`id`, `name`, `slug`; read-only) |
 | `GET` | `/api/categories/<id>/` | Category detail (read-only) |
@@ -199,6 +203,23 @@ Auth header:
 ```http
 Authorization: Token <your-token>
 ```
+
+### Admin Users (Suspend / Reactivate)
+
+Staff-only (`IsAdminUser` — Django `is_staff` / superuser). Public auth routes under `/api/users/` stay separate.
+
+| Method | Endpoint | Notes |
+| --- | --- | --- |
+| `GET` | `/api/admin/users/` | Paginated (20); `search`, `role=BUYER\|SELLER\|ADMIN`, `is_active=true\|false` |
+| `GET` | `/api/admin/users/<id>/` | Read-only detail |
+| `POST` | `/api/admin/users/<id>/suspend/` | Marketplace BUYER/SELLER only → `is_active=false` + revoke DRF token |
+| `POST` | `/api/admin/users/<id>/reactivate/` | `is_active=true`; does **not** restore/issue a token — user must log in again |
+
+- Suspend/reactivate are **idempotent** (safe to retry).
+- Cannot suspend/reactivate: self, staff, superuser, or any ADMIN-resolved account.
+- No user delete, no generic PATCH/PUT, no role/password/staff mutation.
+- Suspension does **not** cancel Auctions or delete/disqualify historical Bids/Products.
+- Primary app auth is DRF token; global session purge remains out of scope.
 
 ### Product images
 

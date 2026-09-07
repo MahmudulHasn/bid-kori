@@ -393,6 +393,16 @@ class SupportChatServiceUnitTests(APITestCase):
         self.assertNotIn('api_key', blob)
         self.assertIn('watchlist is not available', blob)
 
+    def test_knowledge_bidding_rules_match_permissions(self):
+        """Place-bid allows any authenticated non-owner; not Buyer-role-only."""
+        blob = BIDKORI_SUPPORT_KNOWLEDGE.lower()
+        self.assertNotIn('only buyers place bids', blob)
+        self.assertIn('logged in', blob)
+        self.assertIn('cannot bid on your own auction', blob)
+        self.assertIn('minimum increment', blob)
+        self.assertIn('basic/mock checkout', blob)
+        self.assertIn('not a full production payment processor', blob)
+
     @patch('ai.chat_service.AIChatService._build_client')
     def test_provider_request_shape_and_output_bound(self, mock_build):
         client = MagicMock()

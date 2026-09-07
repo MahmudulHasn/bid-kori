@@ -30,10 +30,11 @@ the way to take actions — this assistant only explains how to use BidKori.
 - This assistant cannot search live auctions or show live results.
 
 ## Bidding
-- Only Buyers place bids on active auctions.
-- Sellers cannot bid on their own auctions.
-- A new bid must beat the current highest bid (or starting bid when there are
-  no bids yet) by at least the auction's minimum increment.
+- You must be logged in to place a bid on an active auction.
+- You cannot bid on your own auction (the listing's Seller cannot bid on that listing).
+- Accounts registered as Seller can still bid on other people's auctions; they cannot bid on their own.
+- A new bid must beat the current highest bid (or starting bid when there are no bids yet)
+  by at least the auction's minimum increment.
 - The BidKori server decides whether a bid is valid. If a bid is rejected, follow
   the on-screen error (for example amount too low, auction not active, or rate limit).
 - Bids are placed from the auction detail page — not by chatting with this assistant.

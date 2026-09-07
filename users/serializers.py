@@ -108,3 +108,26 @@ class UserSerializer(serializers.ModelSerializer):
 
     def get_role(self, obj):
         return resolve_user_role(obj)
+
+
+class AdminUserSerializer(serializers.ModelSerializer):
+    """Read-only Admin user directory fields (never password/token)."""
+
+    role = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = [
+            'id',
+            'username',
+            'email',
+            'role',
+            'is_active',
+            'is_staff',
+            'is_superuser',
+            'date_joined',
+        ]
+        read_only_fields = fields
+
+    def get_role(self, obj):
+        return resolve_user_role(obj)
