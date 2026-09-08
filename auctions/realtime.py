@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 BID_ACCEPTED_EVENT = 'bid.accepted'
 AUCTION_CLOSED_EVENT = 'auction.closed'
+AUCTION_CANCELLED_EVENT = 'auction.cancelled'
 
 
 def auction_group_name(auction_id: int | str) -> str:
@@ -169,3 +170,55 @@ def schedule_auction_closed_broadcast(auction: Auction) -> None:
     """
     payload = build_auction_closed_payload(auction)
     transaction.on_commit(lambda p=payload: broadcast_auction_closed(p))
+
+
+def build_auction_cancelled_payload(auction: Auction) -> dict:
+    """Public auction.cancelled payload — no moderation_reason / private fields."""
+    return {
+        'type': AUCTION_CANCELLED_EVENT,
+        'auction_id': auction.pk,
+        'status': 'CANCELLED',
+        'winning_bidder': None,
+        'server_time': timezone.now().isoformat(),
+    }
+
+
+def broadcast_auction_cancelled(payload: dict) -> None:
+    """Send auction.cancelled to the auction group. Never raises to callers."""
+    auction_id = payload.get('auction_id')
+    if auction_id is None:
+        logger.warning('auction.cancelled broadcast skipped: missing auction_id')
+        return
+
+    channel_layer = get_channel_layer()
+    if channel_layer is None:
+        logger.warning(
+            'auction.cancelled broadcast skipped: CHANNEL_LAYERS is not configured'
+        )
+        return
+
+    group = auction_group_name(auction_id)
+    try:
+        async_to_sync(channel_layer.group_send)(
+            group,
+            {
+                # Channels consumer method: auction_cancelled
+                'type': 'auction.cancelled',
+                'payload': payload,
+            },
+        )
+    except Exception:
+        logger.exception(
+            'Failed to broadcast auction.cancelled for auction_id=%s',
+            auction_id,
+        )
+
+
+def schedule_auction_cancelled_broadcast(auction: Auction) -> None:
+    """Register post-commit broadcast after an ACTIVE → CANCELLED transition.
+
+    Call only when ``cancelled`` is True (real transition). Idempotent CANCELLED
+    no-ops must not schedule a duplicate event.
+    """
+    payload = build_auction_cancelled_payload(auction)
+    transaction.on_commit(lambda p=payload: broadcast_auction_cancelled(p))

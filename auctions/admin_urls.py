@@ -1,6 +1,10 @@
 from django.urls import path
 
-from .admin_moderation_views import AdminAuctionHideView, AdminAuctionRestoreView
+from .admin_moderation_views import (
+    AdminAuctionCancelView,
+    AdminAuctionHideView,
+    AdminAuctionRestoreView,
+)
 
 app_name = 'admin_auctions'
 
@@ -14,5 +18,10 @@ urlpatterns = [
         '<int:auction_id>/restore/',
         AdminAuctionRestoreView.as_view(),
         name='restore',
+    ),
+    path(
+        '<int:auction_id>/cancel/',
+        AdminAuctionCancelView.as_view(),
+        name='cancel',
     ),
 ]

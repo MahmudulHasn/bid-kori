@@ -837,7 +837,7 @@ class AuctionClosedRealtimeTests(TransactionTestCase):
         auction.refresh_from_db()
         self.assertEqual(auction.status, Auction.Status.CLOSED)
 
-    def test_cancel_does_not_emit_auction_closed(self):
+    def test_cancel_emits_auction_cancelled_not_closed(self):
         auction = self._auction()
         auction_id = auction.pk
 
@@ -849,10 +849,17 @@ class AuctionClosedRealtimeTests(TransactionTestCase):
                 AuctionLifecycleService.cancel_auction
             )(auction_id)
             self.assertTrue(cancelled)
+            event = await communicator.receive_json_from(timeout=2)
             self.assertTrue(await communicator.receive_nothing(timeout=0.5))
             await communicator.disconnect()
+            return event
 
-        async_to_sync(_run)()
+        event = async_to_sync(_run)()
+        self.assertEqual(event['type'], 'auction.cancelled')
+        self.assertEqual(event['auction_id'], auction_id)
+        self.assertEqual(event['status'], Auction.Status.CANCELLED)
+        self.assertIsNone(event['winning_bidder'])
+        self.assertNotIn('moderation_reason', event)
         auction.refresh_from_db()
         self.assertEqual(auction.status, Auction.Status.CANCELLED)
 

@@ -27,7 +27,12 @@ class AuctionLifecycleService:
 
     @classmethod
     def _lock_auction(cls, auction_id):
-        queryset = Auction.objects
+        queryset = Auction.objects.select_related(
+            'product',
+            'product__seller',
+            'winning_bidder',
+            'payment',
+        )
         if connection.features.has_select_for_update:
             queryset = queryset.select_for_update()
         return get_object_or_404(queryset, pk=auction_id)
@@ -136,6 +141,10 @@ class AuctionLifecycleService:
             if auction.status == Auction.Status.CLOSED:
                 return auction, False
 
+            # CANCELLED is already terminal — never rewrite to CLOSED / assign winner.
+            if auction.status == Auction.Status.CANCELLED:
+                return auction, False
+
             if auction.status != Auction.Status.ACTIVE:
                 raise ValidationError(
                     f'Cannot close auction in status {auction.status}.'
@@ -160,8 +169,22 @@ class AuctionLifecycleService:
         return cls.close_auction(auction_id, source='expired')
 
     @classmethod
-    def cancel_auction(cls, auction_id):
+    def cancel_auction(
+        cls,
+        auction_id,
+        *,
+        reason: str | None = None,
+        moderator=None,
+        enforce_unpaid: bool = False,
+    ):
         """Cancel an ACTIVE auction; clears the winner and blocks checkout.
+
+        Seller and Admin paths share this method. ``enforce_unpaid=True`` is for
+        Admin cancel only (rejects ``is_paid`` or an existing Payment row).
+
+        On a real ACTIVE → CANCELLED transition, schedules ``auction.cancelled``
+        (never ``auction.closed``). Already-CANCELLED is idempotent with no
+        duplicate broadcast.
 
         Returns:
             Tuple of (auction, cancelled).
@@ -177,9 +200,39 @@ class AuctionLifecycleService:
                     f'Cannot cancel auction in status {auction.status}.'
                 )
 
+            if enforce_unpaid:
+                if auction.is_paid:
+                    raise ValidationError(
+                        'Cannot cancel a paid auction.'
+                    )
+                from .models import Payment
+
+                if Payment.objects.filter(auction_id=auction.pk).exists():
+                    raise ValidationError(
+                        'Cannot cancel an auction that has a payment record.'
+                    )
+
             auction.status = Auction.Status.CANCELLED
             auction.winning_bidder = None
-            auction.save(update_fields=['status', 'winning_bidder'])
+            update_fields = ['status', 'winning_bidder']
+
+            # Optional Admin moderation metadata — never toggles is_hidden.
+            if moderator is not None:
+                auction.moderated_by = moderator
+                auction.moderated_at = timezone.now()
+                update_fields.extend(['moderated_by', 'moderated_at'])
+                if reason:
+                    auction.moderation_reason = reason
+                    update_fields.append('moderation_reason')
+            elif reason:
+                auction.moderation_reason = reason
+                update_fields.append('moderation_reason')
+
+            auction.save(update_fields=update_fields)
+
+            from .realtime import schedule_auction_cancelled_broadcast
+
+            schedule_auction_cancelled_broadcast(auction)
             return auction, True
 
     @classmethod

@@ -523,8 +523,11 @@ class AuctionClosingBehaviorTests(APITestCase):
 
         cancelled = self._auction()
         AuctionLifecycleService.cancel_auction(cancelled.pk)
-        with self.assertRaises(ValidationError):
-            AuctionLifecycleService.close_auction(cancelled.pk)
+        closed_cancelled, did_close = AuctionLifecycleService.close_auction(
+            cancelled.pk
+        )
+        self.assertFalse(did_close)
+        self.assertEqual(closed_cancelled.status, Auction.Status.CANCELLED)
         cancelled.refresh_from_db()
         self.assertEqual(cancelled.status, Auction.Status.CANCELLED)
         self.assertIsNone(cancelled.winning_bidder)

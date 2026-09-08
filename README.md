@@ -95,7 +95,7 @@ WebSocket (auction room): `ws://127.0.0.1:8000/ws/auctions/<auction_id>/`
 Swagger: [http://127.0.0.1:8000/api/schema/swagger-ui/](http://127.0.0.1:8000/api/schema/swagger-ui/)  
 Admin: [http://127.0.0.1:8000/admin/](http://127.0.0.1:8000/admin/)
 
-**Real-time note:** Bids are still placed only via REST `POST /api/auctions/<id>/place-bid/`. WebSockets are **subscribe/broadcast only** (`bid.accepted` after a successful commit; `auction.closed` after authoritative finalization). Production must use Redis (`REDIS_URL`); the test suite uses an in-memory channel layer and does not need Redis.
+**Real-time note:** Bids are still placed only via REST `POST /api/auctions/<id>/place-bid/`. WebSockets are **subscribe/broadcast only** (`bid.accepted` after a successful commit; `auction.closed` after authoritative finalization; `auction.cancelled` after ACTIVE → CANCELLED, regardless of Seller vs Admin actor). Production must use Redis (`REDIS_URL`); the test suite uses an in-memory channel layer and does not need Redis.
 
 **Automatic closing:** Celery Beat schedules expired ACTIVE auction finalization every ~10s without HTTP traffic. Late bids are still rejected immediately by `BidService` even before Beat runs. Manual recovery remains available via `close_expired_auctions`.
 
@@ -193,7 +193,7 @@ Ensure the Django API is reachable at `http://127.0.0.1:8000`.
 | `POST` | `/api/auctions/` | Create auction (JSON or multipart + images) |
 | `POST` | `/api/auctions/<id>/images/` | Upload auction images |
 | `POST` | `/api/auctions/<id>/place-bid/` | Place bid (atomic + rate limited; broadcasts `bid.accepted` after commit) |
-| `WS` | `/ws/auctions/<id>/` | Subscribe to live `bid.accepted` / `auction.closed` events (read-only; no bid submission) |
+| `WS` | `/ws/auctions/<id>/` | Subscribe to live `bid.accepted` / `auction.closed` / `auction.cancelled` events (read-only; no bid submission) |
 | `WS` | `/ws/notifications/` | Authenticated private inbox push (`notification.created`); first message auth with DRF token (no token in URL) |
 | `POST` | `/api/auctions/<id>/checkout/` | Winner mock payment checkout |
 | `GET` | `/api/auctions/my-bids/` | Buyer bid dashboard data |
@@ -250,6 +250,25 @@ Behavior:
 - Buyer My Bids / winner history access is preserved for participants.
 - Seller cannot clear `is_hidden` via Product/Auction PATCH.
 - Direct media file URLs may remain reachable if the URL is known (storage ACL not redesigned).
+
+### Admin Auction Cancel (MOD-B02)
+
+Staff-only (`IsAdminUser`):
+
+- `POST /api/admin/auctions/<id>/cancel/` — optional JSON `{ "reason": "..." }` (same ~500-char moderation reason limit as hide)
+
+Semantics:
+
+- Admin only (Seller cancel remains a separate owner transition endpoint).
+- ACTIVE unpaid auctions only via `AuctionLifecycleService` (no raw status writes).
+- Rejects `CLOSED`, `is_paid=True`, or any existing `Payment` row (even if `is_paid` is inconsistent).
+- Already `CANCELLED` → idempotent **200** (no duplicate `auction.cancelled` broadcast).
+- Preserves all Bid rows; clears `winning_bidder`; does not delete Product/Auction/Payment.
+- Does **not** auto-set `is_hidden` — hide/restore stay independent of lifecycle cancel.
+- Irreversible: no reopen (`CANCELLED` → `ACTIVE` / `CLOSED` → `CANCELLED` forbidden).
+- Emits exactly one public WebSocket `auction.cancelled` after commit (`winning_bidder: null`; no moderation_reason on the wire).
+- Does **not** emit `auction.closed` on cancel.
+- Seller cancellation also emits `auction.cancelled` (same lifecycle broadcast).
 
 ### AI listing description draft
 
