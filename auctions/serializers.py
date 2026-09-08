@@ -464,7 +464,7 @@ class PaymentSerializer(serializers.ModelSerializer):
 
     Omits seller-side fee snapshots (``fee_rate``, ``platform_fee``,
     ``seller_net_amount``). Those columns remain on the Payment model for
-    future Seller/Admin financial APIs (MON-F01) and must never be
+    Seller/Admin financial APIs (MON-F01) and must never be
     recalculated from live settings during serialization.
     """
 
@@ -480,6 +480,71 @@ class PaymentSerializer(serializers.ModelSerializer):
             'created_at',
         ]
         read_only_fields = fields
+
+
+class SellerSaleSerializer(serializers.Serializer):
+    """One completed mock checkout sale owned by the requesting Seller."""
+
+    payment_id = serializers.IntegerField(read_only=True)
+    auction_id = serializers.IntegerField(read_only=True)
+    auction_title = serializers.CharField(read_only=True)
+    buyer_username = serializers.CharField(read_only=True)
+    amount = serializers.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        read_only=True,
+        coerce_to_string=True,
+    )
+    fee_rate = serializers.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        read_only=True,
+        allow_null=True,
+        coerce_to_string=True,
+    )
+    platform_fee = serializers.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        read_only=True,
+        allow_null=True,
+        coerce_to_string=True,
+    )
+    seller_net_amount = serializers.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        read_only=True,
+        allow_null=True,
+        coerce_to_string=True,
+    )
+    status = serializers.CharField(read_only=True)
+    created_at = serializers.DateTimeField(read_only=True)
+    has_fee_snapshot = serializers.BooleanField(read_only=True)
+
+
+class SellerEarningsSerializer(serializers.Serializer):
+    """Exact Seller earnings aggregates (mock checkout ledger)."""
+
+    completed_sales_count = serializers.IntegerField(read_only=True)
+    gross_sales = serializers.CharField(read_only=True)
+    platform_fees = serializers.CharField(read_only=True)
+    net_earnings = serializers.CharField(read_only=True)
+    accounted_sales_count = serializers.IntegerField(read_only=True)
+    legacy_completed_sales_count = serializers.IntegerField(read_only=True)
+    legacy_gross_sales = serializers.CharField(read_only=True)
+    disclosure = serializers.CharField(read_only=True)
+
+
+class AdminFinancialSummarySerializer(serializers.Serializer):
+    """Exact platform financial aggregates (mock checkout ledger)."""
+
+    completed_sales_count = serializers.IntegerField(read_only=True)
+    gross_paid_volume = serializers.CharField(read_only=True)
+    platform_revenue = serializers.CharField(read_only=True)
+    seller_net_total = serializers.CharField(read_only=True)
+    accounted_sales_count = serializers.IntegerField(read_only=True)
+    legacy_completed_sales_count = serializers.IntegerField(read_only=True)
+    legacy_gross_paid_volume = serializers.CharField(read_only=True)
+    disclosure = serializers.CharField(read_only=True)
 
 
 class AuctionDetailSerializer(serializers.ModelSerializer):

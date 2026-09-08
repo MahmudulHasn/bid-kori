@@ -225,6 +225,20 @@ BidKori MVP monetization is **seller-side successful-sale commission** recorded 
 
 Changing `PLATFORM_SUCCESS_FEE_PERCENT` never recalculates existing Payment snapshots.
 
+### Seller earnings & Admin platform revenue (mock ledger reads)
+
+Exact financial visibility derives from **COMPLETED** `Payment` rows only — never from auction samples, bidding volume, or frontend page sums.
+
+| Role | Endpoint | Notes |
+| --- | --- | --- |
+| Seller | `GET /api/seller/earnings/` | Exact gross / platform fees / net for owned auctions; legacy null-snapshot sales reported separately |
+| Seller | `GET /api/seller/sales/` | Paginated (20) completed sale ledger for the authenticated Seller only |
+| Admin | `GET /api/admin/finance/summary/` | Exact completed checkout volume, platform revenue (`Sum(platform_fee)`), seller net total |
+
+- UI: Seller `/seller/sales`; Admin Analytics includes a separate mock-checkout financial section.
+- Legacy COMPLETED Payments with null fee fields count toward **gross** only; they do **not** invent platform revenue/net.
+- No payouts, refunds, gateway settlement, or financial mutation endpoints.
+
 ### Admin Users (Suspend / Reactivate)
 
 Staff-only (`IsAdminUser` — Django `is_staff` / superuser). Public auth routes under `/api/users/` stay separate.

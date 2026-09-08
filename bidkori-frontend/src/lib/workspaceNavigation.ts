@@ -54,6 +54,7 @@ export const SELLER_PRODUCTS_PATH = '/seller/products';
 export const SELLER_PRODUCT_CREATE_PATH = '/seller/products/create';
 export const SELLER_AUCTIONS_PATH = '/seller/auctions';
 export const SELLER_AUCTION_CREATE_PATH = '/seller/auctions/create';
+export const SELLER_SALES_PATH = '/seller/sales';
 
 /** Legacy combined Product+Auction create — not linked from Seller workspace. */
 export const LEGACY_AUCTION_CREATE_PATH = '/auctions/create';
@@ -104,6 +105,7 @@ const SELLER_NAV: readonly WorkspaceNavItem[] = [
   { id: 'dashboard', label: 'Dashboard', href: '/seller', enabled: true },
   { id: 'products', label: 'Products', href: SELLER_PRODUCTS_PATH, enabled: true },
   { id: 'auctions', label: 'Auctions', href: SELLER_AUCTIONS_PATH, enabled: true },
+  { id: 'sales', label: 'Sales', href: SELLER_SALES_PATH, enabled: true },
   {
     id: 'notifications',
     label: 'Notifications',

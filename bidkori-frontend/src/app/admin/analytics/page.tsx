@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useMemo, type ReactNode } from 'react';
 import { format } from 'date-fns';
-import { Gavel, Layers, Trophy, Wallet } from 'lucide-react';
+import { Gavel, Layers, Percent, Receipt, Trophy, Wallet } from 'lucide-react';
 import useSWR from 'swr';
 
 import {
@@ -18,6 +18,16 @@ import {
   mapAdminAnalyticsTopBidders,
 } from '@/lib/adminAnalytics';
 import { adminAnalyticsFetcher } from '@/lib/adminAnalyticsApi';
+import {
+  ADMIN_FINANCE_DISCLOSURE,
+  ADMIN_FINANCE_SUMMARY_API_PATH,
+  COMPLETED_CHECKOUT_VOLUME_LABEL,
+  COMPLETED_SALES_COUNT_LABEL,
+  PLATFORM_REVENUE_LABEL,
+  SELLER_NET_TOTAL_LABEL,
+  hasLegacyAdminPayments,
+} from '@/lib/adminFinance';
+import { adminFinancialSummaryFetcher } from '@/lib/adminFinanceApi';
 import { formatAdminMoney } from '@/lib/adminDashboard';
 import { adminAuctionDetailPath } from '@/lib/adminAuctions';
 import { getApiErrorMessage } from '@/lib/apiErrors';
@@ -78,6 +88,13 @@ export default function AdminAnalyticsPage() {
     mutate,
   } = useSWR(ADMIN_ANALYTICS_API_PATH, adminAnalyticsFetcher);
 
+  const {
+    data: finance,
+    error: financeError,
+    isLoading: financeLoading,
+    mutate: mutateFinance,
+  } = useSWR(ADMIN_FINANCE_SUMMARY_API_PATH, adminFinancialSummaryFetcher);
+
   const summary = useMemo(
     () => (analytics ? getAdminAnalyticsSummary(analytics) : null),
     [analytics],
@@ -97,9 +114,14 @@ export default function AdminAnalyticsPage() {
   );
 
   const loading = isLoading && !analytics;
+  const financeBusy = financeLoading && !finance;
   const errorMessage = error
     ? getApiErrorMessage(error, 'Could not load platform analytics.')
     : null;
+  const financeErrorMessage = financeError
+    ? getApiErrorMessage(financeError, 'Unable to load financial summary.')
+    : null;
+  const showFinanceLegacy = hasLegacyAdminPayments(finance ?? null);
 
   return (
     <div className="space-y-8">
@@ -108,8 +130,9 @@ export default function AdminAnalyticsPage() {
           Platform Analytics
         </h1>
         <p className="max-w-2xl text-sm text-zinc-600 dark:text-zinc-400">
-          Staff-only auction and bidding metrics from the live analytics API.
-          This is not a revenue, seller, or user-management dashboard.
+          Staff-only auction and bidding metrics from the live analytics API,
+          plus a separate mock-checkout financial summary. Bidding volume is not
+          platform revenue.
         </p>
         <p className="text-xs text-zinc-500 dark:text-zinc-500">
           Source: <code>{ADMIN_ANALYTICS_API_PATH}</code> · Route:{' '}
@@ -172,6 +195,88 @@ export default function AdminAnalyticsPage() {
             loading={loading}
           />
         </div>
+      </section>
+
+      <section aria-labelledby="admin-finance-heading" className="space-y-4">
+        <div>
+          <h2
+            id="admin-finance-heading"
+            className="text-lg font-semibold text-zinc-900 dark:text-white"
+          >
+            Mock checkout financial summary
+          </h2>
+          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+            Exact aggregates from <code>{ADMIN_FINANCE_SUMMARY_API_PATH}</code>.
+            Distinct from {BIDDING_VOLUME_LABEL}. {ADMIN_FINANCE_DISCLOSURE}
+          </p>
+        </div>
+
+        {financeErrorMessage ? (
+          <div
+            role="alert"
+            className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200"
+          >
+            <p>{financeErrorMessage}</p>
+            <button
+              type="button"
+              onClick={() => void mutateFinance()}
+              className="rounded-lg border border-red-300 px-3 py-1.5 text-xs font-medium hover:bg-red-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500 dark:border-red-800 dark:hover:bg-red-900/40"
+            >
+              Retry financial summary
+            </button>
+          </div>
+        ) : null}
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <MetricCard
+            label={COMPLETED_SALES_COUNT_LABEL}
+            value={finance?.completed_sales_count ?? null}
+            hint="COMPLETED Payment rows"
+            icon={<Receipt className="h-5 w-5" aria-hidden />}
+            loading={financeBusy}
+          />
+          <MetricCard
+            label={COMPLETED_CHECKOUT_VOLUME_LABEL}
+            value={
+              finance ? formatAdminMoney(finance.gross_paid_volume) : null
+            }
+            hint="Sum of Payment.amount (mock ledger)"
+            icon={<Wallet className="h-5 w-5" aria-hidden />}
+            loading={financeBusy}
+          />
+          <MetricCard
+            label={PLATFORM_REVENUE_LABEL}
+            value={
+              finance ? formatAdminMoney(finance.platform_revenue) : null
+            }
+            hint="Sum of stored platform_fee snapshots"
+            icon={<Percent className="h-5 w-5" aria-hidden />}
+            loading={financeBusy}
+          />
+          <MetricCard
+            label={SELLER_NET_TOTAL_LABEL}
+            value={
+              finance ? formatAdminMoney(finance.seller_net_total) : null
+            }
+            hint="Sum of seller_net_amount snapshots"
+            icon={<Trophy className="h-5 w-5" aria-hidden />}
+            loading={financeBusy}
+          />
+        </div>
+
+        {showFinanceLegacy ? (
+          <p
+            role="status"
+            className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-100"
+          >
+            Legacy completed sales without fee snapshots:{' '}
+            {finance?.legacy_completed_sales_count}. Legacy gross:{' '}
+            <span className="font-medium tabular-nums">
+              {finance ? formatAdminMoney(finance.legacy_gross_paid_volume) : '—'}
+            </span>
+            . Platform Revenue excludes those rows.
+          </p>
+        ) : null}
       </section>
 
       <section

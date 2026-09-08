@@ -18,6 +18,7 @@ import {
   SELLER_PRODUCTS_PATH,
   SELLER_PRODUCT_CREATE_PATH,
   SELLER_PROFILE_PATH,
+  SELLER_SALES_PATH,
   SELLER_SETTINGS_PATH,
   WORKSPACE_CONFIGS,
   getRoleDisplayLabel,
@@ -119,6 +120,7 @@ test('seller config does not contain buyer/admin-only items', () => {
   }
   assert.ok(ids.has('products'));
   assert.ok(ids.has('auctions'));
+  assert.ok(ids.has('sales'));
   assert.ok(ids.has('analytics'));
   assert.equal(WORKSPACE_CONFIGS.SELLER.brandTitle, 'BidKori Seller');
   assert.equal(WORKSPACE_CONFIGS.SELLER.homePath, '/seller');
@@ -141,6 +143,10 @@ test('seller config does not contain buyer/admin-only items', () => {
   assert.equal(SELLER_AUCTION_CREATE_PATH, '/seller/auctions/create');
   assert.equal(sellerAuctionCreatePath(), '/seller/auctions/create');
   assert.equal(sellerAuctionCreatePath(42), '/seller/auctions/create?product=42');
+  const sellerSales = WORKSPACE_CONFIGS.SELLER.navItems.find((item) => item.id === 'sales');
+  assert.equal(sellerSales?.enabled, true);
+  assert.equal(sellerSales?.href, SELLER_SALES_PATH);
+  assert.equal(SELLER_SALES_PATH, '/seller/sales');
   const sellerNotifications = WORKSPACE_CONFIGS.SELLER.navItems.find(
     (item) => item.id === 'notifications',
   );
