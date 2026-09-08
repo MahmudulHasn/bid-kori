@@ -1,5 +1,6 @@
 from django.contrib.auth.models import User
 from django.db import models
+from django.db.models import Q
 from django.utils import timezone
 
 from .image_validation import validate_auction_image
@@ -142,7 +143,20 @@ class Bid(models.Model):
 
 
 class Payment(models.Model):
-    """Mock payment record for a completed auction checkout."""
+    """Mock checkout ledger row for a won auction (not gateway settlement).
+
+    A COMPLETED Payment means BidKori recorded the sale as paid in the mock
+    accounting ledger. It does **not** mean bank settlement, gateway capture,
+    seller payout, or external cash receipt.
+
+    ``amount`` is the gross winning sale amount paid by the Buyer.
+
+    ``fee_rate`` / ``platform_fee`` / ``seller_net_amount`` are immutable
+    seller-side successful-sale commission snapshots written only when a new
+    checkout completes. Legacy rows created before fee policy may leave these
+    null — financial aggregates must ignore null-snapshot rows rather than
+    invent historical revenue.
+    """
 
     class Status(models.TextChoices):
         PENDING = 'PENDING', 'Pending'
@@ -160,6 +174,27 @@ class Payment(models.Model):
         related_name='payments',
     )
     amount = models.DecimalField(max_digits=10, decimal_places=2)
+    fee_rate = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text='Snapshot of PLATFORM_SUCCESS_FEE_PERCENT at checkout (%).',
+    )
+    platform_fee = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text='Seller-side commission snapshot (immutable).',
+    )
+    seller_net_amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text='Gross minus platform_fee at checkout (immutable).',
+    )
     status = models.CharField(
         max_length=20,
         choices=Status.choices,
@@ -171,6 +206,27 @@ class Payment(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(fee_rate__isnull=True)
+                | (Q(fee_rate__gte=0) & Q(fee_rate__lte=100)),
+                name='payment_fee_rate_range',
+            ),
+            models.CheckConstraint(
+                condition=Q(platform_fee__isnull=True) | Q(platform_fee__gte=0),
+                name='payment_platform_fee_non_negative',
+            ),
+            models.CheckConstraint(
+                condition=Q(seller_net_amount__isnull=True)
+                | Q(seller_net_amount__gte=0),
+                name='payment_seller_net_non_negative',
+            ),
+            models.CheckConstraint(
+                condition=Q(platform_fee__isnull=True)
+                | Q(platform_fee__lte=models.F('amount')),
+                name='payment_platform_fee_lte_amount',
+            ),
+        ]
 
     def __str__(self):
         return f'Payment {self.transaction_id or self.pk} ({self.status})'

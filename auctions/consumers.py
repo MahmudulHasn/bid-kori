@@ -10,6 +10,7 @@ from channels.generic.websocket import AsyncJsonWebsocketConsumer
 
 from .models import Auction
 from .realtime import auction_group_name
+from .visibility import user_can_retrieve_auction
 
 
 class AuctionConsumer(AsyncJsonWebsocketConsumer):
@@ -18,6 +19,10 @@ class AuctionConsumer(AsyncJsonWebsocketConsumer):
     Forwards server ``bid.accepted``, ``auction.closed``, and
     ``auction.cancelled`` payloads. Clients must place bids via REST, never
     over WebSocket.
+
+    Connect authorization mirrors REST auction detail retrieve:
+    publicly visible auctions are open; hidden auctions require Seller,
+    Admin, winner, or prior bidder (same as ``user_can_retrieve_auction``).
     """
 
     auction_id: int
@@ -31,7 +36,8 @@ class AuctionConsumer(AsyncJsonWebsocketConsumer):
             await self.close()
             return
 
-        if not await self._auction_exists(self.auction_id):
+        user = self.scope.get('user')
+        if not await self._user_may_subscribe(self.auction_id, user):
             await self.close()
             return
 
@@ -77,5 +83,12 @@ class AuctionConsumer(AsyncJsonWebsocketConsumer):
 
     @staticmethod
     @database_sync_to_async
-    def _auction_exists(auction_id: int) -> bool:
-        return Auction.objects.filter(pk=auction_id).exists()
+    def _user_may_subscribe(auction_id: int, user) -> bool:
+        auction = (
+            Auction.objects.select_related('product')
+            .filter(pk=auction_id)
+            .first()
+        )
+        if auction is None:
+            return False
+        return user_can_retrieve_auction(user, auction)

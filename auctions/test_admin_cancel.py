@@ -389,6 +389,39 @@ class AdminAuctionCancelAPITests(APITestCase):
         response = self.client.post(self._cancel_url(), format='json')
         self.assertEqual(response.status_code, 403)
 
+    def test_seller_cancel_rejects_paid_auction(self):
+        self.auction.is_paid = True
+        self.auction.save(update_fields=['is_paid'])
+        self._auth(self.seller_token)
+        response = self.client.post(
+            f'/api/auctions/{self.auction.pk}/transition/',
+            {'status': Auction.Status.CANCELLED},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 400, response.data)
+        self.auction.refresh_from_db()
+        self.assertEqual(self.auction.status, Auction.Status.ACTIVE)
+        self.assertTrue(self.auction.is_paid)
+
+    def test_seller_cancel_rejects_payment_row(self):
+        Payment.objects.create(
+            auction=self.auction,
+            user=self.buyer,
+            amount=Decimal('110.00'),
+            status=Payment.Status.PENDING,
+            transaction_id='seller-cancel-guard-tx',
+        )
+        self._auth(self.seller_token)
+        response = self.client.post(
+            f'/api/auctions/{self.auction.pk}/transition/',
+            {'status': Auction.Status.CANCELLED},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 400, response.data)
+        self.auction.refresh_from_db()
+        self.assertEqual(self.auction.status, Auction.Status.ACTIVE)
+        self.assertTrue(Payment.objects.filter(auction=self.auction).exists())
+
     def test_auto_close_ignores_cancelled(self):
         self._auth(self.admin_token)
         self.client.post(self._cancel_url(), format='json')

@@ -294,6 +294,11 @@ export function applyAuctionClosedToAuction(
     return { auction, revalidate: false, applied: false };
   }
 
+  // CANCELLED is terminal — never rewrite to CLOSED / invent a winner.
+  if (String(auction.status ?? '').toUpperCase() === 'CANCELLED') {
+    return { auction, revalidate: true, applied: false };
+  }
+
   const winner = event.winning_bidder;
   const next: Auction = {
     ...auction,

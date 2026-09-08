@@ -284,6 +284,41 @@ PRODUCT_IMAGE_MAX_COUNT = int(os.getenv('PRODUCT_IMAGE_MAX_COUNT', '5'))
 PRODUCT_IMAGE_MAX_PER_REQUEST = int(
     os.getenv('PRODUCT_IMAGE_MAX_PER_REQUEST', '5')
 )
+
+# ---------------------------------------------------------------------------
+# Monetization (mock checkout accounting — not gateway settlement)
+# ---------------------------------------------------------------------------
+# Seller-side successful-sale commission percent applied when a winner completes
+# mock checkout. Snapshots are stored on Payment and never recalculated from
+# this setting for historical rows. Valid range: 0 <= rate <= 100.
+
+
+def _parse_platform_success_fee_percent():
+    from decimal import Decimal, InvalidOperation
+
+    raw = os.getenv('PLATFORM_SUCCESS_FEE_PERCENT', '5.00')
+    try:
+        value = Decimal(str(raw).strip())
+    except (InvalidOperation, AttributeError) as exc:
+        raise ImproperlyConfigured(
+            'PLATFORM_SUCCESS_FEE_PERCENT must be a Decimal-compatible number '
+            f'(got {raw!r}).'
+        ) from exc
+    if not value.is_finite():
+        raise ImproperlyConfigured(
+            'PLATFORM_SUCCESS_FEE_PERCENT must be a finite number.'
+        )
+    quantized = value.quantize(Decimal('0.01'))
+    if quantized < Decimal('0.00') or quantized > Decimal('100.00'):
+        raise ImproperlyConfigured(
+            'PLATFORM_SUCCESS_FEE_PERCENT must satisfy 0 <= rate <= 100 '
+            f'(got {quantized}).'
+        )
+    return quantized
+
+
+PLATFORM_SUCCESS_FEE_PERCENT = _parse_platform_success_fee_percent()
+
 PRODUCT_IMAGE_ALLOWED_FORMATS = ('JPEG', 'PNG', 'WEBP', 'GIF')
 
 # ---------------------------------------------------------------------------

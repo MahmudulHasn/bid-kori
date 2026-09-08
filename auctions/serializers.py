@@ -460,7 +460,13 @@ class TransitionStatusSerializer(serializers.Serializer):
 
 
 class PaymentSerializer(serializers.ModelSerializer):
-    """Serializes a mock checkout payment for an auction winner."""
+    """Buyer-facing mock checkout payment (winner-private response).
+
+    Omits seller-side fee snapshots (``fee_rate``, ``platform_fee``,
+    ``seller_net_amount``). Those columns remain on the Payment model for
+    future Seller/Admin financial APIs (MON-F01) and must never be
+    recalculated from live settings during serialization.
+    """
 
     class Meta:
         model = Payment

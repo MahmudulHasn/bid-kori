@@ -112,6 +112,64 @@ class AuctionRealtimeFoundationTests(TransactionTestCase):
 
         async_to_sync(_run)()
 
+    def test_websocket_rejects_anonymous_on_hidden_auction(self):
+        auction_id = self.auction.pk
+        self.auction.is_hidden = True
+        self.auction.save(update_fields=['is_hidden'])
+
+        async def _run():
+            communicator = self._communicator(auction_id)
+            connected, _ = await communicator.connect()
+            self.assertFalse(connected)
+
+        async_to_sync(_run)()
+
+    def test_websocket_rejects_anonymous_when_product_hidden(self):
+        auction_id = self.auction.pk
+        self.product.is_hidden = True
+        self.product.save(update_fields=['is_hidden'])
+
+        async def _run():
+            communicator = self._communicator(auction_id)
+            connected, _ = await communicator.connect()
+            self.assertFalse(connected)
+
+        async_to_sync(_run)()
+
+    def test_websocket_seller_can_subscribe_hidden_auction(self):
+        from django.contrib.auth import (
+            BACKEND_SESSION_KEY,
+            HASH_SESSION_KEY,
+            SESSION_KEY,
+        )
+        from django.contrib.sessions.backends.db import SessionStore
+
+        auction_id = self.auction.pk
+        self.auction.is_hidden = True
+        self.auction.save(update_fields=['is_hidden'])
+
+        session = SessionStore()
+        session[SESSION_KEY] = str(self.seller.pk)
+        session[BACKEND_SESSION_KEY] = 'django.contrib.auth.backends.ModelBackend'
+        session[HASH_SESSION_KEY] = self.seller.get_session_auth_hash()
+        session.save()
+        cookie = f'sessionid={session.session_key}'.encode()
+
+        async def _run():
+            communicator = WebsocketCommunicator(
+                application,
+                f'/ws/auctions/{auction_id}/',
+                headers=[
+                    (b'origin', b'http://localhost'),
+                    (b'cookie', cookie),
+                ],
+            )
+            connected, _ = await communicator.connect()
+            self.assertTrue(connected)
+            await communicator.disconnect()
+
+        async_to_sync(_run)()
+
     def test_server_group_send_reaches_consumer(self):
         auction = self.auction
         buyer = self.buyer

@@ -1,5 +1,4 @@
 from decimal import Decimal, InvalidOperation
-import uuid
 
 from django.contrib.auth.mixins import UserPassesTestMixin
 from django.core.exceptions import ValidationError
@@ -41,7 +40,13 @@ from .serializers import (
     PlaceBidRequestSerializer,
     TransitionStatusSerializer,
 )
-from .services import AuctionLifecycleService, BidService
+from .services import (
+    AuctionLifecycleService,
+    BidService,
+    CheckoutAlreadyCompleted,
+    CheckoutForbidden,
+    CheckoutService,
+)
 from .throttling import BidBurstThrottle
 
 AUCTION_LIST_PARAMETERS = [
@@ -367,75 +372,47 @@ class AuctionViewSet(viewsets.ModelViewSet):
         permission_classes=[IsAuthenticated],
     )
     def checkout(self, request, pk=None, auction_id=None):
-        """Mock payment checkout for the auction winning bidder."""
+        """Mock payment checkout for the auction winning bidder.
+
+        Records a COMPLETED Payment ledger row with immutable seller-side fee
+        snapshots. This is accounting metadata only — not gateway settlement.
+        Request body financial fields are ignored; amount and fees are
+        server-owned.
+        """
         target_id = auction_id or pk
-        auction = get_object_or_404(
-            Auction.objects.select_related('winning_bidder', 'product'),
-            pk=target_id,
-        )
+        # Ensure the auction exists before locking (404 vs domain errors).
+        get_object_or_404(Auction, pk=target_id)
 
-        if auction.status != Auction.Status.CLOSED:
-            return Response(
-                {'error': 'Checkout is only allowed for CLOSED auctions.'},
-                status=status.HTTP_400_BAD_REQUEST,
+        try:
+            payment = CheckoutService.checkout_for_winner(
+                target_id,
+                request.user,
             )
-
-        if auction.winning_bidder_id is None:
+        except CheckoutForbidden as exc:
             return Response(
-                {'error': 'This auction has no winning bidder to charge.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        if request.user != auction.winning_bidder:
-            return Response(
-                {'error': 'Only the winning bidder can complete checkout.'},
+                {'error': str(exc.message)},
                 status=status.HTTP_403_FORBIDDEN,
             )
-
-        existing = Payment.objects.filter(auction=auction).first()
-        if existing is not None and (
-            existing.status == Payment.Status.COMPLETED or auction.is_paid
-        ):
+        except CheckoutAlreadyCompleted as exc:
+            payload = {
+                'error': str(exc.message),
+            }
+            if exc.payment is not None:
+                payload['payment'] = PaymentSerializer(
+                    exc.payment,
+                    context={'request': request},
+                ).data
+            return Response(payload, status=status.HTTP_400_BAD_REQUEST)
+        except ValidationError as exc:
+            message = (
+                exc.messages[0]
+                if getattr(exc, 'messages', None)
+                else str(exc)
+            )
             return Response(
-                {
-                    'error': 'Payment already completed for this auction.',
-                    'payment': PaymentSerializer(
-                        existing, context={'request': request}
-                    ).data,
-                },
+                {'error': message},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-
-        amount = auction.current_highest_bid
-        transaction_id = f'TXN-{uuid.uuid4().hex[:16].upper()}'
-
-        with transaction.atomic():
-            if existing is not None:
-                payment = existing
-                payment.user = request.user
-                payment.amount = amount
-                payment.status = Payment.Status.COMPLETED
-                payment.transaction_id = transaction_id
-                payment.save(
-                    update_fields=[
-                        'user',
-                        'amount',
-                        'status',
-                        'transaction_id',
-                        'updated_at',
-                    ]
-                )
-            else:
-                payment = Payment.objects.create(
-                    auction=auction,
-                    user=request.user,
-                    amount=amount,
-                    status=Payment.Status.COMPLETED,
-                    transaction_id=transaction_id,
-                )
-
-            auction.is_paid = True
-            auction.save(update_fields=['is_paid'])
 
         serializer = PaymentSerializer(payment, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)

@@ -432,3 +432,29 @@ class VisibilityModerationTests(APITestCase):
         self.product.refresh_from_db()
         self.assertTrue(self.product.is_hidden)
         self.assertEqual(self.product.moderation_reason, 'Two')
+
+    def test_anonymous_product_detail_omits_moderation_reason_when_visible(self):
+        self.product.moderation_reason = 'Internal note'
+        self.product.moderated_at = timezone.now()
+        self.product.save(update_fields=['moderation_reason', 'moderated_at'])
+        self._auth(None)
+        response = self.client.get(f'/api/products/{self.product.pk}/')
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertNotIn('moderation_reason', response.data)
+        self.assertNotIn('moderated_at', response.data)
+        self.assertIn('is_hidden', response.data)
+        self.assertFalse(response.data['is_hidden'])
+
+    def test_featured_hidden_auction_excluded_from_public_list(self):
+        self.auction.is_featured = True
+        self.auction.is_hidden = True
+        self.auction.save(update_fields=['is_featured', 'is_hidden'])
+        self._auth(None)
+        ids = [row['id'] for row in self.client.get('/api/auctions/').data]
+        self.assertNotIn(self.auction.pk, ids)
+        active_ids = [
+            row['id'] for row in self.client.get('/api/auctions/active/').data
+        ]
+        self.assertNotIn(self.auction.pk, active_ids)
+        detail = self.client.get(f'/api/auctions/{self.auction.pk}/')
+        self.assertEqual(detail.status_code, 404)

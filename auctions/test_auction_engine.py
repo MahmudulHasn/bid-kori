@@ -586,6 +586,15 @@ class PaymentCheckoutBehaviorTests(APITestCase):
         self.assertTrue(response.data.get('transaction_id'))
         auction.refresh_from_db()
         self.assertTrue(auction.is_paid)
+        payment = Payment.objects.get(auction=auction)
+        self.assertEqual(payment.amount, auction.current_highest_bid)
+        self.assertIsNotNone(payment.fee_rate)
+        self.assertIsNotNone(payment.platform_fee)
+        self.assertIsNotNone(payment.seller_net_amount)
+        self.assertEqual(
+            payment.amount,
+            payment.platform_fee + payment.seller_net_amount,
+        )
 
     def test_non_winner_cannot_checkout(self):
         auction = self._closed_auction_with_winner()

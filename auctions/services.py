@@ -1,9 +1,16 @@
+import uuid
+
 from django.core.exceptions import ValidationError
-from django.db import connection, transaction
+from django.db import IntegrityError, connection, transaction
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
-from .models import Auction, Bid
+from .fees import (
+    FeeCalculationError,
+    calculate_sale_fee_snapshot,
+    get_platform_success_fee_percent,
+)
+from .models import Auction, Bid, Payment
 
 
 class AuctionLifecycleService:
@@ -175,12 +182,12 @@ class AuctionLifecycleService:
         *,
         reason: str | None = None,
         moderator=None,
-        enforce_unpaid: bool = False,
+        enforce_unpaid: bool = True,
     ):
         """Cancel an ACTIVE auction; clears the winner and blocks checkout.
 
-        Seller and Admin paths share this method. ``enforce_unpaid=True`` is for
-        Admin cancel only (rejects ``is_paid`` or an existing Payment row).
+        Seller and Admin paths share this method. By default rejects
+        ``is_paid`` or an existing Payment row (``enforce_unpaid=True``).
 
         On a real ACTIVE → CANCELLED transition, schedules ``auction.cancelled``
         (never ``auction.closed``). Already-CANCELLED is idempotent with no
@@ -475,6 +482,174 @@ def close_all_expired_auctions(*, now=None):
         )
 
     return result
+
+
+class CheckoutAlreadyCompleted(Exception):
+    """Winner attempted checkout when a completed sale is already recorded."""
+
+    def __init__(self, payment=None, message=None):
+        self.payment = payment
+        self.message = message or 'Payment already completed for this auction.'
+        super().__init__(self.message)
+
+
+class CheckoutForbidden(Exception):
+    """Authenticated user is not the winning bidder."""
+
+    def __init__(self, message=None):
+        self.message = message or (
+            'Only the winning bidder can complete checkout.'
+        )
+        super().__init__(self.message)
+
+
+class CheckoutService:
+    """Mock winner checkout with row-locked concurrency and fee snapshots.
+
+    Completing checkout writes a COMPLETED Payment ledger row and sets
+    ``Auction.is_paid=True``. This is mock settlement / accounting only —
+    not a payment-provider capture or seller payout.
+
+    Seller suspension is not checked: historical winning sales remain payable
+    by an authenticated active winner. Suspended winners cannot authenticate.
+    """
+
+    ALREADY_COMPLETED_MESSAGE = 'Payment already completed for this auction.'
+    NOT_CLOSED_MESSAGE = 'Checkout is only allowed for CLOSED auctions.'
+    NO_WINNER_MESSAGE = 'This auction has no winning bidder to charge.'
+    NOT_WINNER_MESSAGE = 'Only the winning bidder can complete checkout.'
+    INCONSISTENT_PAID_MESSAGE = (
+        'Auction is marked paid but has no Payment record; checkout rejected.'
+    )
+    INVALID_GROSS_MESSAGE = 'Winning sale amount must be greater than zero.'
+
+    @classmethod
+    def _lock_auction(cls, auction_id):
+        queryset = Auction.objects.select_related(
+            'winning_bidder',
+            'product',
+            'product__seller',
+            'payment',
+        )
+        if connection.features.has_select_for_update:
+            queryset = queryset.select_for_update()
+        return get_object_or_404(queryset, pk=auction_id)
+
+    @classmethod
+    def _existing_payment(cls, auction):
+        try:
+            return auction.payment
+        except Payment.DoesNotExist:
+            return None
+
+    @classmethod
+    def _raise_already_completed(cls, payment=None, message=None):
+        raise CheckoutAlreadyCompleted(
+            payment=payment,
+            message=message or cls.ALREADY_COMPLETED_MESSAGE,
+        )
+
+    @classmethod
+    def checkout_for_winner(cls, auction_id, user):
+        """Complete mock checkout for ``user`` on ``auction_id``.
+
+        Returns the COMPLETED ``Payment``. Raises ``ValidationError`` for
+        domain rejections (mapped to 400/403 by the view) or
+        ``CheckoutAlreadyCompleted`` for duplicate checkout.
+        """
+        with transaction.atomic():
+            auction = cls._lock_auction(auction_id)
+
+            if auction.status != Auction.Status.CLOSED:
+                raise ValidationError(cls.NOT_CLOSED_MESSAGE)
+
+            if auction.winning_bidder_id is None:
+                raise ValidationError(cls.NO_WINNER_MESSAGE)
+
+            if user.pk != auction.winning_bidder_id:
+                raise CheckoutForbidden(cls.NOT_WINNER_MESSAGE)
+
+            existing = cls._existing_payment(auction)
+
+            if existing is not None and existing.status == Payment.Status.COMPLETED:
+                # Do not retroactively populate legacy null fee snapshots.
+                cls._raise_already_completed(existing)
+
+            if auction.is_paid:
+                if existing is None:
+                    cls._raise_already_completed(
+                        None,
+                        message=cls.INCONSISTENT_PAID_MESSAGE,
+                    )
+                cls._raise_already_completed(existing)
+
+            amount = auction.current_highest_bid
+            if amount is None or amount <= 0:
+                raise ValidationError(cls.INVALID_GROSS_MESSAGE)
+
+            try:
+                snapshot = calculate_sale_fee_snapshot(
+                    amount,
+                    get_platform_success_fee_percent(),
+                )
+            except FeeCalculationError as exc:
+                raise ValidationError(str(exc)) from exc
+
+            transaction_id = f'TXN-{uuid.uuid4().hex[:16].upper()}'
+            fee_fields = {
+                'fee_rate': snapshot.fee_rate,
+                'platform_fee': snapshot.platform_fee,
+                'seller_net_amount': snapshot.seller_net_amount,
+            }
+
+            try:
+                # Nested atomic = savepoint so IntegrityError does not abort
+                # the outer checkout transaction on PostgreSQL.
+                with transaction.atomic():
+                    if existing is not None:
+                        payment = existing
+                        payment.user = user
+                        payment.amount = amount
+                        payment.status = Payment.Status.COMPLETED
+                        payment.transaction_id = transaction_id
+                        payment.fee_rate = snapshot.fee_rate
+                        payment.platform_fee = snapshot.platform_fee
+                        payment.seller_net_amount = snapshot.seller_net_amount
+                        payment.save(
+                            update_fields=[
+                                'user',
+                                'amount',
+                                'status',
+                                'transaction_id',
+                                'fee_rate',
+                                'platform_fee',
+                                'seller_net_amount',
+                                'updated_at',
+                            ]
+                        )
+                    else:
+                        payment = Payment.objects.create(
+                            auction=auction,
+                            user=user,
+                            amount=amount,
+                            status=Payment.Status.COMPLETED,
+                            transaction_id=transaction_id,
+                            **fee_fields,
+                        )
+            except IntegrityError:
+                raced = Payment.objects.filter(auction_id=auction.pk).first()
+                if raced is not None and raced.status == Payment.Status.COMPLETED:
+                    cls._raise_already_completed(raced)
+                auction.refresh_from_db(fields=['is_paid'])
+                if auction.is_paid:
+                    cls._raise_already_completed(raced)
+                raise ValidationError(
+                    'Unable to complete checkout due to a conflicting payment record.'
+                )
+
+            auction.is_paid = True
+            auction.save(update_fields=['is_paid'])
+            return payment
 
 
 # Backwards-compatible alias for imports that reference AuctionStateMachine.

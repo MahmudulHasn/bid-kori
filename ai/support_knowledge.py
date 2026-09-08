@@ -97,7 +97,9 @@ Sellers use the Seller workspace for these steps.
 
 ## Checkout and payments
 - When a Buyer wins an auction, BidKori provides a basic/mock checkout flow for
-  won auctions.
+  won auctions. Checkout records a Payment ledger row (not bank settlement).
+- Seller-side successful-sale commission may be snapshotted on new completed
+  Payments (server-configured; Buyer still pays only the winning amount).
 - This is not a full production payment processor. Do not promise real bank
   settlement, refunds, chargebacks, shipping guarantees, or buyer-protection
   policies.
@@ -112,7 +114,7 @@ Sellers use the Seller workspace for these steps.
 
 ## Unsupported features (do not invent)
 Watchlist, Admin user management for end users, refunds, disputes, ratings,
-seller verification badges, premium subscriptions, platform fees schedules,
-real payment settlement, shipping guarantees, and marketplace reports are not
-part of current BidKori help knowledge.
+seller verification badges, premium subscriptions, real payment settlement,
+shipping guarantees, payouts, and marketplace reports are not part of current
+BidKori help knowledge.
 """.strip()

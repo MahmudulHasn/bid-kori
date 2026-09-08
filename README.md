@@ -195,7 +195,7 @@ Ensure the Django API is reachable at `http://127.0.0.1:8000`.
 | `POST` | `/api/auctions/<id>/place-bid/` | Place bid (atomic + rate limited; broadcasts `bid.accepted` after commit) |
 | `WS` | `/ws/auctions/<id>/` | Subscribe to live `bid.accepted` / `auction.closed` / `auction.cancelled` events (read-only; no bid submission) |
 | `WS` | `/ws/notifications/` | Authenticated private inbox push (`notification.created`); first message auth with DRF token (no token in URL) |
-| `POST` | `/api/auctions/<id>/checkout/` | Winner mock payment checkout |
+| `POST` | `/api/auctions/<id>/checkout/` | Winner mock payment checkout (ledger only; seller-side fee snapshot) |
 | `GET` | `/api/auctions/my-bids/` | Buyer bid dashboard data |
 | `GET` | `/api/notifications/` | Authenticated user's notifications (paginated, newest first) |
 | `POST` | `/api/notifications/<id>/read/` | Mark one own notification read |
@@ -207,6 +207,23 @@ Auth header:
 ```http
 Authorization: Token <your-token>
 ```
+
+### Successful-sale fee (mock checkout accounting)
+
+BidKori MVP monetization is **seller-side successful-sale commission** recorded on mock checkout — **not** real payment-provider settlement, bank capture, payouts, refunds, tax, or subscription billing.
+
+| Rule | Detail |
+| --- | --- |
+| Who pays the sale amount | Buyer pays the **winning amount only** (`Payment.amount`) |
+| Platform fee | Deducted from Seller gross proceeds (commission) |
+| Default rate | **5.00%** via `PLATFORM_SUCCESS_FEE_PERCENT` (env/settings; `0`–`100`) |
+| When fee is recognized | Only when mock checkout creates a **COMPLETED** Payment |
+| Snapshots | `fee_rate`, `platform_fee`, `seller_net_amount` stored immutably on Payment |
+| Historical rows | Pre-fee Payments may have **null** fee fields — do not invent backfilled revenue |
+| Concurrency | Checkout locks the Auction row (`select_for_update`) before Payment create |
+| Not included | Gateways, payouts, refunds, Premium, buyer surcharge, VAT |
+
+Changing `PLATFORM_SUCCESS_FEE_PERCENT` never recalculates existing Payment snapshots.
 
 ### Admin Users (Suspend / Reactivate)
 
@@ -262,6 +279,7 @@ Semantics:
 - Admin only (Seller cancel remains a separate owner transition endpoint).
 - ACTIVE unpaid auctions only via `AuctionLifecycleService` (no raw status writes).
 - Rejects `CLOSED`, `is_paid=True`, or any existing `Payment` row (even if `is_paid` is inconsistent).
+- The same unpaid/Payment guard applies to Seller lifecycle cancel (owner transition), not only Admin cancel.
 - Already `CANCELLED` → idempotent **200** (no duplicate `auction.cancelled` broadcast).
 - Preserves all Bid rows; clears `winning_bidder`; does not delete Product/Auction/Payment.
 - Does **not** auto-set `is_hidden` — hide/restore stay independent of lifecycle cancel.
@@ -269,6 +287,7 @@ Semantics:
 - Emits exactly one public WebSocket `auction.cancelled` after commit (`winning_bidder: null`; no moderation_reason on the wire).
 - Does **not** emit `auction.closed` on cancel.
 - Seller cancellation also emits `auction.cancelled` (same lifecycle broadcast).
+- Auction WebSocket subscribe mirrors REST retrieve: hidden auctions are not joinable by anonymous/public users (Seller/Admin/participants may still subscribe).
 
 ### AI listing description draft
 

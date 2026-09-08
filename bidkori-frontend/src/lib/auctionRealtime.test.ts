@@ -427,6 +427,27 @@ test('stale bid.accepted after CLOSED does not reopen or regress price', () => {
   assert.equal(result.auction?.winning_bidder, 7);
 });
 
+test('stale auction.closed after CANCELLED does not invent winner', () => {
+  const cancelled = sampleAuction({
+    status: 'CANCELLED',
+    winning_bidder: null,
+    winning_bidder_username: null,
+  });
+  const frozen = structuredClone(cancelled);
+  const result = applyAuctionClosedToAuction(
+    cancelled,
+    validClosedEvent({
+      winning_bidder: { id: 7, username: 'buyer1' },
+    }),
+    42,
+  );
+  assert.equal(result.applied, false);
+  assert.equal(result.revalidate, true);
+  assert.equal(result.auction?.status, 'CANCELLED');
+  assert.equal(result.auction?.winning_bidder, null);
+  assert.deepEqual(cancelled, frozen);
+});
+
 test('compareMoneyAmounts: decimal-safe ordering', () => {
   assert.equal(compareMoneyAmounts('10.00', '9.99'), 1);
   assert.equal(compareMoneyAmounts('10.00', '10.00'), 0);
