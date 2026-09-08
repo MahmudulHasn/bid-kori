@@ -51,6 +51,16 @@ class Auction(models.Model):
     )
     is_featured = models.BooleanField(default=False)
     is_paid = models.BooleanField(default=False)
+    is_hidden = models.BooleanField(default=False)
+    moderation_reason = models.TextField(blank=True, default='')
+    moderated_at = models.DateTimeField(null=True, blank=True)
+    moderated_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='moderated_auctions',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

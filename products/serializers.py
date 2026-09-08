@@ -72,10 +72,32 @@ class ProductSerializer(serializers.ModelSerializer):
             'description',
             'condition',
             'images',
+            'is_hidden',
+            'moderation_reason',
+            'moderated_at',
             'created_at',
             'updated_at',
         ]
-        read_only_fields = ['seller', 'images', 'created_at', 'updated_at']
+        read_only_fields = [
+            'seller',
+            'images',
+            'is_hidden',
+            'moderation_reason',
+            'moderated_at',
+            'created_at',
+            'updated_at',
+        ]
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        request = self.context.get('request')
+        user = getattr(request, 'user', None) if request else None
+        from .visibility import user_can_see_product_moderation_reason
+
+        if not user_can_see_product_moderation_reason(user, instance):
+            data.pop('moderation_reason', None)
+            data.pop('moderated_at', None)
+        return data
 
 
 class ProductDescriptionGenerationSerializer(serializers.Serializer):

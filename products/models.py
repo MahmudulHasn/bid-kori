@@ -45,6 +45,16 @@ class Product(models.Model):
         choices=Condition.choices,
         default=Condition.USED_GOOD,
     )
+    is_hidden = models.BooleanField(default=False)
+    moderation_reason = models.TextField(blank=True, default='')
+    moderated_at = models.DateTimeField(null=True, blank=True)
+    moderated_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='moderated_products',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

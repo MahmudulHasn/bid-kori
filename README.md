@@ -186,6 +186,10 @@ Ensure the Django API is reachable at `http://127.0.0.1:8000`.
 | `GET` | `/api/products/<id>/images/` | List Product images (ordered by `uploaded_at`, `id`) |
 | `POST` | `/api/products/<id>/images/` | Upload Product images (multipart field `images`; owner; freeze-aware) |
 | `DELETE` | `/api/products/<id>/images/<image_id>/` | Delete Product image (owner; freeze-aware) |
+| `POST` | `/api/admin/products/<id>/hide/` | Admin hide Product (visibility only; optional `reason`) |
+| `POST` | `/api/admin/products/<id>/restore/` | Admin restore Product visibility |
+| `POST` | `/api/admin/auctions/<id>/hide/` | Admin hide Auction (visibility only; does not cancel) |
+| `POST` | `/api/admin/auctions/<id>/restore/` | Admin restore Auction visibility |
 | `POST` | `/api/auctions/` | Create auction (JSON or multipart + images) |
 | `POST` | `/api/auctions/<id>/images/` | Upload auction images |
 | `POST` | `/api/auctions/<id>/place-bid/` | Place bid (atomic + rate limited; broadcasts `bid.accepted` after commit) |
@@ -227,6 +231,25 @@ Staff-only (`IsAdminUser` — Django `is_staff` / superuser). Public auth routes
 - Formats: JPEG / PNG / WEBP / GIF (Pillow content validation).
 - Upload/delete: Product **owner only**; blocked when Product mutation is frozen.
 - Default display image = first by `uploaded_at`, then `id` (no primary API).
+
+### Admin visibility moderation (MOD-B01)
+
+Staff-only (`IsAdminUser`) action endpoints:
+
+- `POST /api/admin/products/<id>/hide/` — optional JSON `{ "reason": "..." }`
+- `POST /api/admin/products/<id>/restore/`
+- `POST /api/admin/auctions/<id>/hide/` — optional JSON `{ "reason": "..." }`
+- `POST /api/admin/auctions/<id>/restore/`
+
+Behavior:
+
+- Hide removes public marketplace visibility (list/active/search/detail) without deleting data.
+- Hide does **not** cancel Auction lifecycle (`ACTIVE`/`CLOSED`/`CANCELLED` unchanged).
+- Hidden Auction **or** hidden Product blocks new bids; auto-close still runs.
+- Seller still sees own hidden Product/Auction; Admin lists remain unfiltered for staff.
+- Buyer My Bids / winner history access is preserved for participants.
+- Seller cannot clear `is_hidden` via Product/Auction PATCH.
+- Direct media file URLs may remain reachable if the URL is known (storage ACL not redesigned).
 
 ### AI listing description draft
 

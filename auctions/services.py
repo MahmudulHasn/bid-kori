@@ -279,6 +279,13 @@ class BidService:
                     'Action forbidden: Sellers cannot bid on their own listings.'
                 )
 
+            from .visibility import auction_accepts_new_bids
+
+            if not auction_accepts_new_bids(auction):
+                raise ValidationError(
+                    'This auction is not available for bidding.'
+                )
+
             if auction.status == Auction.Status.ACTIVE and now >= auction.end_time:
                 AuctionLifecycleService._finalize_close(auction)
                 reject_bid = True

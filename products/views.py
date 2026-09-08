@@ -70,19 +70,25 @@ class ProductListCreateView(generics.ListCreateAPIView):
 
     BUYER tokens receive 403 on create. Nested Product creation inside Auction
     create serializers is unaffected by this view-level gate.
+
+    Public list excludes Admin-hidden Products; staff see all; sellers still see
+    their own hidden Products.
     """
 
-    queryset = (
-        Product.objects.select_related('category', 'seller')
-        .prefetch_related('images')
-        .all()
-    )
     serializer_class = ProductSerializer
     permission_classes = [
         IsAuthenticatedOrReadOnly,
         IsSellerOrAdminForProductCreate,
         IsSellerOrReadOnly,
     ]
+
+    def get_queryset(self):
+        from .visibility import products_visible_to_user
+
+        base = Product.objects.select_related('category', 'seller').prefetch_related(
+            'images'
+        )
+        return products_visible_to_user(self.request.user, base)
 
     def perform_create(self, serializer):
         serializer.save(seller=self.request.user)
@@ -168,15 +174,30 @@ class ProductDetailView(generics.RetrieveUpdateDestroyAPIView):
     IsSellerOrReadOnly. UPDATE is blocked when a linked Auction is frozen by
     ``AuctionMutationPolicy`` (started, has bids, or CLOSED/CANCELLED) for all
     roles including ADMIN. DELETE is blocked when any Auction is linked.
+
+    Public retrieve of Admin-hidden Products returns 404. Seller/Admin retain
+    access. Seller cannot clear moderation fields via PATCH.
     """
 
-    queryset = (
-        Product.objects.select_related('category', 'seller')
-        .prefetch_related('images')
-        .all()
-    )
     serializer_class = ProductSerializer
     permission_classes = [IsAuthenticatedOrReadOnly, IsSellerOrReadOnly]
+
+    def get_queryset(self):
+        return (
+            Product.objects.select_related('category', 'seller')
+            .prefetch_related('images')
+            .all()
+        )
+
+    def get_object(self):
+        from rest_framework.exceptions import NotFound
+
+        from .visibility import user_can_retrieve_product
+
+        obj = super().get_object()
+        if not user_can_retrieve_product(self.request.user, obj):
+            raise NotFound()
+        return obj
 
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop('partial', False)
@@ -244,7 +265,13 @@ class ProductImageListCreateView(APIView):
         return [IsAuthenticated(), IsSellerOrReadOnly()]
 
     def get(self, request, product_id):
+        from rest_framework.exceptions import NotFound
+
+        from .visibility import user_can_retrieve_product
+
         product = get_object_or_404(Product, pk=product_id)
+        if not user_can_retrieve_product(request.user, product):
+            raise NotFound()
         images = product.images.all().order_by('uploaded_at', 'id')
         serializer = ProductImageSerializer(
             images,

@@ -104,6 +104,9 @@ class AuctionSerializer(serializers.ModelSerializer):
             'status',
             'is_featured',
             'is_paid',
+            'is_hidden',
+            'moderation_reason',
+            'moderated_at',
             'images',
             'uploaded_images',
             'server_time',
@@ -115,12 +118,26 @@ class AuctionSerializer(serializers.ModelSerializer):
             'is_paid',
             # Featured placement is a platform capability (Django admin / staff).
             'is_featured',
+            'is_hidden',
+            'moderation_reason',
+            'moderated_at',
             'server_time',
         ]
 
     def get_server_time(self, obj):
         """Return timezone.now() at serialization — zero DB work."""
         return timezone.now()
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        request = self.context.get('request')
+        user = getattr(request, 'user', None) if request else None
+        from .visibility import user_can_see_auction_moderation_reason
+
+        if not user_can_see_auction_moderation_reason(user, instance):
+            data.pop('moderation_reason', None)
+            data.pop('moderated_at', None)
+        return data
 
     def validate_starting_bid(self, value):
         if value <= 0:
@@ -313,6 +330,10 @@ class AuctionSerializer(serializers.ModelSerializer):
         validated_data.pop('status', None)
         validated_data.pop('is_paid', None)
         validated_data.pop('is_featured', None)
+        validated_data.pop('is_hidden', None)
+        validated_data.pop('moderation_reason', None)
+        validated_data.pop('moderated_at', None)
+        validated_data.pop('moderated_by', None)
 
         with transaction.atomic():
             if existing_product is not None:
@@ -348,6 +369,10 @@ class AuctionSerializer(serializers.ModelSerializer):
         validated_data.pop('status', None)
         validated_data.pop('is_paid', None)
         validated_data.pop('is_featured', None)
+        validated_data.pop('is_hidden', None)
+        validated_data.pop('moderation_reason', None)
+        validated_data.pop('moderated_at', None)
+        validated_data.pop('moderated_by', None)
         validated_data.pop('_existing_product', None)
         validated_data.pop('_nested_product_data', None)
         validated_data.pop('seller', None)
@@ -477,6 +502,7 @@ class AuctionDetailSerializer(serializers.ModelSerializer):
             'winning_bidder_username',
             'status',
             'is_paid',
+            'is_hidden',
             'is_active',
             'recent_bids',
             'images',

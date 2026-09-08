@@ -86,8 +86,15 @@ class AuctionViewSet(viewsets.ModelViewSet):
     parser_classes = (MultiPartParser, FormParser, JSONParser)
 
     def get_queryset(self):
+        from .visibility import auctions_visible_to_user
+
         queryset = (
-            Auction.objects.select_related('product', 'product__category', 'winning_bidder')
+            Auction.objects.select_related(
+                'product',
+                'product__category',
+                'product__seller',
+                'winning_bidder',
+            )
             .prefetch_related('images')
             .all()
         )
@@ -96,6 +103,8 @@ class AuctionViewSet(viewsets.ModelViewSet):
         # otherwise e.g. GET /auctions/1/?status=CLOSED 404s an ACTIVE auction.
         if getattr(self, 'action', None) != 'list':
             return queryset
+
+        queryset = auctions_visible_to_user(self.request.user, queryset)
 
         status_param = self.request.query_params.get('status')
         category = self.request.query_params.get('category')
@@ -115,6 +124,16 @@ class AuctionViewSet(viewsets.ModelViewSet):
             )
 
         return queryset
+
+    def get_object(self):
+        from rest_framework.exceptions import NotFound
+
+        from .visibility import user_can_retrieve_auction
+
+        obj = super().get_object()
+        if not user_can_retrieve_auction(self.request.user, obj):
+            raise NotFound()
+        return obj
 
     @extend_schema(
         tags=['Auctions'],
@@ -572,15 +591,20 @@ class ActiveAuctionListView(APIView):
     def get(self, request):
         now = timezone.now()
         # Match Auction.is_biddable(): ACTIVE and within [start_time, end_time).
-        auctions = (
+        # Hidden Auction / Product-hidden Auction are excluded from public active.
+        from .visibility import publicly_visible_auctions
+
+        auctions = publicly_visible_auctions(
             Auction.objects.filter(
                 status=Auction.Status.ACTIVE,
                 start_time__lte=now,
                 end_time__gt=now,
             )
-            .select_related('product', 'product__category', 'winning_bidder')
-            .prefetch_related('bids__bidder', 'images')
-        )
+        ).select_related(
+            'product',
+            'product__category',
+            'winning_bidder',
+        ).prefetch_related('bids__bidder', 'images')
 
         category = request.query_params.get('category')
         search = request.query_params.get('search')
@@ -612,7 +636,16 @@ class AuctionBidHistoryView(APIView):
         responses={200: BidSerializer(many=True)},
     )
     def get(self, request, auction_id):
-        auction = get_object_or_404(Auction, pk=auction_id)
+        from rest_framework.exceptions import NotFound
+
+        from .visibility import user_can_retrieve_auction
+
+        auction = get_object_or_404(
+            Auction.objects.select_related('product', 'product__seller'),
+            pk=auction_id,
+        )
+        if not user_can_retrieve_auction(request.user, auction):
+            raise NotFound()
         bids = (
             Bid.objects.filter(auction=auction)
             .select_related('bidder', 'auction')
