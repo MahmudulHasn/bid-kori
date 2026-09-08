@@ -55,6 +55,28 @@ class FeeCalculationUnitTests(TestCase):
         self.assertEqual(snap.platform_fee, Decimal('0.00'))
         self.assertEqual(snap.seller_net_amount, Decimal('1000.00'))
 
+    def test_penny_gross_half_up(self):
+        snap = calculate_sale_fee_snapshot(Decimal('0.01'), Decimal('5.00'))
+        self.assertEqual(snap.platform_fee, Decimal('0.00'))
+        self.assertEqual(snap.seller_net_amount, Decimal('0.01'))
+        self.assertEqual(
+            snap.platform_fee + snap.seller_net_amount,
+            Decimal('0.01'),
+        )
+
+    def test_ten_cents_and_large_near_precision(self):
+        snap_ten = calculate_sale_fee_snapshot(Decimal('0.10'), Decimal('5.00'))
+        self.assertEqual(snap_ten.platform_fee, Decimal('0.01'))
+        self.assertEqual(snap_ten.seller_net_amount, Decimal('0.09'))
+        # max_digits=10, decimal_places=2 → largest practical 2dp value in field
+        large = Decimal('99999999.99')
+        snap_large = calculate_sale_fee_snapshot(large, Decimal('5.00'))
+        self.assertEqual(
+            snap_large.platform_fee + snap_large.seller_net_amount,
+            large,
+        )
+        self.assertGreaterEqual(snap_large.seller_net_amount, Decimal('0.00'))
+
     def test_hundred_percent(self):
         snap = calculate_sale_fee_snapshot(Decimal('1000.00'), Decimal('100.00'))
         self.assertEqual(snap.platform_fee, Decimal('1000.00'))
@@ -331,6 +353,24 @@ class PaymentFeeCheckoutTests(APITestCase):
         self.assertIsNone(payment.fee_rate)
         self.assertIsNone(payment.platform_fee)
         self.assertIsNone(payment.seller_net_amount)
+
+    def test_checkout_rollback_when_is_paid_save_fails(self):
+        auction = self._closed_auction(Decimal('1000.00'))
+        original_save = Auction.save
+
+        def fail_is_paid_save(self, *args, **kwargs):
+            update_fields = kwargs.get('update_fields')
+            if update_fields is not None and list(update_fields) == ['is_paid']:
+                raise RuntimeError('forced is_paid failure')
+            return original_save(self, *args, **kwargs)
+
+        with patch.object(Auction, 'save', fail_is_paid_save):
+            with self.assertRaises(RuntimeError):
+                CheckoutService.checkout_for_winner(auction.pk, self.winner)
+
+        auction.refresh_from_db()
+        self.assertFalse(auction.is_paid)
+        self.assertFalse(Payment.objects.filter(auction=auction).exists())
 
     def test_is_paid_without_payment_rejects(self):
         auction = self._closed_auction()

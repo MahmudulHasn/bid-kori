@@ -220,7 +220,7 @@ BidKori MVP monetization is **seller-side successful-sale commission** recorded 
 | When fee is recognized | Only when mock checkout creates a **COMPLETED** Payment |
 | Snapshots | `fee_rate`, `platform_fee`, `seller_net_amount` stored immutably on Payment |
 | Historical rows | Pre-fee Payments may have **null** fee fields — do not invent backfilled revenue |
-| Concurrency | Checkout locks the Auction row (`select_for_update`) before Payment create |
+| Concurrency | Checkout locks the Auction row (`select_for_update`) before Payment create. Full concurrent duplicate safety requires a DB that supports row locking (PostgreSQL in Docker/production). Local SQLite falls back without `select_for_update`; sequential duplicate checks + OneToOne uniqueness still apply. |
 | Not included | Gateways, payouts, refunds, Premium, buyer surcharge, VAT |
 
 Changing `PLATFORM_SUCCESS_FEE_PERCENT` never recalculates existing Payment snapshots.
