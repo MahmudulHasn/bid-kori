@@ -7,6 +7,7 @@ import { format } from 'date-fns';
 import useSWR from 'swr';
 import type { ReactNode } from 'react';
 
+import AuctionModerationActions from '@/components/admin/AuctionModerationActions';
 import { getApiErrorMessage, getApiStatus } from '@/lib/apiErrors';
 import {
   ADMIN_AUCTIONS_PATH,
@@ -70,7 +71,15 @@ function money(value: string | number | undefined): string {
   return formatAuctionMoney(n);
 }
 
-function AuctionDetailBody({ auction }: { auction: Auction }) {
+function AuctionDetailBody({
+  auction,
+  detailKey,
+  onAuctionPatched,
+}: {
+  auction: Auction;
+  detailKey: string;
+  onAuctionPatched: (next: Auction) => void | Promise<void>;
+}) {
   const title = getAdminAuctionTitle(auction);
   const productId = getAdminAuctionProductId(auction);
   const start = formatTimestamp(auction.start_time);
@@ -105,7 +114,7 @@ function AuctionDetailBody({ auction }: { auction: Auction }) {
           {title}
         </h1>
         <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-          Read-only auction record from the platform catalog.
+          Auction record from the platform catalog. Economics remain read-only.
         </p>
         {productId != null ? (
           <p className="mt-3">
@@ -122,6 +131,12 @@ function AuctionDetailBody({ auction }: { auction: Auction }) {
       <p className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900/60 dark:text-zinc-400">
         {ADMIN_AUCTION_READONLY_COPY}
       </p>
+
+      <AuctionModerationActions
+        auction={auction}
+        detailKey={detailKey}
+        onAuctionPatched={onAuctionPatched}
+      />
 
       <section
         aria-labelledby="auction-details-heading"
@@ -408,5 +423,13 @@ export default function AdminAuctionDetailPage() {
     );
   }
 
-  return <AuctionDetailBody auction={auction} />;
+  return (
+    <AuctionDetailBody
+      auction={auction}
+      detailKey={detailKey}
+      onAuctionPatched={async (next) => {
+        await mutate(next, { revalidate: false });
+      }}
+    />
+  );
 }

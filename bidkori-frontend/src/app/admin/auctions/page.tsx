@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import useSWR from 'swr';
 
+import ModerationVisibilityBadge from '@/components/admin/ModerationVisibilityBadge';
 import { getApiErrorMessage } from '@/lib/apiErrors';
 import {
   ADMIN_AUCTIONS_PATH,
@@ -58,9 +59,15 @@ function AuctionCard({ auction }: { auction: Auction }) {
           </dd>
         </div>
         <div className="flex justify-between gap-3">
-          <dt>Status</dt>
+          <dt>Lifecycle</dt>
           <dd className="text-zinc-800 dark:text-zinc-200">
             {formatAdminAuctionStatusLabel(auction.status)}
+          </dd>
+        </div>
+        <div className="flex justify-between gap-3">
+          <dt>Visibility</dt>
+          <dd>
+            <ModerationVisibilityBadge isHidden={auction.is_hidden} />
           </dd>
         </div>
         <div className="flex justify-between gap-3">
@@ -284,7 +291,10 @@ export default function AdminAuctionsPage() {
                     Seller
                   </th>
                   <th scope="col" className="px-4 py-3">
-                    Status
+                    Lifecycle
+                  </th>
+                  <th scope="col" className="px-4 py-3">
+                    Visibility
                   </th>
                   <th scope="col" className="px-4 py-3">
                     Amount
@@ -332,6 +342,9 @@ export default function AdminAuctionsPage() {
                       </td>
                       <td className="px-4 py-3 text-zinc-700 dark:text-zinc-300">
                         {formatAdminAuctionStatusLabel(auction.status)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <ModerationVisibilityBadge isHidden={auction.is_hidden} />
                       </td>
                       <td className="px-4 py-3 text-zinc-700 dark:text-zinc-300">
                         <div className="text-xs text-zinc-500 dark:text-zinc-400">

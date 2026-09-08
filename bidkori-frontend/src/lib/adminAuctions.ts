@@ -13,7 +13,7 @@ import type { Auction, UserBid } from './types.ts';
 export const ADMIN_AUCTIONS_PATH = '/admin/auctions';
 
 export const ADMIN_AUCTION_READONLY_COPY =
-  'Auction records are read-only in the Admin workspace with the current REST API.';
+  'Auction economics remain read-only. Visibility (Hide/Restore) and lifecycle Cancel are available on the auction detail page.';
 
 export const ADMIN_AUCTION_SEARCH_HINT =
   'Uses backend ?search= on product title and description.';

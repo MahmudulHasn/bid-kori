@@ -6,6 +6,7 @@ import { format } from 'date-fns';
 import useSWR from 'swr';
 
 import { getApiErrorMessage } from '@/lib/apiErrors';
+import ModerationVisibilityBadge from '@/components/admin/ModerationVisibilityBadge';
 import {
   ADMIN_PRODUCT_READONLY_COPY,
   ADMIN_PRODUCT_SEARCH_HINT,
@@ -59,6 +60,12 @@ function ProductCard({ product }: { product: Product }) {
           <dt>Seller</dt>
           <dd className="text-zinc-800 dark:text-zinc-200">
             {formatAdminProductSeller(product.seller)}
+          </dd>
+        </div>
+        <div className="flex justify-between gap-3">
+          <dt>Visibility</dt>
+          <dd>
+            <ModerationVisibilityBadge isHidden={product.is_hidden} />
           </dd>
         </div>
         <div className="flex justify-between gap-3">
@@ -220,6 +227,9 @@ export default function AdminProductsPage() {
                         Seller
                       </th>
                       <th scope="col" className="px-4 py-3">
+                        Visibility
+                      </th>
+                      <th scope="col" className="px-4 py-3">
                         Created
                       </th>
                       <th scope="col" className="px-4 py-3 text-right">
@@ -253,6 +263,11 @@ export default function AdminProductsPage() {
                           </td>
                           <td className="px-4 py-3 text-zinc-700 dark:text-zinc-300">
                             {formatAdminProductSeller(product.seller)}
+                          </td>
+                          <td className="px-4 py-3">
+                            <ModerationVisibilityBadge
+                              isHidden={product.is_hidden}
+                            />
                           </td>
                           <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">
                             {formatCreatedAt(product.created_at)}

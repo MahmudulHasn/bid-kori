@@ -6,7 +6,7 @@ import type { Auction, Product } from './types.ts';
 export const ADMIN_PRODUCTS_PATH = '/admin/products';
 
 export const ADMIN_PRODUCT_READONLY_COPY =
-  'Product records are read-only in the Admin workspace with the current REST API.';
+  'Product catalog fields are read-only. Visibility can be moderated with Hide/Restore on the product detail page.';
 
 /** Client-side catalog filter label — not server search. */
 export const ADMIN_PRODUCT_SEARCH_HINT =

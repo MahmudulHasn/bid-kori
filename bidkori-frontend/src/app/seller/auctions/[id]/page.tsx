@@ -18,6 +18,7 @@ import {
   getAuctionTitle,
 } from '@/lib/auctionDisplay';
 import AuctionImageUploadSection from '@/components/seller/AuctionImageUploadSection';
+import SellerModerationNotice from '@/components/seller/SellerModerationNotice';
 import {
   AUCTIONS_LIST_API_PATH,
   auctionDetailFetcher,
@@ -158,6 +159,13 @@ function OwnedAuctionDetail({
         <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
           Auction summary for a listing you own.
         </p>
+        <div className="mt-3">
+          <SellerModerationNotice
+            isHidden={auction.is_hidden}
+            moderationReason={auction.moderation_reason}
+            entityLabel="Auction"
+          />
+        </div>
         <div className="mt-4 flex flex-wrap gap-3">
           {showEdit ? (
             <Link

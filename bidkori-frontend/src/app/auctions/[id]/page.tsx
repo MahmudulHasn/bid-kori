@@ -15,8 +15,10 @@ import api from '@/lib/api';
 import { getApiErrorMessage, getApiStatus } from '@/lib/apiErrors';
 import { isAuctionOwnedByUser } from '@/lib/auctionOwnership';
 import {
+  applyAuctionCancelledToAuction,
   applyAuctionClosedToAuction,
   applyBidAcceptedToAuction,
+  type AuctionCancelledEvent,
   type AuctionClosedEvent,
   type BidAcceptedEvent,
 } from '@/lib/auctionRealtime';
@@ -89,6 +91,29 @@ export default function AuctionDetailPage() {
     [auctionId, mutate],
   );
 
+  const handleAuctionCancelled = useCallback(
+    (event: AuctionCancelledEvent) => {
+      if (!auctionId) return;
+      void mutate(
+        (current) => {
+          const result = applyAuctionCancelledToAuction(
+            current,
+            event,
+            auctionId,
+          );
+          if (result.revalidate) {
+            queueMicrotask(() => {
+              void mutate();
+            });
+          }
+          return result.auction;
+        },
+        { revalidate: false },
+      );
+    },
+    [auctionId, mutate],
+  );
+
   const handleRealtimeReconnect = useCallback(() => {
     void mutate();
   }, [mutate]);
@@ -98,6 +123,7 @@ export default function AuctionDetailPage() {
     enabled: Boolean(auctionId),
     onBidAccepted: handleBidAccepted,
     onAuctionClosed: handleAuctionClosed,
+    onAuctionCancelled: handleAuctionCancelled,
     onReconnect: handleRealtimeReconnect,
   });
 
@@ -111,10 +137,11 @@ export default function AuctionDetailPage() {
     auction?.status === 'CLOSED' ||
     auction?.status === 'CANCELLED';
   const isBackendClosed = auction?.status === 'CLOSED';
+  const isBackendCancelled = auction?.status === 'CANCELLED';
   const priceLabel = auction ? getAuctionPriceLabel(auction) : null;
 
   const winnerLabel = (() => {
-    if (!isBackendClosed) return null;
+    if (!isBackendClosed || isBackendCancelled) return null;
     const username = auction?.winning_bidder_username?.trim();
     if (username) return username;
     if (auction?.winning_bidder != null) {
@@ -161,7 +188,11 @@ export default function AuctionDetailPage() {
       return;
     }
     if (!auctionId || biddingUnavailable) {
-      toast.error('This auction is closed.');
+      toast.error(
+        auction?.status === 'CANCELLED'
+          ? 'This auction was cancelled.'
+          : 'This auction is closed.',
+      );
       return;
     }
 
@@ -296,7 +327,11 @@ export default function AuctionDetailPage() {
           <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
             <div className="mb-3 flex items-center gap-2 text-sm font-medium text-zinc-500 dark:text-zinc-400">
               <Clock3 className="h-4 w-4" aria-hidden />
-              {biddingUnavailable ? 'Auction ended' : 'Time remaining'}
+              {isBackendCancelled
+                ? 'Auction cancelled'
+                : biddingUnavailable
+                  ? 'Auction ended'
+                  : 'Time remaining'}
             </div>
             <div className="grid grid-cols-4 gap-2 text-center">
               {[
@@ -346,6 +381,11 @@ export default function AuctionDetailPage() {
                 Status: {auction.status}
               </p>
             )}
+            {isBackendCancelled ? (
+              <p className="mt-3 text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                This auction was cancelled.
+              </p>
+            ) : null}
             {isBackendClosed ? (
               <p className="mt-3 text-sm text-zinc-700 dark:text-zinc-300">
                 {winnerLabel ? (

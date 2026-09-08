@@ -4,9 +4,11 @@ import { useEffect, useRef, useState } from 'react';
 
 import {
   buildAuctionWebSocketUrl,
+  isAuctionCancelledEvent,
   isAuctionClosedEvent,
   isBidAcceptedEvent,
   parseWebSocketJson,
+  type AuctionCancelledEvent,
   type AuctionClosedEvent,
   type BidAcceptedEvent,
 } from '@/lib/auctionRealtime';
@@ -23,6 +25,7 @@ type UseAuctionRealtimeOptions = {
   enabled?: boolean;
   onBidAccepted: (event: BidAcceptedEvent) => void;
   onAuctionClosed?: (event: AuctionClosedEvent) => void;
+  onAuctionCancelled?: (event: AuctionCancelledEvent) => void;
   /** Called after an unexpected disconnect reconnects successfully. */
   onReconnect?: () => void;
 };
@@ -35,7 +38,7 @@ function nextBackoffMs(attempt: number): number {
 }
 
 /**
- * Subscribe to `/ws/auctions/<id>/` for `bid.accepted` and `auction.closed`.
+ * Subscribe to `/ws/auctions/<id>/` for live auction events.
  * Receive-only — place bids via REST. Safe under Next.js (browser-only).
  */
 export function useAuctionRealtime({
@@ -43,6 +46,7 @@ export function useAuctionRealtime({
   enabled = true,
   onBidAccepted,
   onAuctionClosed,
+  onAuctionCancelled,
   onReconnect,
 }: UseAuctionRealtimeOptions): { status: AuctionRealtimeStatus } {
   const inactive =
@@ -51,6 +55,7 @@ export function useAuctionRealtime({
     useState<AuctionRealtimeStatus>('connecting');
   const onBidAcceptedRef = useRef(onBidAccepted);
   const onAuctionClosedRef = useRef(onAuctionClosed);
+  const onAuctionCancelledRef = useRef(onAuctionCancelled);
   const onReconnectRef = useRef(onReconnect);
 
   useEffect(() => {
@@ -60,6 +65,10 @@ export function useAuctionRealtime({
   useEffect(() => {
     onAuctionClosedRef.current = onAuctionClosed;
   }, [onAuctionClosed]);
+
+  useEffect(() => {
+    onAuctionCancelledRef.current = onAuctionCancelled;
+  }, [onAuctionCancelled]);
 
   useEffect(() => {
     onReconnectRef.current = onReconnect;
@@ -127,6 +136,14 @@ export function useAuctionRealtime({
             return;
           }
           onAuctionClosedRef.current?.(parsed);
+          return;
+        }
+
+        if (isAuctionCancelledEvent(parsed)) {
+          if (Number(parsed.auction_id) !== Number(auctionId)) {
+            return;
+          }
+          onAuctionCancelledRef.current?.(parsed);
           return;
         }
 

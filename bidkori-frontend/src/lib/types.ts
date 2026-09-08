@@ -54,6 +54,10 @@ export type AuctionProduct = {
   category?: number | null;
   /** Product seller user id — used for UX ownership checks only. */
   seller?: number | string | null;
+  /** Visibility moderation (Seller/Admin/private responses). */
+  is_hidden?: boolean;
+  moderation_reason?: string;
+  moderated_at?: string | null;
 };
 
 /** Catalog product from GET /products/ and GET /products/my-listings/. */
@@ -68,6 +72,10 @@ export type Product = {
   images?: ProductImage[];
   created_at?: string;
   updated_at?: string;
+  /** Visibility moderation (Seller/Admin/private responses). */
+  is_hidden?: boolean;
+  moderation_reason?: string;
+  moderated_at?: string | null;
 };
 
 /** Public Category catalog row from GET /categories/. */
@@ -106,6 +114,18 @@ export type Auction = {
   images?: AuctionImage[];
   /** Optional recent bids (active list); used for honest starting vs current labels. */
   recent_bids?: UserBid[];
+  /** Visibility moderation (Seller/Admin/private responses). */
+  is_hidden?: boolean;
+  moderation_reason?: string;
+  moderated_at?: string | null;
+};
+
+/** Compact Admin hide/restore response from ModerationStateSerializer. */
+export type ModerationState = {
+  id: number;
+  is_hidden: boolean;
+  moderation_reason: string;
+  moderated_at: string | null;
 };
 
 export type UserBid = {

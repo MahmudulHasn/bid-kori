@@ -2,14 +2,17 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  applyAuctionCancelledToAuction,
   applyAuctionClosedToAuction,
   applyBidAcceptedToAuction,
   buildAuctionWebSocketUrl,
   compareMoneyAmounts,
   eventMatchesAuctionId,
+  isAuctionCancelledEvent,
   isAuctionClosedEvent,
   isBidAcceptedEvent,
   parseWebSocketJson,
+  type AuctionCancelledEvent,
   type AuctionClosedEvent,
   type BidAcceptedEvent,
 } from './auctionRealtime.ts';
@@ -47,6 +50,19 @@ function validClosedEvent(
     winning_bidder: { id: 7, username: 'buyer1' },
     is_paid: false,
     closed_at: '2026-09-06T12:05:00Z',
+    ...overrides,
+  };
+}
+
+function validCancelledEvent(
+  overrides: Partial<AuctionCancelledEvent> = {},
+): AuctionCancelledEvent {
+  return {
+    type: 'auction.cancelled',
+    auction_id: 42,
+    status: 'CANCELLED',
+    winning_bidder: null,
+    server_time: '2026-09-08T12:00:00Z',
     ...overrides,
   };
 }
@@ -416,6 +432,78 @@ test('compareMoneyAmounts: decimal-safe ordering', () => {
   assert.equal(compareMoneyAmounts('10.00', '10.00'), 0);
   assert.equal(compareMoneyAmounts('9.50', '10.00'), -1);
   assert.equal(compareMoneyAmounts('25000.00', '25000'), 0);
+});
+
+test('isAuctionCancelledEvent: valid payload accepted', () => {
+  assert.equal(isAuctionCancelledEvent(validCancelledEvent()), true);
+});
+
+test('isAuctionCancelledEvent: malformed payloads rejected', () => {
+  assert.equal(
+    isAuctionCancelledEvent(validCancelledEvent({ status: 'CLOSED' as 'CANCELLED' })),
+    false,
+  );
+  assert.equal(
+    isAuctionCancelledEvent({
+      ...validCancelledEvent(),
+      winning_bidder: { id: 1, username: 'x' },
+    }),
+    false,
+  );
+  const missingId = { ...validCancelledEvent() };
+  delete (missingId as { auction_id?: number }).auction_id;
+  assert.equal(isAuctionCancelledEvent(missingId), false);
+  assert.equal(
+    isAuctionCancelledEvent(validCancelledEvent({ server_time: '' })),
+    false,
+  );
+  assert.equal(isAuctionCancelledEvent(validBidEvent()), false);
+  assert.equal(isAuctionCancelledEvent(validClosedEvent()), false);
+  assert.equal(isAuctionCancelledEvent({ type: 'auction.future' }), false);
+});
+
+test('applyAuctionCancelledToAuction: status CANCELLED and winner cleared', () => {
+  const auction = sampleAuction({
+    status: 'ACTIVE',
+    winning_bidder: 7,
+    winning_bidder_username: 'buyer1',
+  });
+  const frozen = structuredClone(auction);
+  const result = applyAuctionCancelledToAuction(
+    auction,
+    validCancelledEvent(),
+    42,
+  );
+  assert.equal(result.applied, true);
+  assert.equal(result.revalidate, true);
+  assert.equal(result.auction?.status, 'CANCELLED');
+  assert.equal(result.auction?.winning_bidder, null);
+  assert.equal(result.auction?.winning_bidder_username, null);
+  assert.equal(result.auction?.server_time, '2026-09-08T12:00:00Z');
+  assert.deepEqual(auction, frozen);
+});
+
+test('applyAuctionCancelledToAuction: duplicate remains CANCELLED', () => {
+  const auction = sampleAuction({
+    status: 'CANCELLED',
+    winning_bidder: null,
+    winning_bidder_username: null,
+  });
+  const result = applyAuctionCancelledToAuction(
+    auction,
+    validCancelledEvent(),
+    42,
+  );
+  assert.equal(result.applied, true);
+  assert.equal(result.auction?.status, 'CANCELLED');
+  assert.equal(result.auction?.winning_bidder, null);
+});
+
+test('unknown realtime event shapes are ignored by validators', () => {
+  const unknown = { type: 'auction.future', auction_id: 1 };
+  assert.equal(isBidAcceptedEvent(unknown), false);
+  assert.equal(isAuctionClosedEvent(unknown), false);
+  assert.equal(isAuctionCancelledEvent(unknown), false);
 });
 
 test('RT-F02 helpers are receive-only (no send/place-bid helpers exported)', async () => {

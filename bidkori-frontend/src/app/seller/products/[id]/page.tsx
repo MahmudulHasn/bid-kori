@@ -25,6 +25,7 @@ import {
 } from '@/lib/categoriesApi';
 import { resolveCategoryLabel } from '@/lib/categories';
 import ProductPhotosSection from '@/components/seller/ProductPhotosSection';
+import SellerModerationNotice from '@/components/seller/SellerModerationNotice';
 import {
   canOfferSellerProductEdit,
   canSellerDeleteProduct,
@@ -113,6 +114,13 @@ function OwnedProductDetail({
         <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
           Product details from your catalog.
         </p>
+        <div className="mt-3">
+          <SellerModerationNotice
+            isHidden={product.is_hidden}
+            moderationReason={product.moderation_reason}
+            entityLabel="Product"
+          />
+        </div>
         <div className="mt-4 flex flex-wrap gap-3">
           {canEdit ? (
             <Link

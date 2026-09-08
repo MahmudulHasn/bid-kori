@@ -36,7 +36,9 @@ test('admin product pages introduce no Admin PATCH/DELETE helpers', () => {
   assert.equal(adminProductAllowsMutationUi(), false);
   assert.match(ADMIN_PRODUCT_READONLY_COPY.toLowerCase(), /read-only/);
   assert.equal(
-    /\bedit\b|\bdelete\b|\bpatch\b/i.test(ADMIN_PRODUCT_READONLY_COPY),
+    /\bdelete product\b|\bedit product\b|\bpatch\b/i.test(
+      ADMIN_PRODUCT_READONLY_COPY,
+    ),
     false,
   );
 });

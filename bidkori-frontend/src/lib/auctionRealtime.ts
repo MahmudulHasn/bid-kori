@@ -1,6 +1,6 @@
 /**
  * Pure helpers for Auction detail live updates (Channels).
- * Supported receive events: `bid.accepted`, `auction.closed`.
+ * Supported receive events: `bid.accepted`, `auction.closed`, `auction.cancelled`.
  * WebSocket is receive-only — bids remain REST POST /place-bid/.
  */
 
@@ -9,6 +9,7 @@ import type { Auction } from './types.ts';
 
 export const BID_ACCEPTED_EVENT_TYPE = 'bid.accepted' as const;
 export const AUCTION_CLOSED_EVENT_TYPE = 'auction.closed' as const;
+export const AUCTION_CANCELLED_EVENT_TYPE = 'auction.cancelled' as const;
 
 export type BidAcceptedBidPayload = {
   id: number;
@@ -44,7 +45,22 @@ export type AuctionClosedEvent = {
   closed_at: string;
 };
 
-export type AuctionRealtimeEvent = BidAcceptedEvent | AuctionClosedEvent;
+/**
+ * Exact public `auction.cancelled` payload from `auctions.realtime`.
+ * No moderation_reason / actor identity on the wire.
+ */
+export type AuctionCancelledEvent = {
+  type: typeof AUCTION_CANCELLED_EVENT_TYPE;
+  auction_id: number;
+  status: 'CANCELLED';
+  winning_bidder: null;
+  server_time: string;
+};
+
+export type AuctionRealtimeEvent =
+  | BidAcceptedEvent
+  | AuctionClosedEvent
+  | AuctionCancelledEvent;
 
 export type ApplyBidAcceptedResult = {
   auction: Auction | undefined;
@@ -56,6 +72,12 @@ export type ApplyBidAcceptedResult = {
 export type ApplyAuctionClosedResult = {
   auction: Auction | undefined;
   /** Always true after a matching close so REST can reconcile compact WS state. */
+  revalidate: boolean;
+  applied: boolean;
+};
+
+export type ApplyAuctionCancelledResult = {
+  auction: Auction | undefined;
   revalidate: boolean;
   applied: boolean;
 };
@@ -139,11 +161,29 @@ export function isAuctionClosedEvent(
   if (!isFiniteNumber(value.auction_id)) return false;
   if (value.status !== 'CLOSED') return false;
   if (!isNonEmptyString(value.current_highest_bid)) return false;
-  if (value.winning_bidder !== null && !isAuctionClosedWinningBidder(value.winning_bidder)) {
+  if (
+    value.winning_bidder !== null &&
+    !isAuctionClosedWinningBidder(value.winning_bidder)
+  ) {
     return false;
   }
   if (typeof value.is_paid !== 'boolean') return false;
   if (typeof value.closed_at !== 'string') return false;
+  return true;
+}
+
+/** Runtime guard for backend `auction.cancelled` WebSocket payloads. */
+export function isAuctionCancelledEvent(
+  value: unknown,
+): value is AuctionCancelledEvent {
+  if (!isRecord(value)) return false;
+  if (value.type !== AUCTION_CANCELLED_EVENT_TYPE) return false;
+  if (!isFiniteNumber(value.auction_id)) return false;
+  if (value.status !== 'CANCELLED') return false;
+  if (value.winning_bidder !== null) return false;
+  if (typeof value.server_time !== 'string' || value.server_time.length === 0) {
+    return false;
+  }
   return true;
 }
 
@@ -264,6 +304,40 @@ export function applyAuctionClosedToAuction(
       ? winner.username.trim() || null
       : null,
     is_paid: event.is_paid,
+  };
+
+  return {
+    auction: next,
+    revalidate: true,
+    applied: true,
+  };
+}
+
+/**
+ * Apply a validated `auction.cancelled` event to Auction SWR cache data.
+ * Clears winner; never invents moderation reason. Does not mutate `auction`.
+ */
+export function applyAuctionCancelledToAuction(
+  auction: Auction | undefined,
+  event: AuctionCancelledEvent,
+  auctionId: number | string,
+): ApplyAuctionCancelledResult {
+  if (!auction) {
+    return { auction, revalidate: true, applied: false };
+  }
+  if (!eventMatchesAuctionId(event, auctionId)) {
+    return { auction, revalidate: false, applied: false };
+  }
+  if (Number(auction.id) !== Number(auctionId)) {
+    return { auction, revalidate: false, applied: false };
+  }
+
+  const next: Auction = {
+    ...auction,
+    status: 'CANCELLED',
+    winning_bidder: null,
+    winning_bidder_username: null,
+    server_time: event.server_time,
   };
 
   return {

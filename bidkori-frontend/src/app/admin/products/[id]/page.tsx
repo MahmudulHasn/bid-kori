@@ -6,6 +6,7 @@ import { format } from 'date-fns';
 import useSWR from 'swr';
 import type { ReactNode } from 'react';
 
+import ProductModerationActions from '@/components/admin/ProductModerationActions';
 import { getApiErrorMessage, getApiStatus } from '@/lib/apiErrors';
 import {
   ADMIN_PRODUCTS_PATH,
@@ -57,7 +58,15 @@ function DetailRow({
   );
 }
 
-function ProductDetailBody({ product }: { product: Product }) {
+function ProductDetailBody({
+  product,
+  detailKey,
+  onProductPatched,
+}: {
+  product: Product;
+  detailKey: string;
+  onProductPatched: (next: Product) => void | Promise<void>;
+}) {
   const created = formatTimestamp(product.created_at);
   const updated = formatTimestamp(product.updated_at);
   const title = product.title.trim() ? product.title : 'Untitled product';
@@ -82,13 +91,20 @@ function ProductDetailBody({ product }: { product: Product }) {
           {title}
         </h1>
         <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-          Read-only product record from the platform catalog.
+          Product record from the platform catalog. Catalog fields are
+          read-only.
         </p>
       </header>
 
       <p className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900/60 dark:text-zinc-400">
         {ADMIN_PRODUCT_READONLY_COPY}
       </p>
+
+      <ProductModerationActions
+        product={product}
+        detailKey={detailKey}
+        onProductPatched={onProductPatched}
+      />
 
       <section
         aria-labelledby="product-details-heading"
@@ -279,5 +295,13 @@ export default function AdminProductDetailPage() {
     );
   }
 
-  return <ProductDetailBody product={product} />;
+  return (
+    <ProductDetailBody
+      product={product}
+      detailKey={detailKey}
+      onProductPatched={async (next) => {
+        await mutate(next, { revalidate: false });
+      }}
+    />
+  );
 }
