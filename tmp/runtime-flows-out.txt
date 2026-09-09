@@ -1,0 +1,375 @@
+﻿url        http://localhost:3000/auth/login
+http       200
+load       44980ms
+title      "BidKori"
+bodyChars  149
+patchright C:\Users\User\.vscode\extensions\danielsanmedium.dscodegpt-3.24.62\standalone/
+text       BidKori Marketplace Search Sign in Access your BidKori seller and bidder account. Username Password Sign in Need an account? Register Ask BidKori
+script     {
+ "login": {
+  "status": 200,
+  "bodyPreview": "{\"token\":\"50749cd1a6550cd0b31e3fa5568cf771638cd3de\",\"user\":{\"id\":48,\"username\":\"demo_buyer_a\",\"email\":\"demo_buyer_a@bidkori.local\",\"role\":\"BUYER\",\"is_staff\":false}}",
+  "tokenPresent": true,
+  "afterUrl": "http://localhost:3000/buyer",
+  "dump": {
+   "label": "post-login",
+   "url": "http://localhost:3000/buyer",
+   "body": "BidKori Buyer\n\nWorkspace\n\nDashboard\nMy Bids\nWon Auctions\nNotifications\nWatchlist\nSOON\nProfile\nSettings\nBrowse Marketplace\n\nBuyer Dashboard\n\nBidKori Buyer\n\nBrowse Marketplace\ndemo_buyer_a\nBUYER\nBuyer Dashboard\n\nWelcome back, demo_buyer_a.\n\nTrack your bids and won auctions from here.\n\nBrowse Auctions\nView profile\n\nAuctions Bid On\n\n14\n\nDistinct auctions from your bid history\n\nWon Auctions\n\n2\n\nClosed auctions you won\n\nPending Checkout\n\n0\n\nWon auctions with unpaid checkout status\n\nRecent bid activity\n\nAuctions you have participated in, newest first.\n\nView my bids\nNo image\nCANCELLED\n[DEMO] Tablet Stand Bundle\n\nCancelled\n\nαº│2,600.00\n\nCancelled\n\nNo image\nCLOSED\n[DEMO] Limited Edition Controller\n\nFinal bid\n\nαº│5,200.00\n\nAuction ended\n\nNo image\nCLOSED\n[DEMO] Vintage Camera Lens\n\nFinal bid\n\nαº│8,400.00\n\nAuction ended\n\nNo image\nCLOSED\n[DEMO] Mechanical Keyboard Compact\n\nFinal bid\n\nαº│6,950.00\n\nAuction ended\n\nWon auctions\n\nClosed listings where you are the winning bidder.\n\nView all won auctions\nNo image\nCLOSED\n[DEMO] RTX 3070 Graphics Card\n\nFinal bid\n\nαº│36,500.00\n\nAuction ended\n\nNo image\nCLOSED\n[DEMO] Sony A6400\n\nFinal bid\n\nαº│61,500.00\n\nAuction ended\n\nAsk BidKori\nLogged in successfully.\nWelcome back, de"
+  }
+ },
+ "buyer": [
+  {
+   "path": "/buyer",
+   "label": "/buyer",
+   "url": "http://localhost:3000/buyer",
+   "body": "BidKori Buyer\n\nWorkspace\n\nDashboard\nMy Bids\nWon Auctions\nNotifications\nWatchlist\nSOON\nProfile\nSettings\nBrowse Marketplace\n\nBuyer Dashboard\n\nBidKori Buyer\n\nBrowse Marketplace\ndemo_buyer_a\nBUYER\nBuyer Dashboard\n\nWelcome back, demo_buyer_a.\n\nTrack your bids and won auctions from here.\n\nBrowse Auctions\nView profile\n\nAuctions Bid On\n\n14\n\nDistinct auctions from your bid history\n\nWon Auctions\n\n2\n\nClosed auctions you won\n\nPending Checkout\n\n0\n\nWon auctions with unpaid checkout status\n\nRecent bid activity\n\nAuctions you have participated in, newest first.\n\nView my bids\nNo image\nCANCELLED\n[DEMO] Tablet Stand Bundle\n\nCancelled\n\nαº│2,600.00\n\nCancelled\n\nNo image\nCLOSED\n[DEMO] Limited Edition Controller\n\nFinal bid\n\nαº│5,200.00\n\nAuction ended\n\nNo image\nCLOSED\n[DEMO] Vintage Camera Lens\n\nFinal bid\n\nαº│8,400.00\n\nAuction ended\n\nNo image\nCLOSED\n[DEMO] Mechanical Keyboard Compact\n\nFinal bid\n\nαº│6,950.00\n\nAuction ended\n\nWon auctions\n\nClosed listings where you are the winning bidder.\n\nView all won auctions\nNo image\nCLOSED\n[DEMO] RTX 3070 Graphics Card\n\nFinal bid\n\nαº│36,500.00\n\nAuction ended\n\nNo image\nCLOSED\n[DEMO] Sony A6400\n\nFinal bid\n\nαº│61,500.00\n\nAuction ended\n\nAsk BidKori",
+   "apiHits": [
+    {
+     "url": "http://127.0.0.1:8000/api/users/me/",
+     "status": 200
+    },
+    {
+     "url": "http://127.0.0.1:8000/api/users/me/",
+     "status": 200
+    },
+    {
+     "url": "http://127.0.0.1:8000/api/auctions/my-bids/",
+     "status": 200
+    },
+    {
+     "url": "http://127.0.0.1:8000/api/notifications/",
+     "status": 200
+    },
+    {
+     "url": "http://127.0.0.1:8000/api/auctions/",
+     "status": 200
+    }
+   ]
+  },
+  {
+   "path": "/buyer/my-bids",
+   "label": "/buyer/my-bids",
+   "url": "http://localhost:3000/buyer/my-bids",
+   "body": "BidKori Buyer\n\nWorkspace\n\nDashboard\nMy Bids\nWon Auctions\nNotifications\nWatchlist\nSOON\nProfile\nSettings\nBrowse Marketplace\n\nBuyer Dashboard\n\nBidKori Buyer\n\nBrowse Marketplace\ndemo_buyer_a\nBUYER\nMy Bids\n\nAuctions you have participated in, your highest bid, and the current or final outcome.\n\nAll\nActive\nWon\nEnded\nAUCTION\tMY HIGHEST BID\tCURRENT BID\tSTATUS\tLAST BID\t\nACTION\n\n[DEMO] Tablet Stand Bundle\n\n1 bid\n\n\tαº│2,550.00\tαº│2,600.00\tCancelled\tSep 9, 10:22 PM\t\nView Auction\nfor [DEMO] Tablet Stand Bundle\n\n[DEMO] Limited Edition Controller\n\n1 bid\n\n\tαº│5,100.00\tαº│5,200.00\tLost\tSep 9, 10:22 PM\t\nView Auction\nfor [DEMO] Limited Edition Controller\n\n[DEMO] Vintage Camera Lens\n\n1 bid\n\n\tαº│8,200.00\tαº│8,400.00\tLost\tSep 9, 10:22 PM\t\nView Auction\nfor [DEMO] Vintage Camera Lens\n\n[DEMO] Mechanical Keyboard Compact\n\n1 bid\n\n\tαº│6,800.00\tαº│6,950.00\tLost\tSep 9, 10:22 PM\t\nView Auction\nfor [DEMO] Mechanical Keyboard Compact\n\n[DEMO] Seiko 5 Automatic\n\n1 bid\n\n\tαº│14,200.00\tαº│14,600.00\tLost\tSep 9, 10:22 PM\t\nView Auction\nfor [DEMO] Seiko 5 Automatic\n\n[DEMO] Casio G-Shock\n\n1 bid\n\n\tαº│4,600.00\tαº│4,800.00\tLost\tSep 9, 10:22 PM\t\nView Auction\nfor [DEMO] Casio G-Shock\n\n[DEMO] RTX 3070 Graphics Card\n\n1 bid\n\nComplete mock checkout from Won ",
+   "apiHits": [
+    {
+     "url": "http://127.0.0.1:8000/api/users/me/",
+     "status": 200
+    },
+    {
+     "url": "http://127.0.0.1:8000/api/users/me/",
+     "status": 200
+    },
+    {
+     "url": "http://127.0.0.1:8000/api/auctions/my-bids/",
+     "status": 200
+    },
+    {
+     "url": "http://127.0.0.1:8000/api/notifications/",
+     "status": 200
+    },
+    {
+     "url": "http://127.0.0.1:8000/api/auctions/",
+     "status": 200
+    }
+   ]
+  },
+  {
+   "path": "/buyer/won",
+   "label": "/buyer/won",
+   "url": "http://localhost:3000/buyer/won",
+   "body": "BidKori Buyer\n\nWorkspace\n\nDashboard\nMy Bids\nWon Auctions\nNotifications\nWatchlist\nSOON\nProfile\nSettings\nBrowse Marketplace\n\nBuyer Dashboard\n\nBidKori Buyer\n\nBrowse Marketplace\ndemo_buyer_a\nBUYER\nWon Auctions\n\nClosed auctions where you are the winning bidder. Checkout here is a development mock ΓÇö no real payment is processed.\n\nAll2\nAwaiting Checkout0\nPaid2\n[DEMO] RTX 3070 Graphics Card\nWinning bid\nαº│36,500.00\nEnded\nSep 10, 2026, 4:22 AM\nPayment status\nPaid\n\nPaid\n\nView Auction\n[DEMO] Sony A6400\nWinning bid\nαº│61,500.00\nEnded\nSep 10, 2026, 4:22 AM\nPayment status\nPaid\n\nPaid\n\nView Auction\nAsk BidKori",
+   "apiHits": [
+    {
+     "url": "http://127.0.0.1:8000/api/users/me/",
+     "status": 200
+    },
+    {
+     "url": "http://127.0.0.1:8000/api/users/me/",
+     "status": 200
+    },
+    {
+     "url": "http://127.0.0.1:8000/api/notifications/",
+     "status": 200
+    },
+    {
+     "url": "http://127.0.0.1:8000/api/auctions/",
+     "status": 200
+    }
+   ]
+  },
+  {
+   "path": "/buyer/notifications",
+   "label": "/buyer/notifications",
+   "url": "http://localhost:3000/buyer/notifications",
+   "body": "BidKori Buyer\n\nWorkspace\n\nDashboard\nMy Bids\nWon Auctions\nNotifications\nWatchlist\nSOON\nProfile\nSettings\nBrowse Marketplace\n\nBuyer Dashboard\n\nBidKori Buyer\n\nBrowse Marketplace\ndemo_buyer_a\nBUYER\nNotifications\n\nOutbid, auction outcomes, and bid activity for your account.\n\nMark all as read\nOUTBID\nUNREAD\nYou've been outbid\n\nAnother bidder placed a higher bid on [DEMO] iPhone 13 128GB.\n\nSep 9, 2026 10:22 PM\nView auction\nOUTBID\nUNREAD\nYou've been outbid\n\nAnother bidder placed a higher bid on [DEMO] Tablet Stand Bundle.\n\nSep 9, 2026 10:22 PM\nView auction\nOUTBID\nUNREAD\nYou've been outbid\n\nAnother bidder placed a higher bid on [DEMO] Limited Edition Controller.\n\nSep 9, 2026 10:22 PM\nView auction\nOUTBID\nUNREAD\nYou've been outbid\n\nAnother bidder placed a higher bid on [DEMO] Vintage Camera Lens.\n\nSep 9, 2026 10:22 PM\nView auction\nAUCTION ENDED\nUNREAD\nAuction ended\n\nYou did not win [DEMO] Mechanical Keyboard Compact.\n\nSep 9, 2026 10:22 PM\nView auction\nOUTBID\nUNREAD\nYou've been outbid\n\nAnother bidder placed a higher bid on [DEMO] Mechanical Keyboard Compact.\n\nSep 9, 2026 10:22 PM\nView auction\nAUCTION ENDED\nUNREAD\nAuction ended\n\nYou did not win [DEMO] Seiko 5 Automatic.\n\nSep 9, 2026 10:22 PM\nView",
+   "apiHits": [
+    {
+     "url": "http://127.0.0.1:8000/api/users/me/",
+     "status": 200
+    },
+    {
+     "url": "http://127.0.0.1:8000/api/users/me/",
+     "status": 200
+    },
+    {
+     "url": "http://127.0.0.1:8000/api/notifications/",
+     "status": 200
+    }
+   ]
+  }
+ ],
+ "seller": {
+  "afterLogin": {
+   "label": "seller-login",
+   "url": "http://localhost:3000/seller",
+   "body": "BidKori Seller\n\nWorkspace\n\nDashboard\nProducts\nAuctions\nSales\nNotifications\nAnalytics\nSOON\nProfile\nSettings\nBrowse Marketplace\n\nSeller Dashboard\n\nBidKori Seller\n\nBrowse Marketplace\ndemo_seller_electronics\nSELLER\nSeller Dashboard\n\nWelcome back, demo_seller_electronics.\n\nTrack the products you own and the auctions you are running.\n\nView profile\nView sales & earnings\n\nMy Products\n\n13\n\nItems from your product listings\n\nMy Auctions\n\n11\n\nAuctions linked to your products\n\nActive Auctions\n\n7\n\nOwned auctions with ACTIVE status\n\nClosed Auctions\n\n3\n\nOwned auctions with CLOSED status\n\nRecent Products\n\nCatalog items you own. These are not auctions.\n\nCreate Product\nView all products\n[DEMO] Wireless Earbuds Case Set\nCondition\nUsed - Like New\nCreated\nSep 9, 2026\n[DEMO] USB-C Hub Multiport\nCondition\nBrand New\nCreated\nSep 9, 2026\n[DEMO] Tablet Stand Bundle\nCondition\nBrand New\nCreated\nSep 9, 2026\n[DEMO] Vintage Camera Lens\nCondition\nFair Condition\nCreated\nSep 9, 2026\nRecent Auctions\n\nAuctions running on products you own.\n\nCreate Auction\nView all auctions\n[DEMO] Lenovo ThinkPad T14\nStatus\nActive\nCurrent bid\nαº│48,000.00\nEnds\nSep 10, 2026, 11:22 PM\n[DEMO] ASUS ROG Zephyrus G14\nStatus\nActive\nCurrent bid\nαº│9"
+  },
+  "/seller": {
+   "label": "/seller",
+   "url": "http://localhost:3000/seller",
+   "body": "BidKori Seller\n\nWorkspace\n\nDashboard\nProducts\nAuctions\nSales\nNotifications\nAnalytics\nSOON\nProfile\nSettings\nBrowse Marketplace\n\nSeller Dashboard\n\nBidKori Seller\n\nBrowse Marketplace\ndemo_seller_electronics\nSELLER\nSeller Dashboard\n\nWelcome back, demo_seller_electronics.\n\nTrack the products you own and the auctions you are running.\n\nView profile\nView sales & earnings\n\nMy Products\n\n13\n\nItems from your product listings\n\nMy Auctions\n\n11\n\nAuctions linked to your products\n\nActive Auctions\n\n7\n\nOwned auctions with ACTIVE status\n\nClosed Auctions\n\n3\n\nOwned auctions with CLOSED status\n\nRecent Products\n\nCatalog items you own. These are not auctions.\n\nCreate Product\nView all products\n[DEMO] Wireless Earbuds Case Set\nCondition\nUsed - Like New\nCreated\nSep 9, 2026\n[DEMO] USB-C Hub Multiport\nCondition\nBrand New\nCreated\nSep 9, 2026\n[DEMO] Tablet Stand Bundle\nCondition\nBrand New\nCreated\nSep 9, 2026\n[DEMO] Vintage Camera Lens\nCondition\nFair Condition\nCreated\nSep 9, 2026\nRecent Auctions\n\nAuctions running on products you own.\n\nCreate Auction\nView all auctions\n[DEMO] Lenovo ThinkPad T14\nStatus\nActive\nCurrent bid\nαº│48,000.00\nEnds\nSep 10, 2026, 11:22 PM\n[DEMO] ASUS ROG Zephyrus G14\nStatus\nActive\nCurrent bid\nαº│9",
+   "apiHits": [
+    {
+     "url": "http://127.0.0.1:8000/api/users/me/",
+     "status": 200
+    },
+    {
+     "url": "http://127.0.0.1:8000/api/users/me/",
+     "status": 200
+    },
+    {
+     "url": "http://127.0.0.1:8000/api/notifications/",
+     "status": 200
+    },
+    {
+     "url": "http://127.0.0.1:8000/api/products/my-listings/",
+     "status": 200
+    },
+    {
+     "url": "http://127.0.0.1:8000/api/auctions/",
+     "status": 200
+    }
+   ]
+  },
+  "/seller/products": {
+   "label": "/seller/products",
+   "url": "http://localhost:3000/seller/products",
+   "body": "BidKori Seller\n\nWorkspace\n\nDashboard\nProducts\nAuctions\nSales\nNotifications\nAnalytics\nSOON\nProfile\nSettings\nBrowse Marketplace\n\nSeller Dashboard\n\nBidKori Seller\n\nBrowse Marketplace\ndemo_seller_electronics\nSELLER\nMy Products\n\nCatalog items you own. These are not auctions.\n\nCreate Product\nSearch products\nSort\nNewest\nOldest\nName\nYour products\nPRODUCT\tCONDITION\tCREATED\tACTION\n[DEMO] Wireless Earbuds Case Set\tUsed - Like New\tSep 9, 2026\tView\ndetails for [DEMO] Wireless Earbuds Case Set\n\n[DEMO] USB-C Hub Multiport\tBrand New\tSep 9, 2026\tView\ndetails for [DEMO] USB-C Hub Multiport\n\n[DEMO] Tablet Stand Bundle\tBrand New\tSep 9, 2026\tView\ndetails for [DEMO] Tablet Stand Bundle\n\n[DEMO] Vintage Camera Lens\tFair Condition\tSep 9, 2026\tView\ndetails for [DEMO] Vintage Camera Lens\n\n[DEMO] Casio G-Shock\tUsed - Good\tSep 9, 2026\tView\ndetails for [DEMO] Casio G-Shock\n\n[DEMO] Sony A6400\tUsed - Like New\tSep 9, 2026\tView\ndetails for [DEMO] Sony A6400\n\n[DEMO] Lenovo ThinkPad T14\tUsed - Good\tSep 9, 2026\tView\ndetails for [DEMO] Lenovo ThinkPad T14\n\n[DEMO] ASUS ROG Zephyrus G14\tUsed - Like New\tSep 9, 2026\tView\ndetails for [DEMO] ASUS ROG Zephyrus G14\n\n[DEMO] Canon EOS M50 Mark II\tUsed - Good\tSep 9, 2026\tView\ndet",
+   "apiHits": [
+    {
+     "url": "http://127.0.0.1:8000/api/users/me/",
+     "status": 200
+    },
+    {
+     "url": "http://127.0.0.1:8000/api/users/me/",
+     "status": 200
+    },
+    {
+     "url": "http://127.0.0.1:8000/api/notifications/",
+     "status": 200
+    },
+    {
+     "url": "http://127.0.0.1:8000/api/products/my-listings/",
+     "status": 200
+    }
+   ]
+  },
+  "/seller/auctions": {
+   "label": "/seller/auctions",
+   "url": "http://localhost:3000/seller/auctions",
+   "body": "BidKori Seller\n\nWorkspace\n\nDashboard\nProducts\nAuctions\nSales\nNotifications\nAnalytics\nSOON\nProfile\nSettings\nBrowse Marketplace\n\nSeller Dashboard\n\nBidKori Seller\n\nBrowse Marketplace\ndemo_seller_electronics\nSELLER\nMy Auctions\n\nAuctions on products you own, using the catalog auction list.\n\nCreate Auction\nFilter auctions by status\nAll\nActive\nClosed\nCancelled\nYour auctions\nAUCTION\tSTATUS\tAMOUNT\tSTARTS\tENDS\tACTION\n\n[DEMO] Lenovo ThinkPad T14\n\tActive\t\nStarting price\nαº│48,000.00\tSep 9, 2026, 11:22 PM\tSep 10, 2026, 11:22 PM\tView\ndetails for [DEMO] Lenovo ThinkPad T14\n\n\n[DEMO] ASUS ROG Zephyrus G14\n\tActive\t\nStarting price\nαº│95,000.00\tSep 9, 2026, 10:52 PM\tSep 10, 2026, 10:52 PM\tView\ndetails for [DEMO] ASUS ROG Zephyrus G14\n\n\n[DEMO] Canon EOS M50 Mark II\n\tActive\t\nCurrent bid\nαº│56,500.00\tSep 9, 2026, 8:22 PM\tSep 9, 2026, 11:19 PM\tView\ndetails for [DEMO] Canon EOS M50 Mark II\n\n\n[DEMO] MacBook Air M1\n\tActive\t\nCurrent bid\nαº│73,000.00\tSep 9, 2026, 8:22 PM\tSep 9, 2026, 11:29 PM\tView\ndetails for [DEMO] MacBook Air M1\n\n\n[DEMO] Google Pixel 7\n\tActive\t\nCurrent bid\nαº│32,800.00\tSep 9, 2026, 8:22 PM\tSep 9, 2026, 11:22 PM\tView\ndetails for [DEMO] Google Pixel 7\n\n\n[DEMO] Samsung Galaxy S22\n\tActive\t\nCurrent bid\nαº│39",
+   "apiHits": [
+    {
+     "url": "http://127.0.0.1:8000/api/users/me/",
+     "status": 200
+    },
+    {
+     "url": "http://127.0.0.1:8000/api/users/me/",
+     "status": 200
+    },
+    {
+     "url": "http://127.0.0.1:8000/api/notifications/",
+     "status": 200
+    },
+    {
+     "url": "http://127.0.0.1:8000/api/auctions/",
+     "status": 200
+    }
+   ]
+  },
+  "/seller/sales": {
+   "label": "/seller/sales",
+   "url": "http://localhost:3000/seller/sales",
+   "body": "BidKori Seller\n\nWorkspace\n\nDashboard\nProducts\nAuctions\nSales\nNotifications\nAnalytics\nSOON\nProfile\nSettings\nBrowse Marketplace\n\nSeller Dashboard\n\nBidKori Seller\n\nBrowse Marketplace\ndemo_seller_electronics\nSELLER\nSales\n\nCompleted mock checkout ledger for your auctions. Gross is the winning amount; platform fee is the seller-side commission; net is accounting proceeds ΓÇö not a payout balance.\n\nBased on completed BidKori mock checkout records. Not a withdrawable balance or bank settlement.\n\nEarnings summary\n\nCompleted Sales\n\n2\n\nCOMPLETED mock checkouts\n\nGross Sales\n\nαº│66,300.00\n\nSum of winning amounts\n\nPlatform Fees\n\nαº│3,315.00\n\nAccounted fee snapshots only\n\nNet Earnings\n\nαº│62,985.00\n\nAccounting net ΓÇö not withdrawn\n\nCompleted sales\n\nPage 1 ┬╖ 2 sales\n\nAUCTION\tBUYER\tGROSS\tFEE RATE\tPLATFORM FEE\tNET\tDATE\n[DEMO] Casio G-Shock\tdemo_buyer_c\tαº│4,800.00\t5.00%\tαº│240.00\tαº│4,560.00\tSep 9, 2026, 10:22 PM\n[DEMO] Sony A6400\tdemo_buyer_a\tαº│61,500.00\t5.00%\tαº│3,075.00\tαº│58,425.00\tSep 9, 2026, 10:22 PM\nAsk BidKori",
+   "apiHits": [
+    {
+     "url": "http://127.0.0.1:8000/api/users/me/",
+     "status": 200
+    },
+    {
+     "url": "http://127.0.0.1:8000/api/users/me/",
+     "status": 200
+    },
+    {
+     "url": "http://127.0.0.1:8000/api/notifications/",
+     "status": 200
+    },
+    {
+     "url": "http://127.0.0.1:8000/api/seller/earnings/",
+     "status": 200
+    },
+    {
+     "url": "http://127.0.0.1:8000/api/seller/sales/",
+     "status": 200
+    }
+   ]
+  }
+ },
+ "admin": {
+  "afterLogin": {
+   "label": "admin-login",
+   "url": "http://localhost:3000/admin",
+   "body": "BidKori Admin\n\nWorkspace\n\nDashboard\nUsers\nProducts\nAuctions\nBids\nCategories\nSOON\nReports\nSOON\nAnalytics\nProfile\nSettings\nBrowse Marketplace\n\nAdmin Dashboard\n\nBidKori Admin\n\nBrowse Marketplace\ndemo_admin\nADMIN\nAdmin Dashboard\n\nWelcome back, demo_admin. Platform overview from live REST data (read-only).\n\nCatalog counts use unpaginated list APIs ΓÇö suitable for MVP scale only.\n\nPlatform metrics\n\nActive Auctions\n\n13\n\nFrom staff analytics\n\nTotal Auctions\n\n33\n\nFrom auction catalog\n\nTotal Products\n\n38\n\nFrom product catalog\n\nTotal Bids\n\n52\n\nFrom staff analytics\n\nClosed Auctions\n\n16\n\nstatus = CLOSED\n\nCancelled Auctions\n\n4\n\nstatus = CANCELLED\n\nPaid Auctions\n\n7\n\nis_paid = true\n\nPlatform Activity\nTotal Bidding Volume\nαº│763,050.00\n\nSum of current highest bids across auctions. Not revenue, sales, or settled GMV.\n\nView full analytics\n\nRecent Bid Activity\nWHEN\tBIDDER\tAUCTION\tAMOUNT\nSep 9, 2026, 10:22 PM\tdemo_buyer_b\t#80\tαº│46,500.00\nSep 9, 2026, 10:22 PM\tdemo_buyer_d\t#102\tαº│3,600.00\nSep 9, 2026, 10:22 PM\tdemo_buyer_b\t#101\tαº│2,600.00\nSep 9, 2026, 10:22 PM\tdemo_buyer_a\t#101\tαº│2,550.00\nSep 9, 2026, 10:22 PM\tdemo_buyer_c\t#100\tαº│5,200.00\nSep 9, 2026, 10:22 PM\tdemo_buyer_a\t#100\tαº│5,100.00\nSep 9, 2026, 10:22 PM\td"
+  },
+  "/admin": {
+   "label": "/admin",
+   "url": "http://localhost:3000/admin",
+   "body": "BidKori Admin\n\nWorkspace\n\nDashboard\nUsers\nProducts\nAuctions\nBids\nCategories\nSOON\nReports\nSOON\nAnalytics\nProfile\nSettings\nBrowse Marketplace\n\nAdmin Dashboard\n\nBidKori Admin\n\nBrowse Marketplace\ndemo_admin\nADMIN\nAdmin Dashboard\n\nWelcome back, demo_admin. Platform overview from live REST data (read-only).\n\nCatalog counts use unpaginated list APIs ΓÇö suitable for MVP scale only.\n\nPlatform metrics\n\nActive Auctions\n\n13\n\nFrom staff analytics\n\nTotal Auctions\n\n33\n\nFrom auction catalog\n\nTotal Products\n\n38\n\nFrom product catalog\n\nTotal Bids\n\n52\n\nFrom staff analytics\n\nClosed Auctions\n\n16\n\nstatus = CLOSED\n\nCancelled Auctions\n\n4\n\nstatus = CANCELLED\n\nPaid Auctions\n\n7\n\nis_paid = true\n\nPlatform Activity\nTotal Bidding Volume\nαº│763,050.00\n\nSum of current highest bids across auctions. Not revenue, sales, or settled GMV.\n\nView full analytics\n\nRecent Bid Activity\nWHEN\tBIDDER\tAUCTION\tAMOUNT\nSep 9, 2026, 10:22 PM\tdemo_buyer_b\t#80\tαº│46,500.00\nSep 9, 2026, 10:22 PM\tdemo_buyer_d\t#102\tαº│3,600.00\nSep 9, 2026, 10:22 PM\tdemo_buyer_b\t#101\tαº│2,600.00\nSep 9, 2026, 10:22 PM\tdemo_buyer_a\t#101\tαº│2,550.00\nSep 9, 2026, 10:22 PM\tdemo_buyer_c\t#100\tαº│5,200.00\nSep 9, 2026, 10:22 PM\tdemo_buyer_a\t#100\tαº│5,100.00\nSep 9, 2026, 10:22 PM\td",
+   "apiHits": [
+    {
+     "url": "http://127.0.0.1:8000/api/users/me/",
+     "status": 200
+    },
+    {
+     "url": "http://127.0.0.1:8000/api/users/me/",
+     "status": 200
+    },
+    {
+     "url": "http://127.0.0.1:8000/api/products/",
+     "status": 200
+    },
+    {
+     "url": "http://127.0.0.1:8000/api/auctions/analytics/",
+     "status": 200
+    },
+    {
+     "url": "http://127.0.0.1:8000/api/auctions/",
+     "status": 200
+    }
+   ]
+  },
+  "/admin/users": {
+   "label": "/admin/users",
+   "url": "http://localhost:3000/admin/users",
+   "body": "BidKori Admin\n\nWorkspace\n\nDashboard\nUsers\nProducts\nAuctions\nBids\nCategories\nSOON\nReports\nSOON\nAnalytics\nProfile\nSettings\nBrowse Marketplace\n\nAdmin Dashboard\n\nBidKori Admin\n\nBrowse Marketplace\ndemo_admin\nADMIN\nUsers\n\nMarketplace account directory with reversible Suspend and Reactivate controls.\n\nUser identity fields are read-only. Suspend and Reactivate control marketplace access only.\n\nSearch users\nSearches username and email on the server.\nSearch\nRole\nAll roles\nBuyer\nSeller\nAdmin\nStatus\nAll statuses\nActive\nSuspended\nAdmin users directory\nUSERNAME\tEMAIL\tROLE\tSTATUS\tJOINED\tACTIONS\ndemo_admin\tdemo_admin@bidkori.local\tAdmin\tActive\tSep 9, 2026\t\nView\ndemo_admin\n\ndemo_buyer_d\tdemo_buyer_d@bidkori.local\tBuyer\tActive\tSep 9, 2026\t\nView\ndemo_buyer_d\nSuspend\n\ndemo_buyer_c\tdemo_buyer_c@bidkori.local\tBuyer\tActive\tSep 9, 2026\t\nView\ndemo_buyer_c\nSuspend\n\ndemo_buyer_b\tdemo_buyer_b@bidkori.local\tBuyer\tActive\tSep 9, 2026\t\nView\ndemo_buyer_b\nSuspend\n\ndemo_buyer_a\tdemo_buyer_a@bidkori.local\tBuyer\tActive\tSep 9, 2026\t\nView\ndemo_buyer_a\nSuspend\n\ndemo_seller_collectibles\tdemo_seller_collectibles@bidkori.local\tSeller\tActive\tSep 9, 2026\t\nView\ndemo_seller_collectibles\nSuspend\n\ndemo_seller_gaming\tdemo_seller_g",
+   "apiHits": [
+    {
+     "url": "http://127.0.0.1:8000/api/users/me/",
+     "status": 200
+    },
+    {
+     "url": "http://127.0.0.1:8000/api/users/me/",
+     "status": 200
+    },
+    {
+     "url": "http://127.0.0.1:8000/api/admin/users/",
+     "status": 200
+    }
+   ]
+  },
+  "/admin/auctions": {
+   "label": "/admin/auctions",
+   "url": "http://localhost:3000/admin/auctions",
+   "body": "BidKori Admin\n\nWorkspace\n\nDashboard\nUsers\nProducts\nAuctions\nBids\nCategories\nSOON\nReports\nSOON\nAnalytics\nProfile\nSettings\nBrowse Marketplace\n\nAdmin Dashboard\n\nBidKori Admin\n\nBrowse Marketplace\ndemo_admin\nADMIN\nAuctions\n\nPlatform auction catalog for operational visibility.\n\nAuction economics remain read-only. Visibility (Hide/Restore) and lifecycle Cancel are available on the auction detail page.\n\nSearch auctions\nUses backend ?search= on product title and description.\nSearch\nStatus\nAll\nActive\nClosed\nCancelled\nSort\nNewest\nOldest\nEnding Soon\nStarting Soon\nPlatform auctions catalog\nID\tPRODUCT\tSELLER\tLIFECYCLE\tVISIBILITY\tAMOUNT\tSTART\tEND\tPAID\tACTION\n#92\t\n[DEMO] Nike Dunk Low\nProduct #103\tSeller ID #47\tActive\t\nVisibility:\nVisible\t\nStarting price\nαº│12,000.00\n\tSep 10, 2026, 10:22 PM\tSep 12, 2026, 10:22 PM\tUnpaid\tView\n[DEMO] Nike Dunk Low\n\n#91\t\n[DEMO] Air Jordan 1 Retro\nProduct #102\tSeller ID #47\tActive\t\nVisibility:\nVisible\t\nStarting price\nαº│18,000.00\n\tSep 10, 2026, 10:22 AM\tSep 12, 2026, 10:22 AM\tUnpaid\tView\n[DEMO] Air Jordan 1 Retro\n\n#90\t\n[DEMO] Nintendo Switch OLED\nProduct #101\tSeller ID #46\tActive\t\nVisibility:\nVisible\t\nStarting price\nαº│36,000.00\n\tSep 10, 2026, 1:22 AM\tSep 11, 2026, 1:22 PM\t",
+   "apiHits": [
+    {
+     "url": "http://127.0.0.1:8000/api/users/me/",
+     "status": 200
+    },
+    {
+     "url": "http://127.0.0.1:8000/api/users/me/",
+     "status": 200
+    },
+    {
+     "url": "http://127.0.0.1:8000/api/auctions/",
+     "status": 200
+    }
+   ]
+  },
+  "/admin/analytics": {
+   "label": "/admin/analytics",
+   "url": "http://localhost:3000/admin/analytics",
+   "body": "BidKori Admin\n\nWorkspace\n\nDashboard\nUsers\nProducts\nAuctions\nBids\nCategories\nSOON\nReports\nSOON\nAnalytics\nProfile\nSettings\nBrowse Marketplace\n\nAdmin Dashboard\n\nBidKori Admin\n\nBrowse Marketplace\ndemo_admin\nADMIN\nPlatform Analytics\n\nStaff-only auction and bidding metrics from the live analytics API, plus a separate mock-checkout financial summary. Bidding volume is not platform revenue.\n\nSource: /auctions/analytics/ ┬╖ Route: /admin/analytics\n\nSummary metrics\n\nActive Auctions\n\n13\n\ntotal_active_auctions\n\nTotal Bids Placed\n\n52\n\ntotal_bids_placed\n\nTotal Bidding Volume\n\nαº│763,050.00\n\nSum of bid activity reported by the analytics API; this is not platform revenue.\n\nCategories Represented\n\n9\n\nFrom category_breakdown length\n\nMock checkout financial summary\n\nExact aggregates from /admin/finance/summary/. Distinct from Total Bidding Volume. Mock completed checkout ledger totals. Platform revenue is stored fee snapshots only ΓÇö not bidding volume or bank settlement.\n\nCompleted Sales\n\n7\n\nCOMPLETED Payment rows\n\nCompleted Checkout Volume\n\nαº│128,350.00\n\nSum of Payment.amount (mock ledger)\n\nPlatform Revenue\n\nαº│6,417.50\n\nSum of stored platform_fee snapshots\n\nSeller Net Total\n\nαº│121,932.50\n\nSum of seller_ne",
+   "apiHits": [
+    {
+     "url": "http://127.0.0.1:8000/api/users/me/",
+     "status": 200
+    },
+    {
+     "url": "http://127.0.0.1:8000/api/users/me/",
+     "status": 200
+    },
+    {
+     "url": "http://127.0.0.1:8000/api/admin/finance/summary/",
+     "status": 200
+    },
+    {
+     "url": "http://127.0.0.1:8000/api/auctions/analytics/",
+     "status": 200
+    }
+   ]
+  }
+ },
+ "auctionDetail": {
+  "label": "auction-87",
+  "url": "http://localhost:3000/auctions/87",
+  "body": "BidKori\nMarketplace\nSearch\nMy Workspace\ndemo_buyer_a\nLogout\nΓåÉ Back to auctions\n[DEMO] Canon EOS M50 Mark II\nLIVE\n\nMirrorless kit with 15-45mm lens; shutter count under 8k.\n\nCondition: Used - Good\nNo images uploaded\nBid history\nαº│56,500.00\ndemo_buyer_b\n9/9/2026, 10:22:28 PM\nαº│55,750.00\ndemo_buyer_d\n9/9/2026, 10:22:28 PM\nEnding in\n00\nDAYS\n00\nHOURS\n53\nMINS\n02\nSECS\nStarts\n9/9/2026, 8:22:28 PM\nEnds\n9/9/2026, 11:19:28 PM\n\nCurrent highest bid\n\nLIVE UPDATES\n\nαº│56,500.00\n\nStarting bid: αº│55,000.00\n\nMinimum increment: αº│750.00\n\nNext valid bid: αº│57,250.00\n\nYou have not bid yet\n\nBid panel\nYour bid amount\nPlace Bid\nAsk BidKori"
+ },
+ "wsAuction": {
+  "events": [
+   {
+    "url": "ws://127.0.0.1:8000/ws/auctions/87/",
+    "type": "open"
+   },
+   {
+    "url": "ws://127.0.0.1:8000/ws/auctions/87/",
+    "type": "close"
+   },
+   {
+    "url": "ws://127.0.0.1:8000/ws/auctions/87/",
+    "type": "open"
+   }
+  ],
+  "connectedText": false
+ },
+ "wsNotif": {
+  "events": []
+ },
+ "media": {
+  "imgSrc": null
+ },
+ "consoleErrors": [],
+ "failedRequests": [
+  {
+   "url": "http://localhost:3000/favicon.ico?favicon.2vob68tjqpejf.ico",
+   "err": "net::ERR_ABORTED"
+  }
+ ]
+}
+
+console errors/warnings (11):
+  [warning] WebSocket connection to 'ws://127.0.0.1:8000/ws/notifications/' failed: WebSocket is closed before the connection is established.
+  [warning] WebSocket connection to 'ws://127.0.0.1:8000/ws/notifications/' failed: WebSocket is closed before the connection is established.
+  [warning] WebSocket connection to 'ws://127.0.0.1:8000/ws/notifications/' failed: WebSocket is closed before the connection is established.
+  [warning] WebSocket connection to 'ws://127.0.0.1:8000/ws/notifications/' failed: WebSocket is closed before the connection is established.
+  [warning] WebSocket connection to 'ws://127.0.0.1:8000/ws/notifications/' failed: WebSocket is closed before the connection is established.
+  [warning] WebSocket connection to 'ws://127.0.0.1:8000/ws/auctions/87/' failed: WebSocket is closed before the connection is established.
+  [warning] WebSocket connection to 'ws://127.0.0.1:8000/ws/notifications/' failed: WebSocket is closed before the connection is established.
+  [warning] WebSocket connection to 'ws://127.0.0.1:8000/ws/notifications/' failed: WebSocket is closed before the connection is established.
+  [warning] WebSocket connection to 'ws://127.0.0.1:8000/ws/notifications/' failed: WebSocket is closed before the connection is established.
+  [warning] WebSocket connection to 'ws://127.0.0.1:8000/ws/notifications/' failed: WebSocket is closed before the connection is established.
+  [warning] WebSocket connection to 'ws://127.0.0.1:8000/ws/notifications/' failed: WebSocket is closed before the connection is established.
+
+requests failed (1):
+  net::ERR_ABORTED http://localhost:3000/favicon.ico?favicon.2vob68tjqpejf.ico

@@ -1,5 +1,6 @@
 from django.core.management.base import BaseCommand
 
+from config.db_policy import require_postgresql_connection
 from products.category_bootstrap import ensure_mvp_categories
 
 
@@ -12,6 +13,7 @@ class Command(BaseCommand):
     )
 
     def handle(self, *args, **options):
+        require_postgresql_connection('seed_categories')
         created, existing = ensure_mvp_categories()
         for category in created:
             self.stdout.write(

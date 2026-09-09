@@ -7,6 +7,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from auctions.models import Auction, Bid
+from config.db_policy import require_postgresql_connection
 from products.category_bootstrap import ensure_mvp_categories
 from products.models import Category, Product
 
@@ -86,6 +87,7 @@ class Command(BaseCommand):
 
     @transaction.atomic
     def handle(self, *args, **options):
+        require_postgresql_connection('seed_data')
         User = get_user_model()
 
         created_categories, existing_categories = ensure_mvp_categories()

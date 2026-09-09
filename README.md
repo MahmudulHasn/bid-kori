@@ -71,24 +71,66 @@ BidKori handles product catalogs, authenticated buyer/seller workflows, atomic l
 
 ## Quickstart (Windows PowerShell)
 
-### A. Backend with Docker (recommended)
+### Canonical stack (PostgreSQL required)
+
+BidKori **does not** fall back to SQLite for normal development or runtime.
+`DATABASE_URL` must be a `postgres://` / `postgresql://` URL. Canonical backend
+commands run **inside Compose** so they always hit the same PostgreSQL database
+the API serves.
 
 ```powershell
 cd G:\bid-kori
-docker compose up --build -d
-docker compose exec web python manage.py seed_data
-docker compose exec web python manage.py createsuperuser
+# 1) Start Postgres + Redis + Daphne + Celery worker + Beat
+docker compose up -d --build
+
+# 2) Apply migrations (explicit — not auto-seeded)
+docker compose exec web python manage.py migrate
+
+# 3) Optional health gate
+docker compose exec web python manage.py runtime_preflight
+
+# 4) Demo marketplace (manual only; never on migrate/startup)
+docker compose exec web python manage.py seed_demo_marketplace --reset
+
+# 5) Frontend (host) — API/WS must stay on 127.0.0.1:8000, never `web`
+cd G:\bid-kori\bidkori-frontend
+npm install
+npm run dev
+```
+
+Open [http://localhost:3000/](http://localhost:3000/).
+
+**Stop (keeps volumes / data):**
+
+```powershell
+docker compose down
+```
+
+**Wipe Postgres + media volumes (destructive):**
+
+```powershell
+docker compose down -v
+```
+
+Only use `-v` when you intentionally want a clean database. Changing
+`POSTGRES_PASSWORD` after `postgres_data` already exists also requires a volume
+reset (or a manual `ALTER ROLE`) — Postgres stores the original password in the volume.
+
+**After backend code changes** (Compose does not bind-mount source):
+
+```powershell
+docker compose up -d --build web worker beat
 ```
 
 Services:
 
 | Service | Role |
 | --- | --- |
-| `db` | PostgreSQL |
+| `db` | PostgreSQL (canonical app DB; published on `127.0.0.1:5432`) |
 | `redis` | Channels channel layer + Celery broker/result backend |
 | `web` | Django ASGI via **Daphne** (`config.asgi:application`) — HTTP + WebSockets |
 | `worker` | Celery worker — runs `close_expired_auctions_task` |
-| `beat` | Celery Beat — enqueues expired-auction closing every **10 seconds** (configurable via `CELERY_CLOSE_EXPIRED_INTERVAL_SECONDS`) |
+| `beat` | Celery Beat — enqueues expired-auction closing every **10 seconds** |
 
 API: [http://127.0.0.1:8000/](http://127.0.0.1:8000/)  
 WebSocket (auction room): `ws://127.0.0.1:8000/ws/auctions/<auction_id>/`  
@@ -99,12 +141,14 @@ Admin: [http://127.0.0.1:8000/admin/](http://127.0.0.1:8000/admin/)
 
 **Automatic closing:** Celery Beat schedules expired ACTIVE auction finalization every ~10s without HTTP traffic. Late bids are still rejected immediately by `BidService` even before Beat runs. Manual recovery remains available via `close_expired_auctions`.
 
+**Why PostgreSQL is required:** checkout, bidding, and account-control paths use `select_for_update` row locks. SQLite cannot provide the same concurrent safety; silent SQLite fallback previously caused empty UIs when seed/migrate targeted the wrong database.
+
 ### Demo marketplace population (SHOW-D01)
 
-Deterministic showcase data for software-lab demos. **Manual only** — never runs on migrate/startup.
+Deterministic showcase data for software-lab demos. **Manual only** — never runs on migrate/startup. Refuses to run on non-PostgreSQL databases.
 
 ```powershell
-docker compose up -d
+docker compose up -d --build
 docker compose exec web python manage.py migrate
 docker compose exec web python manage.py seed_demo_marketplace --reset
 cd G:\bid-kori\bidkori-frontend
@@ -131,34 +175,36 @@ Useful commands:
 
 ```powershell
 docker compose logs -f web worker beat
+docker compose exec web python manage.py runtime_preflight
 docker compose exec web python manage.py close_expired_auctions
 docker compose exec web python manage.py export_postman
 docker compose exec web python manage.py seed_demo_marketplace --reset
+docker compose exec web python manage.py test
 .\venv\Scripts\python.exe scripts\stress_test.py --docker
 ```
 
-### B. Backend local (venv + SQLite fallback)
+### Host backend tools (optional)
+
+Prefer Compose exec for migrate/seed/test. If you use a host venv, point it at the
+**same** Compose Postgres (never SQLite):
 
 ```powershell
-cd G:\bid-kori
-python -m venv venv
-.\venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-# Start Redis locally (required for live WebSocket broadcasts + Celery), e.g.:
-#   docker run --rm -p 6379:6379 redis:7-alpine
-# Ensure `.env` includes:
-#   REDIS_URL=redis://127.0.0.1:6379/0
-#   CELERY_BROKER_URL=redis://127.0.0.1:6379/1
-# Optional AI (backend-only; leave blank to boot without AI):
-#   AI_API_KEY=
-#   AI_MODEL=gpt-4o-mini
-#   AI_CHAT_MODEL=gpt-4o-mini
-#   AI_TIMEOUT_SECONDS=20
-#   AI_LISTING_RATE=5/minute
-#   AI_CHAT_RATE=10/minute
-python manage.py migrate
-python manage.py seed_data
+# In `.env` (example — use your POSTGRES_* values):
+# DATABASE_URL=postgres://bidkori_user:YOUR_PASSWORD@127.0.0.1:5432/bidkori
+# REDIS_URL=redis://127.0.0.1:6379/0
+# CELERY_BROKER_URL=redis://127.0.0.1:6379/1
 ```
+
+Without `DATABASE_URL`, Django raises:
+`PostgreSQL DATABASE_URL is required for BidKori runtime. SQLite fallback is disabled.`
+
+**Tests:** canonical release validation is PostgreSQL inside Compose:
+
+```powershell
+docker compose exec web python manage.py test
+```
+
+Host-side unit tests without Postgres may set `USE_SQLITE_FOR_TESTS=True` (test suite only).
 
 ### AI showcase readiness (Compose)
 
@@ -193,28 +239,7 @@ Or use Seller `POST /api/products/generate-description/` and public
    (no stack traces, no key hints). The frontend shows a short unavailable message
    and leaves existing Product descriptions unchanged.
 
-Run the local real-time stack in separate terminals:
-
-```powershell
-# Terminal 1 — Redis (if not already running)
-docker run --rm -p 6379:6379 redis:7-alpine
-
-# Terminal 2 — Django/ASGI
-python manage.py runserver
-
-# Terminal 3 — Celery worker
-celery -A config worker -l INFO
-
-# Terminal 4 — Celery Beat
-celery -A config beat -l INFO
-
-# Terminal 5 — Next.js (see section C)
-```
-
-`runserver` uses Daphne/Channels (ASGI) when `daphne` is installed.  
-Optional Postgres via `.env` / `DATABASE_URL` (used automatically by `dj-database-url`).
-
-### C. Next.js frontend
+### Frontend (Next.js)
 
 ```powershell
 cd G:\bid-kori\bidkori-frontend
@@ -223,9 +248,16 @@ npm run dev
 ```
 
 Frontend: [http://localhost:3000/](http://localhost:3000/)  
-Ensure the Django API is reachable at `http://127.0.0.1:8000`.
+Ensure `NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000/api` (browser must not use Docker hostname `web`).
 
-**Local real-time stack:** PostgreSQL (or SQLite) + **Redis** + Django ASGI (`runserver` / Daphne) + **Celery worker** + **Celery Beat** + Next.js. Auction detail still polls (~3s) as a fallback alongside WebSocket updates.
+**Local real-time stack:** PostgreSQL + **Redis** + Django ASGI (Daphne) + **Celery worker** + **Celery Beat** + Next.js. Auction detail still polls (~3s) as a fallback alongside WebSocket updates.
+
+### Production-like notes
+
+For non-dev runs: `DEBUG=False`, PostgreSQL required, Redis required, Daphne required,
+Celery worker + beat required, explicit `ALLOWED_HOSTS` / CORS / CSRF origins.
+Do not auto-seed demo data in production.
+
 ---
 
 ## API Endpoint Reference (selected)

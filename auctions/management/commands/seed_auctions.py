@@ -8,6 +8,7 @@ from django.utils import timezone
 from django.utils.text import slugify
 
 from auctions.models import Auction
+from config.db_policy import require_postgresql_connection
 from products.models import Category, Product
 
 
@@ -18,6 +19,7 @@ class Command(BaseCommand):
 
     @transaction.atomic
     def handle(self, *args, **options):
+        require_postgresql_connection('seed_auctions')
         User = get_user_model()
 
         seller, created = User.objects.get_or_create(

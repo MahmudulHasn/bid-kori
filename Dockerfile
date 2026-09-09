@@ -11,10 +11,13 @@ COPY . .
 
 # collectstatic needs Django settings; use disposable build-time placeholders only.
 # Runtime SECRET_KEY / DEBUG / DATABASE_URL come from Compose/env at container start.
+# DATABASE_URL must be PostgreSQL-shaped so settings fail-fast policy accepts the build;
+# collectstatic does not open a DB connection.
 ENV DEBUG=False
 ENV SECRET_KEY=build-time-only-not-for-runtime
 ENV ALLOWED_HOSTS=localhost
 ENV CORS_ALLOWED_ORIGINS=
+ENV DATABASE_URL=postgres://bidkori_user:build-only@localhost:5432/bidkori
 RUN python manage.py collectstatic --noinput
 
 EXPOSE 8000

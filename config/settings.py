@@ -9,7 +9,6 @@ import os
 import sys
 from pathlib import Path
 
-import dj_database_url
 from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 
@@ -159,17 +158,31 @@ else:
 
 
 # ---------------------------------------------------------------------------
-# Database — DATABASE_URL or local SQLite
+# Database — PostgreSQL required (SQLite only via explicit test flag)
 # ---------------------------------------------------------------------------
 
-# Empty DATABASE_URL in .env must not override the SQLite default.
+from config.db_policy import build_default_database  # noqa: E402
+
 _database_url = os.getenv('DATABASE_URL', '').strip()
+_use_sqlite_for_tests = _env_bool('USE_SQLITE_FOR_TESTS', default=False)
+_db_conn_max_age = int(os.getenv('DB_CONN_MAX_AGE', '600') or '600')
+
 DATABASES = {
-    'default': dj_database_url.parse(
-        _database_url or f'sqlite:///{BASE_DIR / "db.sqlite3"}',
-        conn_max_age=int(os.getenv('DB_CONN_MAX_AGE', '600') or '600'),
+    'default': build_default_database(
+        database_url=_database_url,
+        use_sqlite_for_tests=_use_sqlite_for_tests,
+        running_tests=RUNNING_TESTS,
+        conn_max_age=_db_conn_max_age,
     )
 }
+
+# Persistent connections leave sessions open that block DROP DATABASE on teardown
+# (especially TransactionTestCase / threaded locking tests on PostgreSQL).
+if RUNNING_TESTS:
+    DATABASES['default']['CONN_MAX_AGE'] = 0
+
+TEST_RUNNER = 'config.test_runner.BidKoriDiscoverRunner'
+
 
 
 # ---------------------------------------------------------------------------

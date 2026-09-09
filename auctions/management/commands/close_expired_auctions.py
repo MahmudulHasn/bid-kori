@@ -2,6 +2,7 @@ from django.core.management.base import BaseCommand
 
 from auctions.models import Auction
 from auctions.services import close_all_expired_auctions
+from config.db_policy import require_postgresql_connection
 
 
 class Command(BaseCommand):
@@ -12,6 +13,7 @@ class Command(BaseCommand):
     )
 
     def handle(self, *args, **options):
+        require_postgresql_connection('close_expired_auctions')
         result = close_all_expired_auctions()
 
         for auction_id in result['closed_ids']:

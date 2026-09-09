@@ -8,12 +8,14 @@ from auctions.demo_marketplace import (
     clear_demo_marketplace,
     seed_demo_marketplace,
 )
+from config.db_policy import database_identity_summary, require_postgresql_connection
 
 
 class Command(BaseCommand):
     help = (
         'Seed deterministic demo marketplace data for software-lab showcase. '
-        'Use --reset to remove prior demo_* / [DEMO] records first.'
+        'Use --reset to remove prior demo_* / [DEMO] records first. '
+        'Requires PostgreSQL (Compose canonical).'
     )
 
     def add_arguments(self, parser):
@@ -40,6 +42,8 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        require_postgresql_connection('seed_demo_marketplace')
+
         debug = bool(getattr(settings, 'DEBUG', False))
         verbosity = int(options.get('verbosity', 1))
         if not debug and not options['confirm_demo_data']:
@@ -60,6 +64,12 @@ class Command(BaseCommand):
             'SHOW-D01 demo seed — local/showcase use only. '
             'Never point this at production without explicit confirmation.',
             self.style.WARNING,
+        )
+
+        identity = database_identity_summary()
+        say(
+            f"Target database: vendor={identity['vendor']} "
+            f"name={identity['name']} host={identity['host']}"
         )
 
         if options['clear_only']:
