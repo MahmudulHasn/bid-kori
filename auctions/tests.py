@@ -1000,6 +1000,42 @@ class ReservePriceTests(APITestCase):
         response = self.client.get(f'/api/auctions/{auction.pk}/')
         self.assertEqual(response.status_code, 200)
         self.assertNotIn('reserve_price', response.data)
+        self.assertTrue(response.data.get('has_reserve'))
+        self.assertIs(response.data.get('reserve_met'), False)
+
+    def test_public_reserve_met_flags_without_amount(self):
+        from .models import Bid
+
+        no_reserve = self._create_auction(reserve_price=None)
+        plain = self.client.get(f'/api/auctions/{no_reserve.pk}/')
+        self.assertEqual(plain.status_code, 200)
+        self.assertFalse(plain.data.get('has_reserve'))
+        self.assertIsNone(plain.data.get('reserve_met'))
+        self.assertNotIn('reserve_price', plain.data)
+
+        reserved = self._create_auction(reserve_price=200)
+        unmet = self.client.get(f'/api/auctions/{reserved.pk}/')
+        self.assertTrue(unmet.data.get('has_reserve'))
+        self.assertIs(unmet.data.get('reserve_met'), False)
+
+        Bid.objects.create(auction=reserved, bidder=self.buyer, amount=250)
+        reserved.current_highest_bid = 250
+        reserved.save(update_fields=['current_highest_bid'])
+        met = self.client.get(f'/api/auctions/{reserved.pk}/')
+        self.assertTrue(met.data.get('has_reserve'))
+        self.assertIs(met.data.get('reserve_met'), True)
+        self.assertEqual(met.data.get('bid_count'), 1)
+        self.assertNotIn('reserve_price', met.data)
+        self.assertIn('winning_bidder_username', met.data)
+
+        # starting_bid copied into current_highest_bid must not fake reserve_met.
+        starting_eq = self._create_auction(
+            reserve_price=50,
+            starting_bid=100,
+        )
+        fake = self.client.get(f'/api/auctions/{starting_eq.pk}/')
+        self.assertEqual(fake.data.get('bid_count'), 0)
+        self.assertIs(fake.data.get('reserve_met'), False)
 
     def test_below_reserve_closed_auction_cannot_checkout(self):
         from .models import Bid

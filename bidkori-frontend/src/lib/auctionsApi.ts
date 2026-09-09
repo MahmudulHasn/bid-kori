@@ -107,6 +107,10 @@ export async function auctionBidHistoryFetcher(url: string): Promise<UserBid[]> 
   return unwrapBidList(data);
 }
 
+export function buildAuctionBidHistoryApiPath(id: string | number): string {
+  return `/auctions/${id}/history/`;
+}
+
 /**
  * Mock checkout for a CLOSED auction winner.
  * Sends no payment payload — the backend creates a completed Payment row.

@@ -19,6 +19,11 @@ export type AuctionTimerState = {
    * UX only — does not mean backend status is CLOSED.
    */
   isClosed: boolean;
+  /** Server-adjusted now once mounted; null during SSR/hydration. */
+  estimatedNowMs: number | null;
+  /** Remaining ms until start_time (0 if started / unknown / forced expired). */
+  startsInMs: number;
+  isBeforeStart: boolean;
 };
 
 const EMPTY: AuctionTimerState = {
@@ -27,6 +32,9 @@ const EMPTY: AuctionTimerState = {
   minutes: 0,
   seconds: 0,
   isClosed: true,
+  estimatedNowMs: null,
+  startsInMs: 0,
+  isBeforeStart: false,
 };
 
 export type UseAuctionTimerOptions = {
@@ -44,9 +52,12 @@ export type UseAuctionTimerOptions = {
 export function useAuctionTimer(
   endTime: string | null | undefined,
   serverTime?: string | null | undefined,
-  options?: UseAuctionTimerOptions,
+  options?: UseAuctionTimerOptions & {
+    startTime?: string | null | undefined;
+  },
 ): AuctionTimerState {
   const forceExpired = options?.forceExpired === true;
+  const startTime = options?.startTime;
   /** null until mounted — avoids SSR/client Date.now() hydration mismatch. */
   const [clientNowMs, setClientNowMs] = useState<number | null>(null);
   const [offsetMs, setOffsetMs] = useState<number | null>(null);
@@ -78,11 +89,25 @@ export function useAuctionTimer(
     // Invalid server_time: keep previous offset (or null → local fallback).
   }
 
-  if (forceExpired || clientNowMs == null || !endTime) {
+  if (clientNowMs == null) {
     return EMPTY;
   }
 
   const estimatedNow = estimateServerNowMs(offsetMs, clientNowMs);
+  const startsInMs = startTime
+    ? computeAuctionRemainingMs(startTime, estimatedNow)
+    : 0;
+  const isBeforeStart = Boolean(startTime) && startsInMs > 0;
+
+  if (forceExpired || !endTime) {
+    return {
+      ...EMPTY,
+      estimatedNowMs: estimatedNow,
+      startsInMs: 0,
+      isBeforeStart: false,
+    };
+  }
+
   const remainingMs = computeAuctionRemainingMs(endTime, estimatedNow);
   const parts = remainingMsToCountdownParts(remainingMs);
 
@@ -92,6 +117,9 @@ export function useAuctionTimer(
     minutes: parts.minutes,
     seconds: parts.seconds,
     isClosed: parts.isExpired,
+    estimatedNowMs: estimatedNow,
+    startsInMs,
+    isBeforeStart,
   };
 }
 

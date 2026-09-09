@@ -264,12 +264,19 @@ export function applyBidAcceptedToAuction(
     return { auction, revalidate: false, applied: false };
   }
 
+  const nextBidCount =
+    typeof auction.bid_count === 'number' && Number.isFinite(auction.bid_count)
+      ? auction.bid_count + 1
+      : auction.bid_count;
+
   return {
     auction: {
       ...auction,
       current_highest_bid: event.current_highest_bid,
+      ...(typeof nextBidCount === 'number' ? { bid_count: nextBidCount } : {}),
     },
-    revalidate: false,
+    // Reserve threshold is private — reconcile reserve_met via REST when needed.
+    revalidate: auction.has_reserve === true,
     applied: true,
   };
 }

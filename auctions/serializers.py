@@ -90,6 +90,27 @@ class AuctionSerializer(serializers.ModelSerializer):
         ),
     )
 
+    # Safe public reserve messaging — never exposes the numeric reserve_price.
+    has_reserve = serializers.SerializerMethodField(
+        help_text='True when this auction has a reserve price configured.',
+    )
+    reserve_met = serializers.SerializerMethodField(
+        help_text=(
+            'Null when there is no reserve. Otherwise whether the highest '
+            'Bid row meets the private reserve threshold.'
+        ),
+    )
+    bid_count = serializers.SerializerMethodField(
+        help_text='Number of Bid rows for this auction (0 when none placed).',
+    )
+    winning_bidder_username = serializers.CharField(
+        source='winning_bidder.username',
+        read_only=True,
+        allow_null=True,
+        default=None,
+        help_text='Public username of the winning bidder when assigned.',
+    )
+
     class Meta:
         model = Auction
         fields = [
@@ -99,9 +120,13 @@ class AuctionSerializer(serializers.ModelSerializer):
             'current_highest_bid',
             'min_increment',
             'reserve_price',
+            'has_reserve',
+            'reserve_met',
+            'bid_count',
             'start_time',
             'end_time',
             'winning_bidder',
+            'winning_bidder_username',
             'status',
             'is_featured',
             'is_paid',
@@ -115,6 +140,7 @@ class AuctionSerializer(serializers.ModelSerializer):
         read_only_fields = [
             'current_highest_bid',
             'winning_bidder',
+            'winning_bidder_username',
             'status',
             'is_paid',
             # Featured placement is a platform capability (Django admin / staff).
@@ -123,11 +149,40 @@ class AuctionSerializer(serializers.ModelSerializer):
             'moderation_reason',
             'moderated_at',
             'server_time',
+            'has_reserve',
+            'reserve_met',
+            'bid_count',
         ]
 
     def get_server_time(self, obj):
         """Return timezone.now() at serialization — zero DB work."""
         return timezone.now()
+
+    def get_has_reserve(self, obj):
+        return obj.reserve_price is not None
+
+    def get_bid_count(self, obj):
+        annotated = getattr(obj, 'annotated_bid_count', None)
+        if annotated is not None:
+            return int(annotated)
+        return obj.bids.count()
+
+    def get_reserve_met(self, obj):
+        """Public reserve status without revealing the reserve amount.
+
+        Uses Bid rows (not ``current_highest_bid`` alone) because create may
+        copy starting_bid into current_highest_bid before any Bid exists.
+        """
+        if obj.reserve_price is None:
+            return None
+        highest = (
+            obj.bids.order_by('-amount', 'timestamp')
+            .values_list('amount', flat=True)
+            .first()
+        )
+        if highest is None:
+            return False
+        return highest >= obj.reserve_price
 
     def to_representation(self, instance):
         data = super().to_representation(instance)

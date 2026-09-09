@@ -111,6 +111,15 @@ export type Auction = {
   is_active?: boolean;
   winning_bidder?: number | null;
   winning_bidder_username?: string | null;
+  /** True when a private reserve_price is configured (amount never exposed). */
+  has_reserve?: boolean;
+  /**
+   * Null when no reserve. Otherwise whether highest Bid meets reserve.
+   * Never includes the numeric reserve amount.
+   */
+  reserve_met?: boolean | null;
+  /** Bid row count — preferred over current_highest_bid for “no bids yet”. */
+  bid_count?: number;
   images?: AuctionImage[];
   /** Optional recent bids (active list); used for honest starting vs current labels. */
   recent_bids?: UserBid[];

@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { FormEvent, useCallback, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { Clock3, Gavel, ImageOff, Shield } from 'lucide-react';
 import toast from 'react-hot-toast';
 import useSWR from 'swr';
@@ -12,7 +12,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useAuctionRealtime } from '@/hooks/useAuctionRealtime';
 import { useAuctionTimer } from '@/hooks/useAuctionTimer';
 import api from '@/lib/api';
-import { getApiErrorMessage, getApiStatus } from '@/lib/apiErrors';
+import { getApiStatus } from '@/lib/apiErrors';
 import { isAuctionOwnedByUser } from '@/lib/auctionOwnership';
 import {
   applyAuctionCancelledToAuction,
@@ -23,19 +23,61 @@ import {
   type BidAcceptedEvent,
 } from '@/lib/auctionRealtime';
 import { buildLoginHref } from '@/lib/authRouting';
-import { getAuctionPriceLabel, getAuctionTitle } from '@/lib/auctionDisplay';
+import {
+  formatAuctionMoney,
+  getAuctionProduct,
+  getAuctionTitle,
+} from '@/lib/auctionDisplay';
+import {
+  formatAuctionDetailMoney,
+  formatBidHistoryEmptyLabel,
+  getAuctionCurrentBidAmount,
+  getAuctionDisplayState,
+  getAuctionDisplayStateLabel,
+  getAuctionReservePresentation,
+  getAuctionStartingBidAmount,
+  getAuctionViewerBidState,
+  getAuctionViewerBidStateLabel,
+  getClosedNoWinnerLabel,
+  getNextValidBidAmount,
+  getPlaceBidErrorMessage,
+  myHighestBidAmountForAuction,
+  prependRealtimeBidToHistory,
+  sortBidsNewestFirst,
+} from '@/lib/auctionDetailUx';
+import { remainingMsToCountdownParts } from '@/lib/auctionTime';
+import {
+  auctionBidHistoryFetcher,
+  auctionDetailFetcher,
+  buildAuctionBidHistoryApiPath,
+  myBidsFetcher,
+} from '@/lib/auctionsApi';
+import { MY_BIDS_API_PATH } from '@/lib/buyer';
 import { MARKETPLACE_ROUTES } from '@/lib/marketplace';
 import { resolveMediaUrl } from '@/lib/media';
+import { formatSellerProductCondition } from '@/lib/seller';
 import { sellerAuctionDetailPath } from '@/lib/workspaceNavigation';
-import type { Auction } from '@/lib/types';
-
-const fetcher = async (url: string) => {
-  const { data } = await api.get<Auction>(url);
-  return data;
-};
+import type { UserBid } from '@/lib/types';
 
 function pad(value: number) {
   return String(value).padStart(2, '0');
+}
+
+function displayStateBadgeClass(state: string): string {
+  switch (state) {
+    case 'LIVE':
+      return 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-300';
+    case 'UPCOMING':
+      return 'bg-sky-500/15 text-sky-800 dark:text-sky-300';
+    case 'FINALIZING':
+      return 'bg-amber-500/15 text-amber-900 dark:text-amber-200';
+    case 'CLOSED':
+      return 'bg-zinc-500/15 text-zinc-800 dark:text-zinc-300';
+    case 'CANCELLED':
+      return 'bg-rose-500/15 text-rose-800 dark:text-rose-300';
+    default:
+      return 'bg-zinc-500/15 text-zinc-700 dark:text-zinc-300';
+  }
 }
 
 export default function AuctionDetailPage() {
@@ -47,10 +89,31 @@ export default function AuctionDetailPage() {
   const [submitting, setSubmitting] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
 
-  const { data: auction, error, isLoading, mutate } = useSWR(
+  const {
+    data: auction,
+    error,
+    isLoading,
+    mutate,
+  } = useSWR(
     auctionId ? `/auctions/${auctionId}/` : null,
-    fetcher,
+    auctionDetailFetcher,
     { refreshInterval: 3000 },
+  );
+
+  const historyKey = auctionId
+    ? buildAuctionBidHistoryApiPath(auctionId)
+    : null;
+  const {
+    data: history,
+    mutate: mutateHistory,
+  } = useSWR<UserBid[]>(historyKey, auctionBidHistoryFetcher, {
+    refreshInterval: 3000,
+  });
+
+  const { data: myBids, mutate: mutateMyBids } = useSWR(
+    isAuthenticated && !authLoading ? MY_BIDS_API_PATH : null,
+    myBidsFetcher,
+    { refreshInterval: 5000 },
   );
 
   const handleBidAccepted = useCallback(
@@ -68,8 +131,16 @@ export default function AuctionDetailPage() {
         },
         { revalidate: false },
       );
+      void mutateHistory(
+        (current) =>
+          prependRealtimeBidToHistory(current, event.bid, auctionId),
+        { revalidate: true },
+      );
+      if (isAuthenticated) {
+        void mutateMyBids();
+      }
     },
-    [auctionId, mutate],
+    [auctionId, mutate, mutateHistory, mutateMyBids, isAuthenticated],
   );
 
   const handleAuctionClosed = useCallback(
@@ -87,8 +158,12 @@ export default function AuctionDetailPage() {
         },
         { revalidate: false },
       );
+      void mutateHistory();
+      if (isAuthenticated) {
+        void mutateMyBids();
+      }
     },
-    [auctionId, mutate],
+    [auctionId, mutate, mutateHistory, mutateMyBids, isAuthenticated],
   );
 
   const handleAuctionCancelled = useCallback(
@@ -110,13 +185,18 @@ export default function AuctionDetailPage() {
         },
         { revalidate: false },
       );
+      void mutateHistory();
     },
-    [auctionId, mutate],
+    [auctionId, mutate, mutateHistory],
   );
 
   const handleRealtimeReconnect = useCallback(() => {
     void mutate();
-  }, [mutate]);
+    void mutateHistory();
+    if (isAuthenticated) {
+      void mutateMyBids();
+    }
+  }, [mutate, mutateHistory, mutateMyBids, isAuthenticated]);
 
   const { status: realtimeStatus } = useAuctionRealtime({
     auctionId,
@@ -130,15 +210,34 @@ export default function AuctionDetailPage() {
   const timer = useAuctionTimer(auction?.end_time, auction?.server_time, {
     forceExpired:
       auction?.status === 'CLOSED' || auction?.status === 'CANCELLED',
+    startTime: auction?.start_time,
   });
-  /** Local/server-adjusted timer may hit zero before Beat closes; do not invent CLOSED. */
+
+  const parsedServerMs = auction?.server_time
+    ? Date.parse(auction.server_time)
+    : Number.NaN;
+  const nowMs =
+    timer.estimatedNowMs ??
+    (Number.isFinite(parsedServerMs) ? parsedServerMs : 0);
+
+  const displayState = auction
+    ? getAuctionDisplayState({
+        status: auction.status,
+        startTime: auction.start_time,
+        endTime: auction.end_time,
+        nowMs,
+      })
+    : null;
+
   const biddingUnavailable =
-    timer.isClosed ||
-    auction?.status === 'CLOSED' ||
-    auction?.status === 'CANCELLED';
+    !displayState ||
+    displayState === 'UPCOMING' ||
+    displayState === 'FINALIZING' ||
+    displayState === 'CLOSED' ||
+    displayState === 'CANCELLED';
+
   const isBackendClosed = auction?.status === 'CLOSED';
   const isBackendCancelled = auction?.status === 'CANCELLED';
-  const priceLabel = auction ? getAuctionPriceLabel(auction) : null;
 
   const winnerLabel = (() => {
     if (!isBackendClosed || isBackendCancelled) return null;
@@ -161,11 +260,51 @@ export default function AuctionDetailPage() {
   }, [auction?.images]);
 
   const activeImage = imageUrls[activeImageIndex] ?? imageUrls[0] ?? null;
-  const currentBid = Number(
-    auction?.current_highest_bid ?? auction?.starting_bid ?? 0,
+  const startingBid = auction ? getAuctionStartingBidAmount(auction) : null;
+  const currentBid = auction ? getAuctionCurrentBidAmount(auction) : null;
+  const minIncrement = Number(auction?.min_increment ?? 0);
+  const nextValid = auction ? getNextValidBidAmount(auction) : null;
+  const suggestedBid =
+    nextValid != null ? nextValid.toFixed(2) : '';
+
+  const reservePresentation = auction
+    ? getAuctionReservePresentation(auction)
+    : { kind: 'none' as const };
+
+  const myHighest = auctionId
+    ? myHighestBidAmountForAuction(myBids, auctionId)
+    : null;
+
+  const viewerState =
+    auction && displayState
+      ? getAuctionViewerBidState({
+          auction,
+          isAuthenticated,
+          isOwner,
+          userId: user?.id,
+          myHighestBidAmount: myHighest,
+          displayState,
+        })
+      : 'anonymous';
+  const viewerLabel = getAuctionViewerBidStateLabel(viewerState);
+
+  const product = auction ? getAuctionProduct(auction) : null;
+  const sortedHistory = useMemo(
+    () => sortBidsNewestFirst(history ?? []),
+    [history],
   );
-  const minIncrement = Number(auction?.min_increment ?? 10);
-  const suggestedBid = (currentBid + minIncrement).toFixed(2);
+
+  const startParts = remainingMsToCountdownParts(timer.startsInMs);
+
+  useEffect(() => {
+    if (displayState === 'FINALIZING' && auction?.status === 'ACTIVE') {
+      const id = window.setTimeout(() => {
+        void mutate();
+      }, 1500);
+      return () => window.clearTimeout(id);
+    }
+    return undefined;
+  }, [displayState, auction?.status, mutate]);
 
   const handlePlaceBid = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -189,9 +328,13 @@ export default function AuctionDetailPage() {
     }
     if (!auctionId || biddingUnavailable) {
       toast.error(
-        auction?.status === 'CANCELLED'
-          ? 'This auction was cancelled.'
-          : 'This auction is closed.',
+        displayState === 'UPCOMING'
+          ? 'This auction has not started yet.'
+          : displayState === 'FINALIZING'
+            ? 'Finalizing auction… bidding is closed.'
+            : auction?.status === 'CANCELLED'
+              ? 'This auction was cancelled.'
+              : 'This auction is closed.',
       );
       return;
     }
@@ -207,26 +350,13 @@ export default function AuctionDetailPage() {
       await api.post(`/auctions/${auctionId}/place-bid/`, { amount });
       toast.success('Bid placed successfully.');
       setBidAmount('');
-      await mutate();
+      await Promise.all([mutate(), mutateHistory(), mutateMyBids()]);
     } catch (err: unknown) {
-      const status = getApiStatus(err);
-      const apiMessage = getApiErrorMessage(err, '');
-
-      if (status === 429) {
-        toast.error(
-          'Too many bids. Please wait a minute and try again.',
+      toast.error(getPlaceBidErrorMessage(err));
+      if (getApiStatus(err) === 401 && auctionId) {
+        router.push(
+          buildLoginHref(MARKETPLACE_ROUTES.auctionDetail(auctionId)),
         );
-      } else if (status === 400) {
-        toast.error(
-          apiMessage ||
-            'Bid too low. Your amount must beat the current highest bid (plus minimum increment).',
-        );
-      } else if (status === 403) {
-        toast.error(apiMessage || 'You are not allowed to bid on this auction.');
-      } else if (status === 401) {
-        toast.error('Please log in to place a bid.');
-      } else {
-        toast.error(apiMessage || 'Could not place bid. Please try again.');
       }
     } finally {
       setSubmitting(false);
@@ -236,26 +366,74 @@ export default function AuctionDetailPage() {
   if (isLoading) {
     return (
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-10 sm:px-6">
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">Loading auction…</p>
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          Loading auction…
+        </p>
       </main>
     );
   }
 
-  if (error || !auction) {
+  if (error || !auction || !displayState) {
+    const status = getApiStatus(error);
+    const notFound = status === 404 || (!auction && !error);
     return (
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-10 sm:px-6">
-        <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">
-          Auction not found or the API is unavailable.
-        </p>
-        <Link
-          href={MARKETPLACE_ROUTES.auctions}
-          className="mt-4 inline-block text-sm text-amber-700 hover:underline"
+        <p
+          role="alert"
+          className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300"
         >
-          Back to auctions
-        </Link>
+          {notFound
+            ? 'Auction not found.'
+            : 'Auction temporarily unavailable. Please try again.'}
+        </p>
+        <div className="mt-4 flex flex-wrap gap-3">
+          {!notFound ? (
+            <button
+              type="button"
+              onClick={() => void mutate()}
+              className="text-sm font-medium text-amber-800 underline-offset-2 hover:underline dark:text-amber-300"
+            >
+              Retry
+            </button>
+          ) : null}
+          <Link
+            href={MARKETPLACE_ROUTES.auctions}
+            className="text-sm text-amber-700 hover:underline dark:text-amber-300"
+          >
+            Back to auctions
+          </Link>
+        </div>
       </main>
     );
   }
+
+  const countdownHeading =
+    displayState === 'CANCELLED'
+      ? 'Auction cancelled'
+      : displayState === 'CLOSED'
+        ? 'Auction ended'
+        : displayState === 'FINALIZING'
+          ? 'Finalizing auction…'
+          : displayState === 'UPCOMING'
+            ? 'Starts in'
+            : 'Ending in';
+
+  const countdownParts =
+    displayState === 'UPCOMING'
+      ? {
+          days: startParts.days,
+          hours: startParts.hours,
+          minutes: startParts.minutes,
+          seconds: startParts.seconds,
+        }
+      : displayState === 'LIVE'
+        ? {
+            days: timer.days,
+            hours: timer.hours,
+            minutes: timer.minutes,
+            seconds: timer.seconds,
+          }
+        : { days: 0, hours: 0, minutes: 0, seconds: 0 };
 
   return (
     <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-10 sm:px-6">
@@ -266,14 +444,34 @@ export default function AuctionDetailPage() {
         >
           ← Back to auctions
         </Link>
-        <h1 className="mt-3 text-3xl font-semibold tracking-tight text-zinc-900 dark:text-white">
-          {getAuctionTitle(auction)}
-        </h1>
-        {typeof auction.product === 'object' && auction.product?.description && (
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <h1 className="text-3xl font-semibold tracking-tight text-zinc-900 dark:text-white">
+            {getAuctionTitle(auction)}
+          </h1>
+          <span
+            className={[
+              'inline-flex rounded-md px-2.5 py-1 text-xs font-semibold uppercase tracking-wide',
+              displayStateBadgeClass(displayState),
+            ].join(' ')}
+          >
+            {getAuctionDisplayStateLabel(displayState)}
+          </span>
+        </div>
+        {product?.description ? (
           <p className="mt-2 max-w-3xl text-zinc-600 dark:text-zinc-400">
-            {auction.product.description}
+            {product.description}
           </p>
-        )}
+        ) : null}
+        <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-sm text-zinc-600 dark:text-zinc-400">
+          {product?.condition ? (
+            <div>
+              <dt className="inline text-zinc-500">Condition: </dt>
+              <dd className="inline font-medium text-zinc-800 dark:text-zinc-200">
+                {formatSellerProductCondition(product.condition)}
+              </dd>
+            </div>
+          ) : null}
+        </dl>
       </div>
 
       <div className="grid gap-8 lg:grid-cols-[1.4fr_0.9fr]">
@@ -296,13 +494,14 @@ export default function AuctionDetailPage() {
             )}
           </div>
 
-          {imageUrls.length > 1 && (
+          {imageUrls.length > 1 ? (
             <div className="grid grid-cols-4 gap-3 sm:grid-cols-6">
               {imageUrls.map((url, index) => (
                 <button
                   key={url + index}
                   type="button"
                   onClick={() => setActiveImageIndex(index)}
+                  aria-label={`Show gallery image ${index + 1}`}
                   className={[
                     'relative aspect-square overflow-hidden rounded-xl border',
                     index === activeImageIndex
@@ -320,25 +519,66 @@ export default function AuctionDetailPage() {
                 </button>
               ))}
             </div>
-          )}
+          ) : null}
+
+          <section
+            aria-labelledby="auction-bid-history-heading"
+            className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-950"
+          >
+            <h2
+              id="auction-bid-history-heading"
+              className="text-base font-semibold text-zinc-900 dark:text-white"
+            >
+              Bid history
+            </h2>
+            {sortedHistory.length === 0 ? (
+              <p className="mt-3 text-sm text-zinc-500 dark:text-zinc-400">
+                {formatBidHistoryEmptyLabel()}
+              </p>
+            ) : (
+              <ol className="mt-3 divide-y divide-zinc-100 dark:divide-zinc-800">
+                {sortedHistory.map((bid) => (
+                  <li
+                    key={bid.id}
+                    className="flex flex-wrap items-baseline justify-between gap-2 py-2.5 text-sm"
+                  >
+                    <span className="font-medium text-zinc-900 dark:text-white">
+                      {formatAuctionMoney(Number(bid.amount))}
+                    </span>
+                    <span className="text-zinc-600 dark:text-zinc-400">
+                      {bid.bidder_username?.trim() || 'Bidder'}
+                    </span>
+                    <time
+                      className="w-full text-xs text-zinc-500 sm:w-auto"
+                      dateTime={bid.timestamp}
+                    >
+                      {bid.timestamp
+                        ? new Date(bid.timestamp).toLocaleString()
+                        : '—'}
+                    </time>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </section>
         </section>
 
         <aside className="space-y-4">
           <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
             <div className="mb-3 flex items-center gap-2 text-sm font-medium text-zinc-500 dark:text-zinc-400">
               <Clock3 className="h-4 w-4" aria-hidden />
-              {isBackendCancelled
-                ? 'Auction cancelled'
-                : biddingUnavailable
-                  ? 'Auction ended'
-                  : 'Time remaining'}
+              <span>{countdownHeading}</span>
             </div>
-            <div className="grid grid-cols-4 gap-2 text-center">
+            <div
+              className="grid grid-cols-4 gap-2 text-center"
+              aria-live="polite"
+              aria-label={countdownHeading}
+            >
               {[
-                { label: 'Days', value: timer.days },
-                { label: 'Hours', value: timer.hours },
-                { label: 'Mins', value: timer.minutes },
-                { label: 'Secs', value: timer.seconds },
+                { label: 'Days', value: countdownParts.days },
+                { label: 'Hours', value: countdownParts.hours },
+                { label: 'Mins', value: countdownParts.minutes },
+                { label: 'Secs', value: countdownParts.seconds },
               ].map((unit) => (
                 <div
                   key={unit.label}
@@ -353,12 +593,32 @@ export default function AuctionDetailPage() {
                 </div>
               ))}
             </div>
+            {auction.start_time || auction.end_time ? (
+              <dl className="mt-3 space-y-1 text-xs text-zinc-500 dark:text-zinc-400">
+                {auction.start_time ? (
+                  <div className="flex justify-between gap-2">
+                    <dt>Starts</dt>
+                    <dd className="text-right text-zinc-700 dark:text-zinc-300">
+                      {new Date(auction.start_time).toLocaleString()}
+                    </dd>
+                  </div>
+                ) : null}
+                {auction.end_time ? (
+                  <div className="flex justify-between gap-2">
+                    <dt>Ends</dt>
+                    <dd className="text-right text-zinc-700 dark:text-zinc-300">
+                      {new Date(auction.end_time).toLocaleString()}
+                    </dd>
+                  </div>
+                ) : null}
+              </dl>
+            ) : null}
           </div>
 
           <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
             <div className="flex items-start justify-between gap-2">
               <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                {priceLabel?.label ?? 'Current highest bid'}
+                {currentBid != null ? 'Current highest bid' : 'Starting bid'}
               </p>
               {realtimeStatus === 'connected' ? (
                 <span
@@ -370,20 +630,56 @@ export default function AuctionDetailPage() {
               ) : null}
             </div>
             <p className="mt-1 text-3xl font-semibold text-amber-700 dark:text-amber-300">
-              ৳{currentBid.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              {formatAuctionDetailMoney(
+                currentBid != null ? currentBid : startingBid,
+              )}
             </p>
-            <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
-              Minimum increment: ৳
-              {minIncrement.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-            </p>
-            {auction.status && (
-              <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
-                Status: {auction.status}
+            {currentBid != null && startingBid != null ? (
+              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                Starting bid: {formatAuctionDetailMoney(startingBid)}
               </p>
-            )}
+            ) : null}
+            {currentBid == null ? (
+              <p className="mt-2 text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                No bids yet
+              </p>
+            ) : null}
+            <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+              Minimum increment:{' '}
+              <span className="font-semibold text-zinc-900 dark:text-white">
+                {Number.isFinite(minIncrement) && minIncrement > 0
+                  ? formatAuctionMoney(minIncrement)
+                  : '—'}
+              </span>
+            </p>
+            {nextValid != null && displayState === 'LIVE' ? (
+              <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                Next valid bid:{' '}
+                <span className="font-semibold text-zinc-900 dark:text-white">
+                  {formatAuctionMoney(nextValid)}
+                </span>
+              </p>
+            ) : null}
+            {reservePresentation.kind !== 'none' &&
+            reservePresentation.kind !== 'closed_unmet' ? (
+              <p
+                className="mt-2 text-sm font-medium text-zinc-800 dark:text-zinc-200"
+                aria-live="polite"
+              >
+                {reservePresentation.label}
+              </p>
+            ) : null}
+            {viewerLabel ? (
+              <p
+                className="mt-3 text-sm font-semibold text-zinc-900 dark:text-white"
+                aria-live="polite"
+              >
+                {viewerLabel}
+              </p>
+            ) : null}
             {isBackendCancelled ? (
               <p className="mt-3 text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                This auction was cancelled.
+                This auction was cancelled. No winner.
               </p>
             ) : null}
             {isBackendClosed ? (
@@ -396,16 +692,31 @@ export default function AuctionDetailPage() {
                     </span>
                   </>
                 ) : (
-                  <span className="font-medium">No winner</span>
+                  <span className="font-medium">
+                    {getClosedNoWinnerLabel(auction)}
+                  </span>
                 )}
+              </p>
+            ) : null}
+            {displayState === 'FINALIZING' ? (
+              <p className="mt-3 text-sm font-medium text-amber-800 dark:text-amber-200">
+                Finalizing auction… bidding is closed.
+              </p>
+            ) : null}
+            {displayState === 'UPCOMING' ? (
+              <p className="mt-3 text-sm font-medium text-sky-800 dark:text-sky-200">
+                Auction has not started yet.
               </p>
             ) : null}
           </div>
 
-          {showSellerWorkspaceLink && auction ? (
+          {showSellerWorkspaceLink ? (
             <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
               <div className="mb-3 flex items-center gap-2">
-                <Shield className="h-4 w-4 text-amber-700 dark:text-amber-300" aria-hidden />
+                <Shield
+                  className="h-4 w-4 text-amber-700 dark:text-amber-300"
+                  aria-hidden
+                />
                 <h2 className="text-base font-semibold text-zinc-900 dark:text-white">
                   Your listing
                 </h2>
@@ -425,7 +736,10 @@ export default function AuctionDetailPage() {
 
           <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
             <div className="mb-4 flex items-center gap-2">
-              <Gavel className="h-4 w-4 text-amber-700 dark:text-amber-300" aria-hidden />
+              <Gavel
+                className="h-4 w-4 text-amber-700 dark:text-amber-300"
+                aria-hidden
+              />
               <h2 className="text-base font-semibold text-zinc-900 dark:text-white">
                 Bid panel
               </h2>
@@ -433,7 +747,13 @@ export default function AuctionDetailPage() {
 
             {biddingUnavailable ? (
               <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                Bidding is closed for this auction.
+                {displayState === 'UPCOMING'
+                  ? 'Bidding opens when the auction starts.'
+                  : displayState === 'FINALIZING'
+                    ? 'Finalizing auction…'
+                    : displayState === 'CANCELLED'
+                      ? 'This auction was cancelled.'
+                      : 'Bidding is closed for this auction.'}
               </p>
             ) : isOwner ? (
               <p className="text-sm text-zinc-500 dark:text-zinc-400">
@@ -447,12 +767,14 @@ export default function AuctionDetailPage() {
                   </span>
                   <input
                     type="number"
-                    min={suggestedBid}
+                    min={suggestedBid || undefined}
                     step="0.01"
                     required
+                    inputMode="decimal"
                     value={bidAmount}
                     onChange={(e) => setBidAmount(e.target.value)}
                     placeholder={suggestedBid}
+                    disabled={submitting}
                     className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm outline-none ring-amber-500/40 focus:ring-2 dark:border-zinc-700 dark:bg-zinc-900"
                   />
                 </label>
@@ -463,7 +785,7 @@ export default function AuctionDetailPage() {
                 >
                   {submitting ? 'Placing bid…' : 'Place Bid'}
                 </button>
-                {!authLoading && !isAuthenticated && (
+                {!authLoading && !isAuthenticated ? (
                   <p className="text-xs text-zinc-500 dark:text-zinc-400">
                     <Link
                       href={buildLoginHref(
@@ -477,12 +799,7 @@ export default function AuctionDetailPage() {
                     </Link>{' '}
                     to place a bid.
                   </p>
-                )}
-                {authLoading && (
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                    Checking your session…
-                  </p>
-                )}
+                ) : null}
               </form>
             )}
           </div>

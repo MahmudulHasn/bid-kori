@@ -46,6 +46,17 @@ export function getAuctionPriceLabel(auction: Auction): {
     return { label: 'Final bid', amount };
   }
 
+  // Prefer explicit bid_count when present (create may copy starting → current).
+  if (typeof auction.bid_count === 'number' && Number.isFinite(auction.bid_count)) {
+    if (auction.bid_count > 0) {
+      return { label: 'Current bid', amount };
+    }
+    return {
+      label: 'Starting price',
+      amount: hasStarting ? starting : amount,
+    };
+  }
+
   // Active-list payloads include recent_bids; empty means no bids yet.
   if (Array.isArray(auction.recent_bids)) {
     if (auction.recent_bids.length > 0) {
