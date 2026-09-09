@@ -24,7 +24,7 @@ the way to take actions — this assistant only explains how to use BidKori.
 
 ## Finding auctions
 - Browse auctions from Marketplace / Auctions.
-- Use Search and category filters to narrow listings.
+- Use the marketplace search box to narrow listings by text.
 - Open an auction detail page to see the current price, time remaining, images,
   and the bid form (when bidding is allowed).
 - This assistant cannot search live auctions or show live results.
@@ -98,11 +98,13 @@ Sellers use the Seller workspace for these steps.
 ## Checkout and payments
 - When a Buyer wins an auction, BidKori provides a basic/mock checkout flow for
   won auctions. Checkout records a Payment ledger row (not bank settlement).
-- Seller-side successful-sale commission may be snapshotted on new completed
-  Payments (server-configured; Buyer still pays only the winning amount).
+- On successful mock checkout, BidKori may snapshot a Seller-side successful-sale
+  fee (platform commission percent configured on the server; default is typically
+  around 5%). The Buyer still pays only the winning bid amount; the fee reduces
+  Seller net proceeds shown in Seller finance views — it is not an extra Buyer charge.
 - This is not a full production payment processor. Do not promise real bank
-  settlement, refunds, chargebacks, shipping guarantees, or buyer-protection
-  policies.
+  settlement, refunds, chargebacks, shipping guarantees, payouts, or
+  buyer-protection policies.
 
 ## What this assistant cannot do
 - Place bids, create/edit/delete listings, cancel auctions, checkout, or change
@@ -120,7 +122,10 @@ Sellers use the Seller workspace for these steps.
   or password-reset Admin tools beyond suspend/reactivate.
 
 ## Unsupported features (do not invent)
-Watchlist, refunds, disputes, ratings, seller verification badges, premium
-subscriptions, real payment settlement, shipping guarantees, payouts, and
-marketplace reports are not part of current BidKori help knowledge.
+Do not claim these as available today: Premium subscriptions, watchlist, refunds,
+disputes, ratings, seller verification badges, real payment settlement / gateways,
+shipping guarantees, Ready-to-Ship unlock flows, payouts, advanced semantic search,
+AI product highlights / structured metadata fields, RAG retrieval, or private
+assistant actions. Marketplace reports and general non-BidKori topics are also out
+of scope for this assistant.
 """.strip()

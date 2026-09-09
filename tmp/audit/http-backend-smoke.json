@@ -1,0 +1,70 @@
+[
+  {
+    "path": "/api/admin/users/?page=1",
+    "status": 200,
+    "shape": [
+      "count",
+      "next",
+      "previous",
+      "results"
+    ],
+    "count": 20
+  },
+  {
+    "path": "/api/auctions/analytics/",
+    "status": 200,
+    "shape": [
+      "bid_escalation_history",
+      "category_breakdown",
+      "top_active_bidders",
+      "total_active_auctions",
+      "total_bidding_volume",
+      "total_bids_placed"
+    ],
+    "count": null
+  },
+  {
+    "path": "/api/admin/finance/summary/",
+    "status": 200,
+    "shape": [
+      "accounted_sales_count",
+      "completed_sales_count",
+      "disclosure",
+      "gross_paid_volume",
+      "legacy_completed_sales_count",
+      "legacy_gross_paid_volume",
+      "platform_revenue",
+      "seller_net_total"
+    ],
+    "count": null
+  },
+  {
+    "path": "/api/auctions/10/",
+    "status": 200,
+    "shape": [
+      "current_highest_bid",
+      "end_time",
+      "id",
+      "images",
+      "is_featured",
+      "is_hidden",
+      "is_paid",
+      "min_increment",
+      "moderated_at",
+      "moderation_reason",
+      "product",
+      "server_time",
+      "start_time",
+      "starting_bid",
+      "status",
+      "winning_bidder"
+    ],
+    "count": null
+  },
+  {
+    "path": "/api/auctions/10/history/",
+    "status": 200,
+    "shape": "list",
+    "count": 1
+  }
+]

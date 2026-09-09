@@ -1,0 +1,30 @@
+[
+  {
+    "path": "/auth/login",
+    "error": "ReadTimeout"
+  },
+  {
+    "path": "/auth/register",
+    "error": "ReadTimeout"
+  },
+  {
+    "path": "/search?q=phone",
+    "error": "ReadTimeout"
+  },
+  {
+    "path": "/auctions/10",
+    "error": "ReadTimeout"
+  },
+  {
+    "path": "/buyer",
+    "error": "ReadTimeout"
+  },
+  {
+    "path": "/seller",
+    "error": "ReadTimeout"
+  },
+  {
+    "path": "/admin",
+    "error": "ReadTimeout"
+  }
+]

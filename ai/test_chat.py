@@ -391,7 +391,10 @@ class SupportChatServiceUnitTests(APITestCase):
         self.assertNotIn('celery', blob)
         self.assertNotIn('select_for_update', blob)
         self.assertNotIn('api_key', blob)
-        self.assertIn('watchlist is not available', blob)
+        self.assertIn('watchlist', blob)
+        self.assertIn('premium subscriptions', blob)
+        self.assertIn('successful-sale', blob)
+        self.assertIn('do not claim these as available', blob)
 
     def test_knowledge_bidding_rules_match_permissions(self):
         """Place-bid allows any authenticated non-owner; not Buyer-role-only."""

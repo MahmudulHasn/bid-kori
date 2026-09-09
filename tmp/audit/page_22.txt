@@ -1,0 +1,1 @@
+● Subscription coverage ● Payment status Notification ● User ● Type ● Message ● Read status Dispute ● Auction ● User ● Reason ● Evidence ● Status ● Admin decision 24. Auction States A formal auction state machine should be implemented. DRAFT ↓ SCHEDULED ↓ LIVE ↓ ENDED ↓ WINNER_VALIDATION ↓ READY_TO_SHIP ↓ SETTLEMENT ↓ COMPLETED Potential exception states:

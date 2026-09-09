@@ -443,6 +443,20 @@ class ProductAIListingAPITests(APITestCase):
             str(response.data['error']).lower(),
         )
 
+    @patch.object(AIListingService, 'generate_description')
+    def test_provider_rate_limit_mapped_safely(self, mock_generate):
+        from products.ai_listing import AIListingRateLimitError
+
+        mock_generate.side_effect = AIListingRateLimitError()
+        response = self._post(
+            token=self.seller_token,
+            files=self._valid_payload(),
+        )
+        self.assertEqual(response.status_code, 429)
+        self.assertIn('error', response.data)
+        self.assertNotIn('Traceback', str(response.data))
+        self.assertNotIn('api_key', str(response.data).lower())
+
     @patch.object(AIListingService, 'generate_description', return_value='ok')
     def test_ai_listing_throttle_does_not_affect_product_list(self, _mock):
         from django.core.cache import cache

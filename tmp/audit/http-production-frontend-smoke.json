@@ -1,0 +1,236 @@
+[
+  {
+    "path": "/",
+    "status": 200,
+    "location": null,
+    "bytes": 19865
+  },
+  {
+    "path": "/admin",
+    "status": 307,
+    "location": "/auth/login?next=%2Fadmin",
+    "bytes": 25
+  },
+  {
+    "path": "/admin/analytics",
+    "status": 307,
+    "location": "/auth/login?next=%2Fadmin%2Fanalytics",
+    "bytes": 37
+  },
+  {
+    "path": "/admin/auctions",
+    "status": 307,
+    "location": "/auth/login?next=%2Fadmin%2Fauctions",
+    "bytes": 36
+  },
+  {
+    "path": "/admin/auctions/10",
+    "status": 307,
+    "location": "/auth/login?next=%2Fadmin%2Fauctions%2F10",
+    "bytes": 41
+  },
+  {
+    "path": "/admin/bids",
+    "status": 307,
+    "location": "/auth/login?next=%2Fadmin%2Fbids",
+    "bytes": 32
+  },
+  {
+    "path": "/admin/products",
+    "status": 307,
+    "location": "/auth/login?next=%2Fadmin%2Fproducts",
+    "bytes": 36
+  },
+  {
+    "path": "/admin/products/1",
+    "status": 307,
+    "location": "/auth/login?next=%2Fadmin%2Fproducts%2F1",
+    "bytes": 40
+  },
+  {
+    "path": "/admin/profile",
+    "status": 307,
+    "location": "/auth/login?next=%2Fadmin%2Fprofile",
+    "bytes": 35
+  },
+  {
+    "path": "/admin/settings",
+    "status": 307,
+    "location": "/auth/login?next=%2Fadmin%2Fsettings",
+    "bytes": 36
+  },
+  {
+    "path": "/admin/users",
+    "status": 307,
+    "location": "/auth/login?next=%2Fadmin%2Fusers",
+    "bytes": 33
+  },
+  {
+    "path": "/admin/users/1",
+    "status": 307,
+    "location": "/auth/login?next=%2Fadmin%2Fusers%2F1",
+    "bytes": 37
+  },
+  {
+    "path": "/auctions",
+    "status": 200,
+    "location": null,
+    "bytes": 19299
+  },
+  {
+    "path": "/auctions/10",
+    "status": 200,
+    "location": null,
+    "bytes": 13814
+  },
+  {
+    "path": "/auctions/create",
+    "status": 307,
+    "location": "/auth/login?next=%2Fauctions%2Fcreate",
+    "bytes": 37
+  },
+  {
+    "path": "/auth/login",
+    "status": 200,
+    "location": null,
+    "bytes": 14065
+  },
+  {
+    "path": "/auth/register",
+    "status": 200,
+    "location": null,
+    "bytes": 17787
+  },
+  {
+    "path": "/buyer",
+    "status": 307,
+    "location": "/auth/login?next=%2Fbuyer",
+    "bytes": 25
+  },
+  {
+    "path": "/buyer/my-bids",
+    "status": 307,
+    "location": "/auth/login?next=%2Fbuyer%2Fmy-bids",
+    "bytes": 35
+  },
+  {
+    "path": "/buyer/notifications",
+    "status": 307,
+    "location": "/auth/login?next=%2Fbuyer%2Fnotifications",
+    "bytes": 41
+  },
+  {
+    "path": "/buyer/profile",
+    "status": 307,
+    "location": "/auth/login?next=%2Fbuyer%2Fprofile",
+    "bytes": 35
+  },
+  {
+    "path": "/buyer/settings",
+    "status": 307,
+    "location": "/auth/login?next=%2Fbuyer%2Fsettings",
+    "bytes": 36
+  },
+  {
+    "path": "/buyer/won",
+    "status": 307,
+    "location": "/auth/login?next=%2Fbuyer%2Fwon",
+    "bytes": 31
+  },
+  {
+    "path": "/dashboard",
+    "status": 307,
+    "location": "/auth/login?next=%2Fdashboard",
+    "bytes": 29
+  },
+  {
+    "path": "/search",
+    "status": 200,
+    "location": null,
+    "bytes": 15636
+  },
+  {
+    "path": "/seller",
+    "status": 307,
+    "location": "/auth/login?next=%2Fseller",
+    "bytes": 26
+  },
+  {
+    "path": "/seller/auctions",
+    "status": 307,
+    "location": "/auth/login?next=%2Fseller%2Fauctions",
+    "bytes": 37
+  },
+  {
+    "path": "/seller/auctions/10",
+    "status": 307,
+    "location": "/auth/login?next=%2Fseller%2Fauctions%2F10",
+    "bytes": 42
+  },
+  {
+    "path": "/seller/auctions/10/edit",
+    "status": 307,
+    "location": "/auth/login?next=%2Fseller%2Fauctions%2F10%2Fedit",
+    "bytes": 49
+  },
+  {
+    "path": "/seller/auctions/create",
+    "status": 307,
+    "location": "/auth/login?next=%2Fseller%2Fauctions%2Fcreate",
+    "bytes": 46
+  },
+  {
+    "path": "/seller/notifications",
+    "status": 307,
+    "location": "/auth/login?next=%2Fseller%2Fnotifications",
+    "bytes": 42
+  },
+  {
+    "path": "/seller/products",
+    "status": 307,
+    "location": "/auth/login?next=%2Fseller%2Fproducts",
+    "bytes": 37
+  },
+  {
+    "path": "/seller/products/1",
+    "status": 307,
+    "location": "/auth/login?next=%2Fseller%2Fproducts%2F1",
+    "bytes": 41
+  },
+  {
+    "path": "/seller/products/1/edit",
+    "status": 307,
+    "location": "/auth/login?next=%2Fseller%2Fproducts%2F1%2Fedit",
+    "bytes": 48
+  },
+  {
+    "path": "/seller/products/create",
+    "status": 307,
+    "location": "/auth/login?next=%2Fseller%2Fproducts%2Fcreate",
+    "bytes": 46
+  },
+  {
+    "path": "/seller/profile",
+    "status": 307,
+    "location": "/auth/login?next=%2Fseller%2Fprofile",
+    "bytes": 36
+  },
+  {
+    "path": "/seller/sales",
+    "status": 307,
+    "location": "/auth/login?next=%2Fseller%2Fsales",
+    "bytes": 34
+  },
+  {
+    "path": "/seller/settings",
+    "status": 307,
+    "location": "/auth/login?next=%2Fseller%2Fsettings",
+    "bytes": 37
+  },
+  {
+    "path": "/unauthorized",
+    "status": 200,
+    "location": null,
+    "bytes": 14800
+  }
+]

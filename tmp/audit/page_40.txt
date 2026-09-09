@@ -1,0 +1,1 @@
+Inventory Products Active Sold Subscription Plan GMV Used GMV Remaining Store Profile Reviews Verification 49. Admin Dashboard The admin interface should include: Dashboard │ ├── Users ├── Sellers ├── Businesses ├── Auctions ├── Bids ├── Transactions ├── Subscriptions ├── Disputes ├── Moderation ├── Fraud Detection └── Analytics 50. MVP Scope
