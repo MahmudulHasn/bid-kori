@@ -144,9 +144,9 @@ def clear_demo_marketplace() -> int:
     )
 
     Payment.objects.filter(auction_id__in=auction_ids).delete()
-    Notification.objects.filter(
-        Q(user__in=users) | Q(auction_id__in=auction_ids)
-    ).delete()
+    # Null out auction FKs first (SET_NULL) so late on_commit rows cannot block deletes.
+    Notification.objects.filter(auction_id__in=auction_ids).update(auction=None)
+    Notification.objects.filter(user__in=users).delete()
     Bid.objects.filter(auction_id__in=auction_ids).delete()
     AuctionImage.objects.filter(auction_id__in=auction_ids).delete()
     Auction.objects.filter(id__in=auction_ids).delete()
@@ -249,6 +249,7 @@ def _create_auction_for_product(
     if existing is not None:
         # Replace demo auction only — delete dependents then recreate cleanly.
         Payment.objects.filter(auction=existing).delete()
+        Notification.objects.filter(auction=existing).update(auction=None)
         Notification.objects.filter(auction=existing).delete()
         Bid.objects.filter(auction=existing).delete()
         AuctionImage.objects.filter(auction=existing).delete()
@@ -535,7 +536,7 @@ def seed_demo_marketplace(
             'checkout': False,
         },
         {
-            'seller': seller_c,
+            'seller': seller_e,
             'title': 'Casio G-Shock',
             'category': 'Watches',
             'condition': Product.Condition.USED_GOOD,
@@ -547,7 +548,7 @@ def seed_demo_marketplace(
                 ('demo_buyer_a', 1),
                 ('demo_buyer_b', 2),
                 ('demo_buyer_c', 3),
-            ],  # A lost
+            ],  # A lost; electronics seller gets paid sale
             'checkout': True,
         },
         {

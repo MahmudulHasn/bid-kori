@@ -99,12 +99,41 @@ Admin: [http://127.0.0.1:8000/admin/](http://127.0.0.1:8000/admin/)
 
 **Automatic closing:** Celery Beat schedules expired ACTIVE auction finalization every ~10s without HTTP traffic. Late bids are still rejected immediately by `BidService` even before Beat runs. Manual recovery remains available via `close_expired_auctions`.
 
+### Demo marketplace population (SHOW-D01)
+
+Deterministic showcase data for software-lab demos. **Manual only** — never runs on migrate/startup.
+
+```powershell
+docker compose up -d
+docker compose exec web python manage.py migrate
+docker compose exec web python manage.py seed_demo_marketplace --reset
+cd G:\bid-kori\bidkori-frontend
+npm run dev
+```
+
+Local-only credentials (all demo users share the same password):
+
+| Role | Username | Password |
+| --- | --- | --- |
+| Buyer (primary) | `demo_buyer_a` | `DemoShowcase123!` |
+| Buyer | `demo_buyer_b` / `c` / `d` | `DemoShowcase123!` |
+| Seller (primary) | `demo_seller_electronics` | `DemoShowcase123!` |
+| Seller | `demo_seller_gaming` / `demo_seller_collectibles` | `DemoShowcase123!` |
+| Admin (staff) | `demo_admin` | `DemoShowcase123!` |
+
+- Product titles are prefixed with `[DEMO]`; usernames use `demo_*`.
+- `--reset` deletes only those demo records, then reseeds.
+- `--clear-only` removes demo data without reseeding.
+- When `DEBUG=False`, require `--confirm-demo-data`.
+- Optional: `--live-duration-minutes 60` to keep LIVE auctions open longer.
+
 Useful commands:
 
 ```powershell
 docker compose logs -f web worker beat
 docker compose exec web python manage.py close_expired_auctions
 docker compose exec web python manage.py export_postman
+docker compose exec web python manage.py seed_demo_marketplace --reset
 .\venv\Scripts\python.exe scripts\stress_test.py --docker
 ```
 

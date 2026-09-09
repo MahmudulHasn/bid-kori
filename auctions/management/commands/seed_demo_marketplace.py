@@ -41,25 +41,32 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         debug = bool(getattr(settings, 'DEBUG', False))
+        verbosity = int(options.get('verbosity', 1))
         if not debug and not options['confirm_demo_data']:
             raise CommandError(
                 'Refusing to seed demo data while DEBUG=False. '
                 'Pass --confirm-demo-data for an intentional non-debug run.'
             )
 
-        self.stdout.write(
-            self.style.WARNING(
-                'SHOW-D01 demo seed — local/showcase use only. '
-                'Never point this at production without explicit confirmation.'
-            )
+        def say(message, style=None):
+            if verbosity < 1:
+                return
+            if style:
+                self.stdout.write(style(message))
+            else:
+                self.stdout.write(message)
+
+        say(
+            'SHOW-D01 demo seed — local/showcase use only. '
+            'Never point this at production without explicit confirmation.',
+            self.style.WARNING,
         )
 
         if options['clear_only']:
             deleted = clear_demo_marketplace()
-            self.stdout.write(
-                self.style.SUCCESS(
-                    f'Cleared demo marketplace ({deleted} demo user(s) removed).'
-                )
+            say(
+                f'Cleared demo marketplace ({deleted} demo user(s) removed).',
+                self.style.SUCCESS,
             )
             return
 
@@ -68,30 +75,28 @@ class Command(BaseCommand):
             live_duration_minutes=int(options['live_duration_minutes']),
         )
 
-        self.stdout.write('')
-        self.stdout.write(self.style.SUCCESS('Demo marketplace seed complete.'))
-        self.stdout.write(f'  Users created:     {summary.users_created}')
-        self.stdout.write(f'  Users updated:     {summary.users_existing}')
-        self.stdout.write(f'  Categories:        {summary.categories_ensured}')
-        self.stdout.write(f'  Products:          {summary.products}')
-        self.stdout.write(f'  Live auctions:     {summary.live_auctions}')
-        self.stdout.write(f'  Upcoming auctions: {summary.upcoming_auctions}')
-        self.stdout.write(f'  Closed (winner):   {summary.closed_auctions}')
-        self.stdout.write(f'  Closed (no win):   {summary.closed_no_winner}')
-        self.stdout.write(f'  Cancelled:         {summary.cancelled_auctions}')
-        self.stdout.write(f'  Bids placed:       {summary.bids}')
-        self.stdout.write(f'  Payments:          {summary.payments}')
-        self.stdout.write(f'  Notifications:     {summary.notifications}')
+        say('')
+        say('Demo marketplace seed complete.', self.style.SUCCESS)
+        say(f'  Users created:     {summary.users_created}')
+        say(f'  Users updated:     {summary.users_existing}')
+        say(f'  Categories:        {summary.categories_ensured}')
+        say(f'  Products:          {summary.products}')
+        say(f'  Live auctions:     {summary.live_auctions}')
+        say(f'  Upcoming auctions: {summary.upcoming_auctions}')
+        say(f'  Closed (winner):   {summary.closed_auctions}')
+        say(f'  Closed (no win):   {summary.closed_no_winner}')
+        say(f'  Cancelled:         {summary.cancelled_auctions}')
+        say(f'  Bids placed:       {summary.bids}')
+        say(f'  Payments:          {summary.payments}')
+        say(f'  Notifications:     {summary.notifications}')
         if summary.reset_deleted_users:
-            self.stdout.write(
-                f'  Reset deleted users: {summary.reset_deleted_users}'
-            )
+            say(f'  Reset deleted users: {summary.reset_deleted_users}')
         for note in summary.notes:
-            self.stdout.write(f'  note: {note}')
+            say(f'  note: {note}')
 
-        self.stdout.write('')
-        self.stdout.write('Local-only demo credentials (not for production):')
-        self.stdout.write(f'  password (all demo users): {DEMO_PASSWORD}')
-        self.stdout.write('  Sellers: demo_seller_electronics | demo_seller_gaming | demo_seller_collectibles')
-        self.stdout.write('  Buyers:  demo_buyer_a (primary) | demo_buyer_b | demo_buyer_c | demo_buyer_d')
-        self.stdout.write('  Admin:   demo_admin (staff)')
+        say('')
+        say('Local-only demo credentials (not for production):')
+        say(f'  password (all demo users): {DEMO_PASSWORD}')
+        say('  Sellers: demo_seller_electronics | demo_seller_gaming | demo_seller_collectibles')
+        say('  Buyers:  demo_buyer_a (primary) | demo_buyer_b | demo_buyer_c | demo_buyer_d')
+        say('  Admin:   demo_admin (staff)')
