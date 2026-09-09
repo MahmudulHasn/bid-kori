@@ -1,0 +1,324 @@
+{
+  "ts": "20260909000835",
+  "flows": {
+    "service_preflight_http": {
+      "result": "PASS",
+      "categories": 200,
+      "auctions": 200
+    },
+    "registration": {
+      "result": "PASS",
+      "admin_role_status": 400,
+      "privilege_injection_status": 400,
+      "admin_rejected": true,
+      "privilege_rejected": true
+    },
+    "auth_login_me": {
+      "result": "PASS",
+      "seller_role": "SELLER",
+      "buyer_a_role": "BUYER"
+    },
+    "workspace_isolation": {
+      "result": "PASS",
+      "buyer_admin_users": 403
+    },
+    "seller_product_create": {
+      "result": "PASS",
+      "product_id": 7,
+      "title": "FINAL-S01 Smoke Product 20260909000835"
+    },
+    "ai_listing_provider": {
+      "result": "NOT EXECUTED",
+      "status": 503,
+      "note": "AI_API_KEY unavailable or provider error"
+    },
+    "product_image_upload": {
+      "result": "PASS",
+      "status": 201,
+      "body": null
+    },
+    "auction_create": {
+      "result": "PASS",
+      "auction_id": 6,
+      "end_time": "2026-09-09T06:10:09.138327+06:00",
+      "starting_bid": "1000.00",
+      "status": "ACTIVE"
+    },
+    "public_browse_search": {
+      "result": "PASS",
+      "detail_status": 200,
+      "search_status": 200,
+      "search_found": true,
+      "server_time": "2026-09-09T00:08:39.254253Z"
+    },
+    "websocket_auction_connect": {
+      "result": "PASS",
+      "buyer_a": true,
+      "buyer_b": true,
+      "buyer_a_error": null,
+      "buyer_b_error": null
+    },
+    "websocket_notification_connect": {
+      "result": "PASS",
+      "connected": true,
+      "types": [
+        "authenticated"
+      ],
+      "seller_types": [
+        "authenticated"
+      ]
+    },
+    "buyer_a_bid": {
+      "result": "PASS",
+      "status": 201,
+      "body": {
+        "id": 4,
+        "auction": 6,
+        "bidder_username": "smoke_buyer_a_20260909000835",
+        "amount": "1600.00",
+        "timestamp": "2026-09-09T06:08:40.844313+06:00"
+      }
+    },
+    "buyer_b_realtime_bid": {
+      "result": "PASS",
+      "received": true,
+      "latency": "immediate",
+      "event_type": "bid.accepted",
+      "highest": "1600.00"
+    },
+    "seller_bid_notification": {
+      "result": "PASS",
+      "ws_event": true,
+      "inbox_seller_new_bid": true,
+      "seller_notif_type": "SELLER_NEW_BID"
+    },
+    "buyer_b_outbid": {
+      "result": "PASS",
+      "status": 201,
+      "body": null
+    },
+    "outbid_notification": {
+      "result": "PASS",
+      "realtime_bid_to_a": true,
+      "ws_notification": true,
+      "inbox_outbid": true
+    },
+    "invalid_bid": {
+      "result": "PASS",
+      "status": 400,
+      "body": "{\"error\":\"Bid amount must be higher than the current highest bid.\"}"
+    },
+    "admin_hide": {
+      "result": "PASS",
+      "hide_status": 200,
+      "public_detail": 404,
+      "bid_status": 400,
+      "seller_detail": 200,
+      "new_ws_connected": false,
+      "new_ws_denied": true
+    },
+    "admin_restore": {
+      "result": "PASS",
+      "restore_status": 200,
+      "public_detail": 200
+    },
+    "product_hide_cascade": {
+      "result": "PASS",
+      "product_hide": 200,
+      "auction_public": 404
+    },
+    "admin_cancel": {
+      "result": "PASS",
+      "cancel_status": 200,
+      "auction_status": "CANCELLED",
+      "winning_bidder": null,
+      "is_paid": false
+    },
+    "auction_cancelled_realtime": {
+      "result": "PASS",
+      "received": true,
+      "types": [
+        "auction.cancelled"
+      ]
+    },
+    "post_cancel_bid": {
+      "result": "PASS",
+      "status": 400,
+      "body": "{\"error\":\"Auction is not active.\"}"
+    },
+    "celery_unattended_close_wait": {
+      "result": "PARTIAL",
+      "note": "waiting for end_time + beat interval",
+      "end_time": "2026-09-09T00:10:09.138327+00:00"
+    },
+    "celery_unattended_close": {
+      "result": "PASS",
+      "status": "CLOSED",
+      "winning_bidder": 14,
+      "current_highest_bid": "2000.00",
+      "ws_closed_event": false,
+      "note": "CLOSED_after_wait_without_client_trigger"
+    },
+    "auction_closed_realtime": {
+      "result": "PARTIAL",
+      "received": false,
+      "types_a": [
+        "bid.accepted",
+        "bid.accepted"
+      ],
+      "types_b": [
+        "bid.accepted",
+        "bid.accepted"
+      ]
+    },
+    "winner_correctness": {
+      "result": "PASS",
+      "status": "CLOSED",
+      "highest": "2000.00",
+      "winning_bidder": 14,
+      "expected_highest": "2000.00"
+    },
+    "won_lost_notifications": {
+      "result": "PASS",
+      "won": true,
+      "lost": true
+    },
+    "buyer_won_api": {
+      "result": "PARTIAL",
+      "my_bids_status": 200,
+      "note": "UI /buyer/won validated separately if frontend up"
+    },
+    "checkout": {
+      "result": "PASS",
+      "status": 200,
+      "payment_keys": [
+        "id",
+        "auction",
+        "user",
+        "amount",
+        "status",
+        "transaction_id",
+        "created_at"
+      ],
+      "amount": "2000.00",
+      "payment_status": "COMPLETED",
+      "has_fee_rate": false,
+      "has_platform_fee": false,
+      "has_seller_net": false,
+      "body": null
+    },
+    "seller_sales": {
+      "result": "PASS",
+      "status": 200,
+      "row_count": 1,
+      "sample_keys": [
+        "payment_id",
+        "auction_id",
+        "auction_title",
+        "buyer_username",
+        "amount",
+        "fee_rate",
+        "platform_fee",
+        "seller_net_amount",
+        "status",
+        "created_at",
+        "has_fee_snapshot"
+      ],
+      "gross": "2000.00",
+      "fee_rate": "5.00",
+      "platform_fee": "100.00",
+      "net": "1900.00"
+    },
+    "seller_earnings": {
+      "result": "PASS",
+      "status": 200,
+      "body": {
+        "completed_sales_count": 1,
+        "gross_sales": "2000.00",
+        "platform_fees": "100.00",
+        "net_earnings": "1900.00",
+        "accounted_sales_count": 1,
+        "legacy_completed_sales_count": 0,
+        "legacy_gross_sales": "0.00",
+        "disclosure": "Based on completed BidKori mock checkout ledger records. Not bank settlement or a withdrawable payout balance."
+      }
+    },
+    "fee_snapshot": {
+      "result": "PASS",
+      "amount": "2000.00",
+      "fee": "100.00",
+      "net": "1900.00",
+      "rate": "5.00",
+      "sum_ok": true
+    },
+    "duplicate_checkout": {
+      "result": "PASS",
+      "status": 400,
+      "body": "{\"error\":\"Payment already completed for this auction.\",\"payment\":{\"id\":2,\"auction\":6,\"user\":14,\"amount\":\"2000.00\",\"status\":\"COMPLETED\",\"transaction_id\":\"TXN-5597214A9D714F98\",\"created_at\":\"2026-09-09T"
+    },
+    "admin_finance": {
+      "result": "PASS",
+      "status": 200,
+      "body": {
+        "completed_sales_count": 2,
+        "gross_paid_volume": "4000.00",
+        "platform_revenue": "200.00",
+        "seller_net_total": "3800.00",
+        "accounted_sales_count": 2,
+        "legacy_completed_sales_count": 0,
+        "legacy_gross_paid_volume": "0.00",
+        "disclosure": "Mock completed checkout ledger totals. Platform revenue is the sum of stored platform_fee snapshots on COMPLETED Payments only \u2014 not bidding volume, unpaid closed auctions, or real bank settlement."
+      }
+    },
+    "paid_cancel_guard": {
+      "result": "PASS",
+      "status": 400,
+      "body": "{\"error\":\"Cannot cancel auction in status CLOSED.\"}"
+    },
+    "buyer_suspend": {
+      "result": "PASS",
+      "status": 200
+    },
+    "old_token_revoked": {
+      "result": "PASS",
+      "me_status": 401
+    },
+    "notification_ws_auth_suspended": {
+      "result": "PASS",
+      "connected": false,
+      "closed_code": 4401,
+      "types": [
+        "error"
+      ]
+    },
+    "reactivation_fresh_token": {
+      "result": "PASS",
+      "reactivate": 200,
+      "old_token_me": 401,
+      "new_token_me": 200
+    },
+    "admin_self_suspend_guard": {
+      "result": "PASS",
+      "status": 403
+    },
+    "chatbot": {
+      "result": "PASS",
+      "status": 503,
+      "note": "safe provider-unavailable"
+    },
+    "notifications_read_state": {
+      "result": "PASS",
+      "mark_one": 200,
+      "mark_all": 200
+    }
+  },
+  "admin_token": "e91533f30515207f765c0af557a2d1c6fe9e4fda",
+  "accounts": {
+    "seller": "smoke_seller_20260909000835",
+    "buyer_a": "smoke_buyer_a_20260909000835",
+    "buyer_b": "smoke_buyer_b_20260909000835",
+    "buyer_c": "smoke_buyer_c_20260909000835",
+    "admin": "smoke_admin_20260909000835",
+    "password_hint": "SmokeTestPass123!"
+  }
+}

@@ -12,11 +12,11 @@ MVP rule:
 
 from __future__ import annotations
 
-from django.db import connection
-
 from auctions.models import Auction
+from config.db_locking import apply_select_for_update
 
 from .models import Product
+
 
 PRODUCT_DELETE_BLOCKED_MESSAGE = (
     'This product cannot be deleted because it is linked to an auction.'
@@ -35,6 +35,5 @@ class ProductDeletionPolicy:
     def lock_product(cls, product_id: int) -> Product:
         """Load a Product row with a write lock when the backend supports it."""
         queryset = Product.objects.select_related('seller', 'category')
-        if connection.features.has_select_for_update:
-            queryset = queryset.select_for_update()
+        queryset = apply_select_for_update(queryset)
         return queryset.get(pk=product_id)

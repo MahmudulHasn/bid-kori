@@ -1,31 +1,29 @@
 /**
  * Admin moderation REST helpers (MOD-F01).
  * Uses shared Axios client (token attached by interceptor).
+ *
+ * Path builders live in adminModeration.ts so Node tests can import them
+ * without resolving the `@/` Axios graph.
  */
 
 import api from '@/lib/api';
-import { buildModerationReasonBody } from '@/lib/adminModeration';
+import {
+  buildAdminAuctionCancelApiPath,
+  buildAdminAuctionHideApiPath,
+  buildAdminAuctionRestoreApiPath,
+  buildAdminProductHideApiPath,
+  buildAdminProductRestoreApiPath,
+  buildModerationReasonBody,
+} from '@/lib/adminModeration';
 import type { Auction, ModerationState } from '@/lib/types';
 
-export function buildAdminProductHideApiPath(id: string | number): string {
-  return `/admin/products/${id}/hide/`;
-}
-
-export function buildAdminProductRestoreApiPath(id: string | number): string {
-  return `/admin/products/${id}/restore/`;
-}
-
-export function buildAdminAuctionHideApiPath(id: string | number): string {
-  return `/admin/auctions/${id}/hide/`;
-}
-
-export function buildAdminAuctionRestoreApiPath(id: string | number): string {
-  return `/admin/auctions/${id}/restore/`;
-}
-
-export function buildAdminAuctionCancelApiPath(id: string | number): string {
-  return `/admin/auctions/${id}/cancel/`;
-}
+export {
+  buildAdminAuctionCancelApiPath,
+  buildAdminAuctionHideApiPath,
+  buildAdminAuctionRestoreApiPath,
+  buildAdminProductHideApiPath,
+  buildAdminProductRestoreApiPath,
+} from '@/lib/adminModeration';
 
 export async function hideAdminProduct(
   id: string | number,

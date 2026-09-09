@@ -13,8 +13,9 @@ AuctionImages alone do not block deletion of an otherwise empty pre-start auctio
 
 from __future__ import annotations
 
-from django.db import connection
 from django.utils import timezone
+
+from config.db_locking import apply_select_for_update
 
 from .models import Auction, Bid, Payment
 
@@ -50,6 +51,5 @@ class AuctionDeletionPolicy:
     def lock_auction(cls, auction_id: int) -> Auction:
         """Load an Auction row with a write lock when the backend supports it."""
         queryset = Auction.objects.select_related('product__seller')
-        if connection.features.has_select_for_update:
-            queryset = queryset.select_for_update()
+        queryset = apply_select_for_update(queryset)
         return queryset.get(pk=auction_id)

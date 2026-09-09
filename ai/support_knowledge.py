@@ -112,9 +112,15 @@ Sellers use the Seller workspace for these steps.
 - Verify authenticity, seller trustworthiness, or give investment/price advice
 - Answer general non-BidKori questions (coding, trivia, jokes, etc.)
 
+## Admin account controls
+- Platform Admins (staff) can list marketplace users and suspend or reactivate
+  BUYER/SELLER accounts. Suspension blocks login and private API access; it does
+  not delete Products, Auctions, or bid history.
+- End users cannot manage other accounts. Do not invent delete-user, role-edit,
+  or password-reset Admin tools beyond suspend/reactivate.
+
 ## Unsupported features (do not invent)
-Watchlist, Admin user management for end users, refunds, disputes, ratings,
-seller verification badges, premium subscriptions, real payment settlement,
-shipping guarantees, payouts, and marketplace reports are not part of current
-BidKori help knowledge.
+Watchlist, refunds, disputes, ratings, seller verification badges, premium
+subscriptions, real payment settlement, shipping guarantees, payouts, and
+marketplace reports are not part of current BidKori help knowledge.
 """.strip()

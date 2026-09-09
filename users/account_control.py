@@ -7,8 +7,10 @@ tokens on suspend so reactivation cannot revive a prior token.
 from __future__ import annotations
 
 from django.contrib.auth.models import User
-from django.db import connection, transaction
+from django.db import transaction
 from rest_framework.exceptions import PermissionDenied, ValidationError
+
+from config.db_locking import apply_select_for_update
 
 from .auth_tokens import revoke_auth_token
 from .models import UserProfile, resolve_user_role
@@ -23,8 +25,7 @@ PROTECTED_REACTIVATE_MESSAGE = (
 
 def _lock_user(user_id: int) -> User:
     queryset = User.objects.select_related('profile').filter(pk=user_id)
-    if connection.features.has_select_for_update:
-        queryset = queryset.select_for_update()
+    queryset = apply_select_for_update(queryset)
     return queryset.get()
 
 

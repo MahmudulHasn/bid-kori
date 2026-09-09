@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { buildModerationReasonBody } from './adminModeration.ts';
 import {
@@ -8,7 +11,10 @@ import {
   buildAdminAuctionRestoreApiPath,
   buildAdminProductHideApiPath,
   buildAdminProductRestoreApiPath,
-} from './adminModerationApi.ts';
+} from './adminModeration.ts';
+
+const here = dirname(fileURLToPath(import.meta.url));
+const source = readFileSync(join(here, 'adminModerationApi.ts'), 'utf8');
 
 test('product hide path', () => {
   assert.equal(buildAdminProductHideApiPath(3), '/admin/products/3/hide/');
@@ -54,4 +60,14 @@ test('auction cancel body contains only reason', () => {
   assert.equal('status' in body, false);
   assert.equal('is_hidden' in body, false);
   assert.equal('winner' in body, false);
+});
+
+test('adminModerationApi wires hide/restore/cancel helpers via shared api client', () => {
+  assert.match(source, /hideAdminProduct/);
+  assert.match(source, /restoreAdminProduct/);
+  assert.match(source, /hideAdminAuction/);
+  assert.match(source, /restoreAdminAuction/);
+  assert.match(source, /cancelAdminAuction/);
+  assert.match(source, /api\.post/);
+  assert.doesNotMatch(source, /localStorage|TOKEN_KEY/);
 });

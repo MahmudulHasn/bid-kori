@@ -8,6 +8,11 @@ import {
   AUCTION_HIDE_CONFIRM_POINTS,
   MODERATION_REASON_MAX_LENGTH,
   PRODUCT_HIDE_CONFIRM_POINTS,
+  buildAdminAuctionCancelApiPath,
+  buildAdminAuctionHideApiPath,
+  buildAdminAuctionRestoreApiPath,
+  buildAdminProductHideApiPath,
+  buildAdminProductRestoreApiPath,
   buildModerationReasonBody,
   canOfferAdminAuctionCancel,
   formatVisibilityLabel,
@@ -17,13 +22,6 @@ import {
   getProductModerationAction,
   normalizeModerationReason,
 } from './adminModeration.ts';
-import {
-  buildAdminAuctionCancelApiPath,
-  buildAdminAuctionHideApiPath,
-  buildAdminAuctionRestoreApiPath,
-  buildAdminProductHideApiPath,
-  buildAdminProductRestoreApiPath,
-} from './adminModerationApi.ts';
 
 test('visibility labels stay independent of lifecycle', () => {
   assert.equal(formatVisibilityLabel(false), 'Visible');

@@ -1,9 +1,11 @@
 import uuid
 
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError, connection, transaction
+from django.db import IntegrityError, transaction
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+
+from config.db_locking import apply_select_for_update
 
 from .fees import (
     FeeCalculationError,
@@ -40,8 +42,7 @@ class AuctionLifecycleService:
             'winning_bidder',
             'payment',
         )
-        if connection.features.has_select_for_update:
-            queryset = queryset.select_for_update()
+        queryset = apply_select_for_update(queryset)
         return get_object_or_404(queryset, pk=auction_id)
 
     @classmethod
@@ -328,8 +329,7 @@ class BidService:
 
         with transaction.atomic():
             queryset = Auction.objects.select_related('product__seller')
-            if connection.features.has_select_for_update:
-                queryset = queryset.select_for_update()
+            queryset = apply_select_for_update(queryset)
 
             auction = get_object_or_404(queryset, pk=auction_id)
             now = timezone.now()
@@ -531,8 +531,7 @@ class CheckoutService:
             'product__seller',
             'payment',
         )
-        if connection.features.has_select_for_update:
-            queryset = queryset.select_for_update()
+        queryset = apply_select_for_update(queryset)
         return get_object_or_404(queryset, pk=auction_id)
 
     @classmethod

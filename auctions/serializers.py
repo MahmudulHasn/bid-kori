@@ -3,6 +3,7 @@ from django.db import IntegrityError, transaction
 from django.utils import timezone
 from rest_framework import serializers
 
+from config.db_locking import apply_select_for_update
 from products.models import Product
 from users.models import resolve_user_role
 from .image_validation import (
@@ -337,11 +338,9 @@ class AuctionSerializer(serializers.ModelSerializer):
 
         with transaction.atomic():
             if existing_product is not None:
-                product = (
-                    Product.objects.select_for_update()
-                    .select_related('seller')
-                    .get(pk=existing_product.pk)
-                )
+                product = apply_select_for_update(
+                    Product.objects.select_related('seller')
+                ).get(pk=existing_product.pk)
                 if Auction.objects.filter(product_id=product.pk).exists():
                     raise serializers.ValidationError(
                         {'product': 'This product already has an auction.'}

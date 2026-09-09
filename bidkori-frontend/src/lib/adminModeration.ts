@@ -170,3 +170,24 @@ export const ADMIN_AUCTION_DANGEROUS_ACTIONS = [
   'Edit starting bid',
   'Edit reserve',
 ] as const;
+
+/** Pure Admin moderation REST path builders (safe for Node test runner). */
+export function buildAdminProductHideApiPath(id: string | number): string {
+  return `/admin/products/${id}/hide/`;
+}
+
+export function buildAdminProductRestoreApiPath(id: string | number): string {
+  return `/admin/products/${id}/restore/`;
+}
+
+export function buildAdminAuctionHideApiPath(id: string | number): string {
+  return `/admin/auctions/${id}/hide/`;
+}
+
+export function buildAdminAuctionRestoreApiPath(id: string | number): string {
+  return `/admin/auctions/${id}/restore/`;
+}
+
+export function buildAdminAuctionCancelApiPath(id: string | number): string {
+  return `/admin/auctions/${id}/cancel/`;
+}

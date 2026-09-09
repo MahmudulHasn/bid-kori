@@ -15,9 +15,9 @@ including staff/ADMIN — consistent with ``AuctionMutationPolicy``.
 from __future__ import annotations
 
 from django.core.exceptions import ObjectDoesNotExist
-from django.db import connection
 
 from auctions.mutation_policy import AuctionMutationPolicy
+from config.db_locking import apply_select_for_update
 
 from .models import Product
 
@@ -68,12 +68,10 @@ class ProductMutationPolicy:
         from auctions.models import Auction
 
         product_qs = Product.objects.select_related('seller', 'category')
-        if connection.features.has_select_for_update:
-            product_qs = product_qs.select_for_update()
+        product_qs = apply_select_for_update(product_qs)
         product = product_qs.get(pk=product_id)
 
         auction_qs = Auction.objects.filter(product_id=product.pk)
-        if connection.features.has_select_for_update:
-            auction_qs = auction_qs.select_for_update()
+        auction_qs = apply_select_for_update(auction_qs)
         product._locked_auction = auction_qs.first()
         return product
