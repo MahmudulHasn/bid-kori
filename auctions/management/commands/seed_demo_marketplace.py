@@ -91,6 +91,8 @@ class Command(BaseCommand):
         say(f'  Users updated:     {summary.users_existing}')
         say(f'  Categories:        {summary.categories_ensured}')
         say(f'  Products:          {summary.products}')
+        say(f'  Product images:    {summary.product_images}')
+        say(f'  Auction images:    {summary.auction_images}')
         say(f'  Live auctions:     {summary.live_auctions}')
         say(f'  Upcoming auctions: {summary.upcoming_auctions}')
         say(f'  Closed (winner):   {summary.closed_auctions}')

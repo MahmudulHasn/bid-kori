@@ -71,6 +71,31 @@ BidKori handles product catalogs, authenticated buyer/seller workflows, atomic l
 
 ## Quickstart (Windows PowerShell)
 
+### Presentation-day runbook (SHOW-S02)
+
+Software-lab showcase — PostgreSQL only (never host SQLite):
+
+```powershell
+cd G:\bid-kori
+docker compose up -d --build
+docker compose exec web python manage.py migrate
+docker compose exec web python manage.py runtime_preflight
+docker compose exec web python manage.py seed_demo_marketplace --reset
+cd G:\bid-kori\bidkori-frontend
+npm run dev
+```
+
+Open [http://localhost:3000/](http://localhost:3000/).
+
+| Role | Username | Password |
+| --- | --- | --- |
+| Buyer | `demo_buyer_a` | `DemoShowcase123!` |
+| Buyer (2nd) | `demo_buyer_b` | `DemoShowcase123!` |
+| Seller | `demo_seller_electronics` | `DemoShowcase123!` |
+| Admin | `demo_admin` | `DemoShowcase123!` |
+
+Demo product/auction images come from `demo_assets/products/` (abstract category art, not brand photos). After backend code or asset changes: `docker compose up -d --build web worker beat`.
+
 ### Canonical stack (PostgreSQL required)
 
 BidKori **does not** fall back to SQLite for normal development or runtime.

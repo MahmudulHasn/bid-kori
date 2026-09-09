@@ -10,8 +10,18 @@ function parseOrigin(raw) {
 
 function buildRemotePatterns() {
   const patterns = [
-    { protocol: 'http', hostname: '127.0.0.1', port: '8000' },
-    { protocol: 'http', hostname: 'localhost', port: '8000' },
+    {
+      protocol: 'http',
+      hostname: '127.0.0.1',
+      port: '8000',
+      pathname: '/media/**',
+    },
+    {
+      protocol: 'http',
+      hostname: 'localhost',
+      port: '8000',
+      pathname: '/media/**',
+    },
   ];
 
   const candidates = [
@@ -25,6 +35,7 @@ function buildRemotePatterns() {
     const entry = {
       protocol: url.protocol.replace(':', ''),
       hostname: url.hostname,
+      pathname: '/media/**',
     };
     if (url.port) {
       entry.port = url.port;
@@ -46,6 +57,9 @@ function buildRemotePatterns() {
 const nextConfig = {
   images: {
     remotePatterns: buildRemotePatterns(),
+    // Local Compose/dev media is served from 127.0.0.1:8000 — Next 16 blocks
+    // private IPs unless explicitly allowed (showcase / lab stack).
+    dangerouslyAllowLocalIP: true,
   },
 };
 

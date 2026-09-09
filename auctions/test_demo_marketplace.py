@@ -113,6 +113,39 @@ class DemoMarketplaceSeedTests(TestCase):
             payment.platform_fee + payment.seller_net_amount,
         )
 
+    def test_demo_products_and_auctions_receive_images(self):
+        with self.captureOnCommitCallbacks(execute=True):
+            summary = seed_demo_marketplace(reset=True)
+
+        from products.models import ProductImage
+        from auctions.models import AuctionImage
+
+        demo_products = Product.objects.filter(title__startswith=DEMO_TITLE_PREFIX)
+        self.assertGreaterEqual(summary.product_images, 20)
+        self.assertEqual(
+            ProductImage.objects.filter(product__in=demo_products).count(),
+            demo_products.count(),
+        )
+        auctioned = Auction.objects.filter(
+            product__title__startswith=DEMO_TITLE_PREFIX,
+        )
+        self.assertGreaterEqual(summary.auction_images, auctioned.count())
+        self.assertEqual(
+            AuctionImage.objects.filter(auction__in=auctioned).count(),
+            auctioned.count(),
+        )
+        # Idempotent reseed without reset must not duplicate images.
+        with self.captureOnCommitCallbacks(execute=True):
+            seed_demo_marketplace(reset=False)
+        self.assertEqual(
+            ProductImage.objects.filter(product__in=demo_products).count(),
+            demo_products.count(),
+        )
+        self.assertEqual(
+            AuctionImage.objects.filter(auction__in=auctioned).count(),
+            auctioned.count(),
+        )
+
     def test_integrity_cancelled_and_reserve_close(self):
         with self.captureOnCommitCallbacks(execute=True):
             seed_demo_marketplace(reset=True)

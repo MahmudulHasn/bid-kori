@@ -9,8 +9,11 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import timedelta
 from decimal import Decimal
+from pathlib import Path
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.core.files import File
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
@@ -33,6 +36,19 @@ DEMO_TITLE_PREFIX = '[DEMO] '
 DEMO_BUYER_PREFIX = 'demo_buyer_'
 DEMO_SELLER_PREFIX = 'demo_seller_'
 DEMO_ADMIN_USERNAME = 'demo_admin'
+
+# Local SHOW-S02 category assets under demo_assets/products/ (not user uploads).
+CATEGORY_DEMO_IMAGE_FILES: dict[str, str] = {
+    'Smartphones': 'smartphones.jpg',
+    'Laptops': 'laptops.jpg',
+    'Gaming Consoles': 'gaming-consoles.jpg',
+    'PC Components': 'pc-components.jpg',
+    'Cameras': 'cameras.jpg',
+    'Sneakers': 'sneakers.jpg',
+    'Watches': 'watches.jpg',
+    'Collectibles': 'collectibles.jpg',
+}
+
 
 SHOWCASE_CATEGORY_NAMES: tuple[str, ...] = (
     'Smartphones',
@@ -93,6 +109,8 @@ class SeedSummary:
     users_existing: int = 0
     categories_ensured: int = 0
     products: int = 0
+    product_images: int = 0
+    auction_images: int = 0
     live_auctions: int = 0
     upcoming_auctions: int = 0
     closed_auctions: int = 0
@@ -103,6 +121,68 @@ class SeedSummary:
     notifications: int = 0
     reset_deleted_users: int = 0
     notes: list[str] = field(default_factory=list)
+
+
+def _demo_assets_dir() -> Path:
+    return Path(settings.BASE_DIR) / 'demo_assets' / 'products'
+
+
+def _category_demo_asset_path(category: Category | None) -> Path | None:
+    if category is None:
+        return None
+    filename = CATEGORY_DEMO_IMAGE_FILES.get(category.name)
+    if not filename:
+        return None
+    path = _demo_assets_dir() / filename
+    return path if path.is_file() else None
+
+
+def _ensure_product_demo_image(product: Product) -> bool:
+    """Attach one ProductImage from the category demo pack if missing.
+
+    Returns True when a new ProductImage row was created.
+    """
+    if product.images.exists():
+        return False
+    asset = _category_demo_asset_path(product.category)
+    if asset is None:
+        return False
+    with asset.open('rb') as handle:
+        ProductImage.objects.create(
+            product=product,
+            image=File(handle, name=asset.name),
+        )
+    return True
+
+
+def _ensure_auction_demo_image(auction: Auction, product: Product) -> bool:
+    """Attach one AuctionImage so marketplace cards/detail show media.
+
+    Marketplace UI reads ``auction.images`` (AuctionImage), while Seller catalog
+    uses ProductImage. Reuse the same category asset file for both.
+    """
+    if auction.images.exists():
+        return False
+    asset = _category_demo_asset_path(product.category)
+    if asset is None and product.images.exists():
+        # Fall back to copying the already-attached product image bytes.
+        product_image = product.images.order_by('uploaded_at', 'id').first()
+        if product_image is None or not product_image.image:
+            return False
+        with product_image.image.open('rb') as handle:
+            AuctionImage.objects.create(
+                auction=auction,
+                image=File(handle, name=Path(product_image.image.name).name),
+            )
+        return True
+    if asset is None:
+        return False
+    with asset.open('rb') as handle:
+        AuctionImage.objects.create(
+            auction=auction,
+            image=File(handle, name=asset.name),
+        )
+    return True
 
 
 def demo_product_title(name: str) -> str:
@@ -681,6 +761,8 @@ def seed_demo_marketplace(
                 category=category,
             )
             summary.products += 1
+            if _ensure_product_demo_image(product):
+                summary.product_images += 1
 
             kind = item['kind']
             if kind == 'product_only':
@@ -698,6 +780,8 @@ def seed_demo_marketplace(
                     start_time=now - timedelta(hours=2),
                     end_time=end,
                 )
+                if _ensure_auction_demo_image(auction, product):
+                    summary.auction_images += 1
                 ladder_spec = item.get('bids') or []
                 ladder = [
                     (users[uname], starting + (incr * step))
@@ -709,13 +793,15 @@ def seed_demo_marketplace(
             elif kind == 'upcoming':
                 start_at = now + timedelta(minutes=int(item['start_in_min']))
                 end_at = start_at + timedelta(hours=int(item['duration_hours']))
-                _create_auction_for_product(
+                auction = _create_auction_for_product(
                     product=product,
                     starting_bid=starting,
                     min_increment=incr,
                     start_time=start_at,
                     end_time=end_at,
                 )
+                if _ensure_auction_demo_image(auction, product):
+                    summary.auction_images += 1
                 summary.upcoming_auctions += 1
 
             elif kind == 'closed_win':
@@ -726,6 +812,8 @@ def seed_demo_marketplace(
                     start_time=now - timedelta(days=2),
                     end_time=now + timedelta(hours=6),
                 )
+                if _ensure_auction_demo_image(auction, product):
+                    summary.auction_images += 1
                 ladder_spec = item.get('bids') or []
                 ladder = [
                     (users[uname], starting + (incr * step))
@@ -755,6 +843,8 @@ def seed_demo_marketplace(
                     end_time=now + timedelta(hours=6),
                     reserve_price=reserve,
                 )
+                if _ensure_auction_demo_image(auction, product):
+                    summary.auction_images += 1
                 ladder_spec = item.get('bids') or []
                 ladder = [
                     (users[uname], starting + (incr * step))
@@ -772,6 +862,8 @@ def seed_demo_marketplace(
                     start_time=now - timedelta(hours=3),
                     end_time=now + timedelta(hours=12),
                 )
+                if _ensure_auction_demo_image(auction, product):
+                    summary.auction_images += 1
                 ladder_spec = item.get('bids') or []
                 if ladder_spec:
                     ladder = [
