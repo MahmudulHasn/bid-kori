@@ -11,25 +11,43 @@ export const SUPPORT_CHAT_MESSAGE_MAX_LENGTH = 1500;
 
 export type ChatRole = 'user' | 'assistant';
 
+export type ChatAction = {
+  type: 'navigate';
+  href: string;
+  label: string;
+};
+
+export type ChatSuggestion = {
+  label: string;
+  href: string;
+};
+
 export type ChatMessage = {
   id: string;
   role: ChatRole;
   content: string;
+  action?: ChatAction | null;
+  suggestions?: ChatSuggestion[];
 };
 
 export type SupportChatRequest = {
   message: string;
+  pathname?: string;
+  context?: Record<string, unknown>;
 };
 
 export type SupportChatResponse = {
   answer: string;
+  message?: string;
+  action?: ChatAction | null;
+  suggestions?: ChatSuggestion[];
 };
 
 export const SUPPORT_CHAT_WELCOME =
-  'Hi! I can help explain how BidKori bidding, auctions, products, and notifications work.';
+  'Hi! I can help explain how BidKori bidding, auctions, products, and notifications work, or help you navigate.';
 
 export const SUPPORT_CHAT_SCOPE_DISCLOSURE =
-  'BidKori Help can explain platform features and navigation. It cannot place bids, access private account data, or perform actions.';
+  'BidKori Help can explain platform features and navigate to supported pages. It cannot place bids, access private account data, or perform actions.';
 
 /** Supported BidKori topics only — no Watchlist/refunds/Admin ops. */
 export const SUPPORT_CHAT_STARTERS: readonly string[] = [
@@ -39,6 +57,39 @@ export const SUPPORT_CHAT_STARTERS: readonly string[] = [
   'What does reserve price mean?',
   'Where can I see auctions I won?',
 ] as const;
+
+export function getRoleBasedStarters(role?: string | null): readonly string[] {
+  if (role === 'BUYER') {
+    return [
+      'Take me to My Bids',
+      'Where are my won auctions?',
+      'How do outbid notifications work?',
+      'Where can I edit my profile?',
+    ];
+  }
+  if (role === 'SELLER') {
+    return [
+      'How do I create a product?',
+      'Take me to Create Auction',
+      'Open seller sales',
+      'How do Seller notifications work?',
+    ];
+  }
+  if (role === 'ADMIN') {
+    return [
+      'Open user management',
+      'Open auction moderation',
+      'Take me to admin analytics',
+      'Where can I manage products?',
+    ];
+  }
+  return [
+    'How do I place a bid?',
+    'What does reserve price mean?',
+    'How do I become a seller?',
+    'Take me to auctions',
+  ];
+}
 
 const UNSUPPORTED_STARTER_MARKERS = [
   'watchlist',
@@ -61,8 +112,10 @@ export function createChatMessage(
   role: ChatRole,
   content: string,
   id: string = createChatMessageId(),
+  action?: ChatAction | null,
+  suggestions?: ChatSuggestion[],
 ): ChatMessage {
-  return { id, role, content };
+  return { id, role, content, action: action || null, suggestions: suggestions || [] };
 }
 
 export function createWelcomeMessages(): ChatMessage[] {
@@ -85,13 +138,23 @@ export function canSendSupportChatMessage(
   return normalizeSupportChatMessage(raw) !== null;
 }
 
-export function buildSupportChatRequest(message: string): SupportChatRequest {
+export function buildSupportChatRequest(
+  message: string,
+  pathname?: string,
+  context?: Record<string, unknown>,
+): SupportChatRequest {
   const normalized = normalizeSupportChatMessage(message);
   if (!normalized) {
     throw new Error('Message cannot be empty.');
   }
-  // Contract: only `message` — never role/history/model/tools/api_key.
-  return { message: normalized };
+  const body: SupportChatRequest = { message: normalized };
+  if (pathname) {
+    body.pathname = pathname;
+  }
+  if (context && Object.keys(context).length > 0) {
+    body.context = context;
+  }
+  return body;
 }
 
 export function appendUserMessage(
@@ -104,8 +167,10 @@ export function appendUserMessage(
 export function appendAssistantMessage(
   messages: readonly ChatMessage[],
   content: string,
+  action?: ChatAction | null,
+  suggestions?: ChatSuggestion[],
 ): ChatMessage[] {
-  return [...messages, createChatMessage('assistant', content)];
+  return [...messages, createChatMessage('assistant', content, undefined, action, suggestions)];
 }
 
 export function clearSupportChatMessages(): ChatMessage[] {
