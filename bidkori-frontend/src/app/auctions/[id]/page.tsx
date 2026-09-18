@@ -9,6 +9,7 @@ import toast from 'react-hot-toast';
 import useSWR from 'swr';
 
 import { useAuth } from '@/context/AuthContext';
+import AuctionStatusBadge from '@/components/auctions/AuctionStatusBadge';
 import { useAuctionRealtime } from '@/hooks/useAuctionRealtime';
 import { useAuctionTimer } from '@/hooks/useAuctionTimer';
 import api from '@/lib/api';
@@ -33,7 +34,6 @@ import {
   formatBidHistoryEmptyLabel,
   getAuctionCurrentBidAmount,
   getAuctionDisplayState,
-  getAuctionDisplayStateLabel,
   getAuctionReservePresentation,
   getAuctionStartingBidAmount,
   getAuctionViewerBidState,
@@ -63,22 +63,6 @@ function pad(value: number) {
   return String(value).padStart(2, '0');
 }
 
-function displayStateBadgeClass(state: string): string {
-  switch (state) {
-    case 'LIVE':
-      return 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-300';
-    case 'UPCOMING':
-      return 'bg-sky-500/15 text-sky-800 dark:text-sky-300';
-    case 'FINALIZING':
-      return 'bg-amber-500/15 text-amber-900 dark:text-amber-200';
-    case 'CLOSED':
-      return 'bg-zinc-500/15 text-zinc-800 dark:text-zinc-300';
-    case 'CANCELLED':
-      return 'bg-rose-500/15 text-rose-800 dark:text-rose-300';
-    default:
-      return 'bg-zinc-500/15 text-zinc-700 dark:text-zinc-300';
-  }
-}
 
 export default function AuctionDetailPage() {
   const params = useParams<{ id: string }>();
@@ -436,26 +420,19 @@ export default function AuctionDetailPage() {
         : { days: 0, hours: 0, minutes: 0, seconds: 0 };
 
   return (
-    <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-10 sm:px-6">
+    <main className="mx-auto w-full max-w-6xl flex-1 px-4 pt-6 pb-28 sm:px-6 sm:py-10">
       <div className="mb-6">
         <Link
           href={MARKETPLACE_ROUTES.auctions}
-          className="text-sm text-amber-700 hover:underline dark:text-amber-300"
+          className="inline-flex min-h-[36px] items-center text-sm font-medium text-amber-700 hover:underline dark:text-amber-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-500 rounded"
         >
           ← Back to auctions
         </Link>
         <div className="mt-3 flex flex-wrap items-center gap-3">
-          <h1 className="text-3xl font-semibold tracking-tight text-zinc-900 dark:text-white">
+          <h1 className="text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl dark:text-white">
             {getAuctionTitle(auction)}
           </h1>
-          <span
-            className={[
-              'inline-flex rounded-md px-2.5 py-1 text-xs font-semibold uppercase tracking-wide',
-              displayStateBadgeClass(displayState),
-            ].join(' ')}
-          >
-            {getAuctionDisplayStateLabel(displayState)}
-          </span>
+          <AuctionStatusBadge state={displayState} size="md" />
         </div>
         {product?.description ? (
           <p className="mt-2 max-w-3xl text-zinc-600 dark:text-zinc-400">
@@ -571,7 +548,6 @@ export default function AuctionDetailPage() {
             </div>
             <div
               className="grid grid-cols-4 gap-2 text-center"
-              aria-live="polite"
               aria-label={countdownHeading}
             >
               {[
@@ -760,40 +736,53 @@ export default function AuctionDetailPage() {
                 Sellers cannot bid on their own listings.
               </p>
             ) : (
-              <form onSubmit={handlePlaceBid} className="space-y-3">
-                <label className="block space-y-1.5">
-                  <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                    Your bid amount
-                  </span>
-                  <input
-                    type="number"
-                    min={suggestedBid || undefined}
-                    step="0.01"
-                    required
-                    inputMode="decimal"
-                    value={bidAmount}
-                    onChange={(e) => setBidAmount(e.target.value)}
-                    placeholder={suggestedBid}
-                    disabled={submitting}
-                    className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm outline-none ring-amber-500/40 focus:ring-2 dark:border-zinc-700 dark:bg-zinc-900"
-                  />
-                </label>
+              <form onSubmit={handlePlaceBid} className="space-y-4">
+                <div>
+                  <label
+                    htmlFor="bid-input-field"
+                    className="block text-sm font-semibold text-zinc-900 dark:text-white"
+                  >
+                    Your bid amount ($ USD)
+                  </label>
+                  <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+                    Must be at least {formatAuctionMoney(suggestedBid ? Number(suggestedBid) : (currentBid != null ? currentBid + minIncrement : startingBid || 0))}
+                  </p>
+                  <div className="relative mt-2">
+                    <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-sm font-bold text-zinc-400">
+                      $
+                    </span>
+                    <input
+                      id="bid-input-field"
+                      name="bidAmount"
+                      type="number"
+                      min={suggestedBid || undefined}
+                      step="0.01"
+                      required
+                      inputMode="decimal"
+                      value={bidAmount}
+                      onChange={(e) => setBidAmount(e.target.value)}
+                      placeholder={suggestedBid}
+                      disabled={submitting}
+                      className="w-full min-h-[44px] rounded-xl border border-zinc-300 bg-white pl-8 pr-4 py-2.5 text-base font-semibold text-zinc-900 outline-none ring-amber-500/40 focus:border-amber-500 focus:ring-2 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
+                    />
+                  </div>
+                </div>
                 <button
                   type="submit"
                   disabled={submitting || authLoading || !isAuthenticated}
-                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-amber-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl bg-amber-600 px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-amber-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-500 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {submitting ? 'Placing bid…' : 'Place Bid'}
                 </button>
                 {!authLoading && !isAuthenticated ? (
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 text-center">
                     <Link
                       href={buildLoginHref(
                         auctionId
                           ? MARKETPLACE_ROUTES.auctionDetail(auctionId)
                           : MARKETPLACE_ROUTES.auctions,
                       )}
-                      className="text-amber-700 hover:underline"
+                      className="font-semibold text-amber-700 hover:underline dark:text-amber-400"
                     >
                       Log in
                     </Link>{' '}
@@ -805,6 +794,38 @@ export default function AuctionDetailPage() {
           </div>
         </aside>
       </div>
+
+      {displayState === 'LIVE' && !biddingUnavailable && !isOwner ? (
+        <aside
+          aria-label="Quick mobile bid action"
+          className="fixed bottom-14 left-0 right-0 z-30 border-t border-zinc-200 bg-white/95 p-3.5 backdrop-blur-md shadow-lg dark:border-zinc-800 dark:bg-zinc-950/95 md:hidden pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]"
+        >
+          <div className="mx-auto flex max-w-md items-center justify-between gap-3">
+            <div>
+              <div className="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                {currentBid != null ? 'Current Bid' : 'Starting'}
+              </div>
+              <div className="text-lg font-extrabold text-amber-700 dark:text-amber-300">
+                {formatAuctionDetailMoney(currentBid != null ? currentBid : startingBid)}
+              </div>
+            </div>
+            <a
+              href="#bid-input-field"
+              onClick={(e) => {
+                const el = document.getElementById('bid-input-field');
+                if (el) {
+                  e.preventDefault();
+                  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  el.focus();
+                }
+              }}
+              className="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-amber-600 px-5 text-sm font-bold text-white shadow-sm transition active:scale-95 hover:bg-amber-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-500"
+            >
+              Bid Now {nextValid ? `(${formatAuctionMoney(nextValid)})` : ''}
+            </a>
+          </div>
+        </aside>
+      ) : null}
     </main>
   );
 }

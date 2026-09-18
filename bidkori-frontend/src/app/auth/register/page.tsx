@@ -127,7 +127,7 @@ export default function RegisterPage() {
           </fieldset>
 
           <label className="block space-y-1.5">
-            <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+            <span className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
               Username
             </span>
             <input
@@ -136,12 +136,12 @@ export default function RegisterPage() {
               autoComplete="username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm outline-none ring-amber-500/40 focus:ring-2 dark:border-zinc-700 dark:bg-zinc-900"
+              className="w-full min-h-[44px] rounded-xl border border-zinc-300 bg-white px-3.5 py-2.5 text-base sm:text-sm text-zinc-900 outline-none ring-amber-500/40 focus:border-amber-500 focus:ring-2 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
             />
           </label>
 
           <label className="block space-y-1.5">
-            <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+            <span className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
               Email
             </span>
             <input
@@ -150,12 +150,12 @@ export default function RegisterPage() {
               autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm outline-none ring-amber-500/40 focus:ring-2 dark:border-zinc-700 dark:bg-zinc-900"
+              className="w-full min-h-[44px] rounded-xl border border-zinc-300 bg-white px-3.5 py-2.5 text-base sm:text-sm text-zinc-900 outline-none ring-amber-500/40 focus:border-amber-500 focus:ring-2 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
             />
           </label>
 
           <label className="block space-y-1.5">
-            <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+            <span className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
               Password
             </span>
             <input
@@ -165,12 +165,12 @@ export default function RegisterPage() {
               autoComplete="new-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm outline-none ring-amber-500/40 focus:ring-2 dark:border-zinc-700 dark:bg-zinc-900"
+              className="w-full min-h-[44px] rounded-xl border border-zinc-300 bg-white px-3.5 py-2.5 text-base sm:text-sm text-zinc-900 outline-none ring-amber-500/40 focus:border-amber-500 focus:ring-2 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
             />
           </label>
 
           <label className="block space-y-1.5">
-            <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+            <span className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
               Confirm password
             </span>
             <input
@@ -180,14 +180,14 @@ export default function RegisterPage() {
               autoComplete="new-password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm outline-none ring-amber-500/40 focus:ring-2 dark:border-zinc-700 dark:bg-zinc-900"
+              className="w-full min-h-[44px] rounded-xl border border-zinc-300 bg-white px-3.5 py-2.5 text-base sm:text-sm text-zinc-900 outline-none ring-amber-500/40 focus:border-amber-500 focus:ring-2 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
             />
           </label>
 
           <button
             type="submit"
             disabled={submitting}
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-amber-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-60"
+            className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl bg-amber-600 px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-amber-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-500 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {submitting ? 'Creating account…' : 'Create account'}
           </button>

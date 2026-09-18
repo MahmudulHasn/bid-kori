@@ -55,6 +55,7 @@ function buildRemotePatterns() {
 }
 
 const nextConfig = {
+  devIndicators: false,
   images: {
     remotePatterns: buildRemotePatterns(),
     // Local Compose/dev media is served from 127.0.0.1:8000 — Next 16 blocks
