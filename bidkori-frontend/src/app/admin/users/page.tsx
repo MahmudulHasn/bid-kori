@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import useSWR, { useSWRConfig } from 'swr';
 
@@ -130,11 +130,13 @@ export default function AdminUsersPage() {
   const status = parseAdminUserStatusFilter(searchParams.get('is_active'));
   const appliedSearch = (searchParams.get('search') ?? '').trim();
 
+  const [prevAppliedSearch, setPrevAppliedSearch] = useState(appliedSearch);
   const [searchInput, setSearchInput] = useState(appliedSearch);
 
-  useEffect(() => {
+  if (prevAppliedSearch !== appliedSearch) {
+    setPrevAppliedSearch(appliedSearch);
     setSearchInput(appliedSearch);
-  }, [appliedSearch]);
+  }
 
   const listKey = useMemo(
     () =>

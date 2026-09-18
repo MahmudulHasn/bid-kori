@@ -42,20 +42,20 @@ function MetricCard({
   icon: ReactNode;
 }) {
   return (
-    <article className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-      <div className="flex items-start justify-between gap-3">
-        <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{label}</p>
-        <span className="text-sky-700 dark:text-sky-300" aria-hidden>
+    <article className="group relative overflow-hidden rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-zinc-800/80 dark:bg-zinc-900/60">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm font-semibold text-zinc-600 dark:text-zinc-400">{label}</p>
+        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-500/10 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300" aria-hidden>
           {icon}
         </span>
       </div>
       <p
-        className="mt-3 text-3xl font-semibold tabular-nums text-zinc-900 dark:text-white"
+        className="mt-4 text-3xl font-bold tracking-tight tabular-nums text-zinc-900 dark:text-white"
         aria-label={`${label}: ${value}`}
       >
         {value}
       </p>
-      <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{hint}</p>
+      <p className="mt-1.5 text-xs font-medium text-zinc-500 dark:text-zinc-400">{hint}</p>
     </article>
   );
 }

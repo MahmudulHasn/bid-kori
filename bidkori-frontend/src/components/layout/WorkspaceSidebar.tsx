@@ -32,10 +32,10 @@ const accentActive: Record<
   string
 > = {
   amber:
-    'bg-amber-500/15 text-amber-800 dark:bg-amber-500/20 dark:text-amber-200',
-  sky: 'bg-sky-500/15 text-sky-800 dark:bg-sky-500/20 dark:text-sky-200',
+    'bg-amber-500/10 text-amber-800 dark:bg-amber-500/20 dark:text-amber-200 font-semibold shadow-2xs',
+  sky: 'bg-sky-500/10 text-sky-800 dark:bg-sky-500/20 dark:text-sky-200 font-semibold shadow-2xs',
   violet:
-    'bg-violet-500/15 text-violet-800 dark:bg-violet-500/20 dark:text-violet-200',
+    'bg-violet-500/10 text-violet-800 dark:bg-violet-500/20 dark:text-violet-200 font-semibold shadow-2xs',
 };
 
 function NavList({
@@ -63,10 +63,10 @@ function NavList({
               <span
                 aria-disabled="true"
                 title="Coming soon"
-                className="flex cursor-not-allowed items-center justify-between rounded-lg px-3 py-2 text-sm text-zinc-400 dark:text-zinc-500"
+                className="flex cursor-not-allowed items-center justify-between rounded-xl px-3.5 py-2.5 text-sm text-zinc-400 dark:text-zinc-500"
               >
                 <span>{item.label}</span>
-                <span className="text-[10px] font-semibold uppercase tracking-wide">
+                <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
                   Soon
                 </span>
               </span>
@@ -81,10 +81,10 @@ function NavList({
               aria-current={active ? 'page' : undefined}
               onClick={onNavigate}
               className={[
-                'flex items-center rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-400',
+                'flex items-center rounded-xl px-3.5 py-2.5 text-sm font-medium transition-all duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-400',
                 active
                   ? accentActive[accent]
-                  : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-white',
+                  : 'text-zinc-600 hover:bg-zinc-100/80 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-100',
               ].join(' ')}
             >
               {item.label}
@@ -107,33 +107,33 @@ export default function WorkspaceSidebar({
   return (
     <aside
       className={[
-        'flex h-full w-64 flex-col border-r border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900',
+        'flex h-full w-64 flex-col border-r border-zinc-200/80 bg-white dark:border-zinc-800/80 dark:bg-zinc-950/90',
         className,
       ].join(' ')}
       aria-label={`${config.brandTitle} navigation`}
     >
-      <div className="border-b border-zinc-200 px-4 py-5 dark:border-zinc-800">
+      <div className="border-b border-zinc-200/80 px-5 py-5 dark:border-zinc-800/80">
         <div className="flex items-center gap-3">
           <span
             className={[
-              'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg',
+              'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl shadow-xs',
               accentBrand[accent],
             ].join(' ')}
           >
-            <Store className="h-4 w-4" aria-hidden />
+            <Store className="h-5 w-5" aria-hidden />
           </span>
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-zinc-900 dark:text-white">
+            <p className="truncate text-sm font-bold text-zinc-900 dark:text-white">
               {config.brandTitle}
             </p>
-            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
               Workspace
             </p>
           </div>
         </div>
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-3 py-4" aria-label="Workspace sections">
+      <nav className="flex-1 overflow-y-auto px-3.5 py-4" aria-label="Workspace sections">
         <NavList
           items={config.navItems}
           pathname={pathname}
@@ -143,11 +143,11 @@ export default function WorkspaceSidebar({
         />
       </nav>
 
-      <div className="border-t border-zinc-200 px-3 py-4 dark:border-zinc-800">
+      <div className="border-t border-zinc-200/80 px-3.5 py-4 dark:border-zinc-800/80">
         <Link
           href={config.marketplaceHref}
           onClick={onNavigate}
-          className="flex items-center rounded-lg px-3 py-2 text-sm font-medium text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-400 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-white"
+          className="flex items-center rounded-xl px-3.5 py-2.5 text-sm font-medium text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-400 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
         >
           {config.marketplaceLabel}
         </Link>
