@@ -51,11 +51,19 @@ export default function RegisterPage() {
     } catch (error: unknown) {
       const data = (error as { response?: { data?: Record<string, unknown> } })
         ?.response?.data;
-      const message =
-        (typeof data?.error === 'string' && data.error) ||
-        (typeof data?.detail === 'string' && data.detail) ||
-        'Registration failed. Please check your details.';
-      toast.error(String(message));
+      let message = 'Registration failed. Please check your details.';
+      if (typeof data?.error === 'string') {
+        message = data.error;
+      } else if (typeof data?.detail === 'string') {
+        message = data.detail;
+      } else if (data?.error && typeof data.error === 'object') {
+        const values = Object.values(data.error);
+        if (values.length > 0) {
+          const first = values[0];
+          message = Array.isArray(first) && first.length > 0 ? String(first[0]) : String(first);
+        }
+      }
+      toast.error(message);
     } finally {
       setSubmitting(false);
     }

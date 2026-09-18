@@ -171,3 +171,141 @@ export function isRevenueLabel(label: string): boolean {
     normalized === 'settled gmv'
   );
 }
+
+// ---------------------------------------------------------------------------
+// ADMIN COMMAND CENTER (ADMIN-X01) UNIFIED SUMMARY SCHEMA & HELPERS
+// ---------------------------------------------------------------------------
+
+export type AdminDashboardUserStats = {
+  total: number;
+  buyers: number;
+  sellers: number;
+  admins: number;
+  active: number;
+  suspended: number;
+};
+
+export type AdminDashboardAuctionStats = {
+  total: number;
+  upcoming: number;
+  live: number;
+  closed: number;
+  cancelled: number;
+  hidden: number;
+};
+
+export type AdminDashboardProductStats = {
+  total: number;
+  hidden: number;
+};
+
+export type AdminDashboardBidStats = {
+  total: number;
+};
+
+export type AdminDashboardFinanceStats = {
+  completed_sales_count: number;
+  gross_paid_volume: string;
+  platform_revenue: string;
+  seller_net_total: string;
+  accounted_sales_count: number;
+  legacy_completed_sales_count: number;
+  legacy_gross_paid_volume: string;
+  disclosure: string;
+};
+
+export type AdminDashboardModerationStats = {
+  hidden_products_count: number;
+  hidden_auctions_count: number;
+  cancelled_auctions_count: number;
+  suspended_users_count: number;
+  total_attention_required: number;
+};
+
+export type AdminRecentUser = {
+  id: number;
+  username: string;
+  email: string;
+  role: 'BUYER' | 'SELLER' | 'ADMIN';
+  is_active: boolean;
+  date_joined: string | null;
+};
+
+export type AdminRecentProduct = {
+  id: number;
+  title: string;
+  seller_username: string;
+  category_name: string;
+  is_hidden: boolean;
+  created_at: string | null;
+};
+
+export type AdminRecentAuction = {
+  id: number;
+  title: string;
+  seller_username: string;
+  status: 'ACTIVE' | 'CLOSED' | 'CANCELLED';
+  current_price: string;
+  is_hidden: boolean;
+  created_at: string | null;
+};
+
+export type AdminRecentBid = {
+  id: number;
+  auction_id: number;
+  auction_title: string;
+  amount: string;
+  bidder_username: string;
+  timestamp: string | null;
+};
+
+export type AdminRecentPayment = {
+  id: number;
+  auction_id: number;
+  auction_title: string;
+  amount: string;
+  platform_fee: string | null;
+  buyer_username: string;
+  created_at: string | null;
+};
+
+export type AdminDashboardRecentActivity = {
+  users: readonly AdminRecentUser[];
+  products: readonly AdminRecentProduct[];
+  auctions: readonly AdminRecentAuction[];
+  bids: readonly AdminRecentBid[];
+  payments: readonly AdminRecentPayment[];
+};
+
+export type AdminDashboardSystemHealth = {
+  database: string;
+  redis: string;
+  celery_broker: string;
+  api: string;
+};
+
+export type AdminDashboardSummary = {
+  users: AdminDashboardUserStats;
+  auctions: AdminDashboardAuctionStats;
+  products: AdminDashboardProductStats;
+  bids: AdminDashboardBidStats;
+  finance: AdminDashboardFinanceStats;
+  moderation: AdminDashboardModerationStats;
+  recent_activity: AdminDashboardRecentActivity;
+  system_health: AdminDashboardSystemHealth;
+};
+
+export function formatHealthStatus(status: string | undefined): {
+  label: string;
+  isHealthy: boolean;
+} {
+  const norm = (status ?? '').trim().toLowerCase();
+  if (norm === 'healthy' || norm === 'online') {
+    return { label: 'Operational', isHealthy: true };
+  }
+  if (norm === 'degraded' || norm === 'unreachable') {
+    return { label: 'Unreachable', isHealthy: false };
+  }
+  return { label: status || 'Unknown', isHealthy: false };
+}
+

@@ -11,6 +11,7 @@ import {
 import {
   buildAdminDashboardMetrics,
   formatAdminMoney,
+  formatHealthStatus,
   getAdminCatalogMetrics,
   isRevenueLabel,
   mapCategorySnapshot,
@@ -267,3 +268,24 @@ test('admin dashboard keeps Categories/Reports disabled; Users and core routes e
     settings: '/admin/settings',
   });
 });
+
+test('formatHealthStatus correctly classifies healthy and degraded states', () => {
+  const healthy = formatHealthStatus('healthy');
+  assert.equal(healthy.isHealthy, true);
+  assert.equal(healthy.label, 'Operational');
+
+  const online = formatHealthStatus('online');
+  assert.equal(online.isHealthy, true);
+
+  const unreachable = formatHealthStatus('unreachable');
+  assert.equal(unreachable.isHealthy, false);
+  assert.equal(unreachable.label, 'Unreachable');
+
+  const degraded = formatHealthStatus('degraded');
+  assert.equal(degraded.isHealthy, false);
+
+  const unknown = formatHealthStatus(undefined);
+  assert.equal(unknown.isHealthy, false);
+  assert.equal(unknown.label, 'Unknown');
+});
+

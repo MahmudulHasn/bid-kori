@@ -165,7 +165,9 @@ from config.db_policy import build_default_database  # noqa: E402
 
 _database_url = os.getenv('DATABASE_URL', '').strip()
 _use_sqlite_for_tests = _env_bool('USE_SQLITE_FOR_TESTS', default=False)
-_db_conn_max_age = int(os.getenv('DB_CONN_MAX_AGE', '600') or '600')
+# Daphne/ASGI creates async tasks; persistent connections (conn_max_age > 0)
+# exhaust PostgreSQL max_connections without an external connection pooler.
+_db_conn_max_age = int(os.getenv('DB_CONN_MAX_AGE', '0') or '0')
 
 DATABASES = {
     'default': build_default_database(
