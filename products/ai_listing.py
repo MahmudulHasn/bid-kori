@@ -344,6 +344,9 @@ class AIListingService:
                 max_output_tokens=max_tokens,
             )
         except RateLimitError as exc:
+            msg = str(exc).lower()
+            if 'quota' in msg or 'credit' in msg:
+                raise AIListingQuotaError() from exc
             raise AIListingRateLimitError() from exc
         except APITimeoutError as exc:
             raise AIListingTimeoutError() from exc

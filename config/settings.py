@@ -342,14 +342,14 @@ PRODUCT_IMAGE_ALLOWED_FORMATS = ('JPEG', 'PNG', 'WEBP', 'GIF')
 # Django boots without these; only POST /api/products/generate-description/
 # fails clearly when generation is attempted without configuration.
 AI_API_KEY = os.getenv('AI_API_KEY', '').strip()
-AI_MODEL = os.getenv('AI_MODEL', '').strip()
+AI_MODEL = os.getenv('AI_MODEL', 'gpt-4o-mini').strip()
 AI_TIMEOUT_SECONDS = int(os.getenv('AI_TIMEOUT_SECONDS', '20') or '20')
 AI_LISTING_RATE = os.getenv('AI_LISTING_RATE', '5/minute').strip() or '5/minute'
 AI_LISTING_MAX_OUTPUT_TOKENS = int(
     os.getenv('AI_LISTING_MAX_OUTPUT_TOKENS', '450') or '450'
 )
 # Support chatbot (AI-B02) — text-only model, separate from listing vision model.
-AI_CHAT_MODEL = os.getenv('AI_CHAT_MODEL', '').strip()
+AI_CHAT_MODEL = os.getenv('AI_CHAT_MODEL', 'gpt-4o-mini').strip()
 AI_CHAT_RATE = os.getenv('AI_CHAT_RATE', '10/minute').strip() or '10/minute'
 AI_CHAT_MAX_OUTPUT_TOKENS = int(
     os.getenv('AI_CHAT_MAX_OUTPUT_TOKENS', '400') or '400'
