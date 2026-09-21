@@ -24,6 +24,7 @@ export type GenerateDescriptionRequest = {
   image: File;
   condition?: ProductCondition;
   category?: number | null;
+  api_key?: string;
 };
 
 export type GenerateDescriptionResponse = {
@@ -36,6 +37,8 @@ export type AiListingGenerateEligibilityInput = {
   generating: boolean;
   /** False when ProductForm fields are frozen/disabled. */
   formEditable: boolean;
+  /** Seller-supplied API key (BYOK). */
+  apiKey: string;
 };
 
 /**
@@ -75,6 +78,10 @@ export function buildGenerateDescriptionFormData(
     formData.append('category', String(input.category));
   }
 
+  if (input.api_key && input.api_key.trim()) {
+    formData.append('api_key', input.api_key.trim());
+  }
+
   return formData;
 }
 
@@ -85,6 +92,7 @@ export function canGenerateAiListingDescription(
   if (input.generating) return false;
   if (!input.title.trim()) return false;
   if (!input.image) return false;
+  if (!validateApiKeyInput(input.apiKey).ok) return false;
   return validateAiListingImage(input.image).ok;
 }
 
@@ -109,6 +117,18 @@ export function getAiListingErrorMessage(error: unknown): string {
   const status = getApiStatus(error);
   const backendMessage = getApiErrorMessage(error, '').trim();
 
+  if (status === 401) {
+    return (
+      backendMessage ||
+      'The API key was rejected by the AI provider. Check the key and try again.'
+    );
+  }
+  if (status === 402) {
+    return (
+      backendMessage ||
+      'The AI provider could not complete the request. Check your provider account or quota.'
+    );
+  }
   if (status === 429) {
     return (
       backendMessage ||
@@ -155,3 +175,27 @@ export const AI_IMAGE_NOT_AUTO_UPLOADED_HELP =
 
 /** Max bytes for UI copy; mirrors Product image limit. */
 export const AI_LISTING_IMAGE_MAX_BYTES = PRODUCT_IMAGE_MAX_BYTES;
+
+// --- BYOK constants ---
+
+export const AI_BYOK_LABEL = 'OpenAI API Key';
+
+export const AI_BYOK_HELPER_TEXT =
+  'Used only for this generation request. BidKori does not save your API key.';
+
+export const AI_BYOK_KEY_CLEARED_MESSAGE =
+  'Your API key has been cleared for security.';
+
+/** Basic client-side API key validation (non-empty, reasonable length). */
+export function validateApiKeyInput(
+  key: string,
+): { ok: true } | { ok: false; error: string } {
+  const trimmed = (key ?? '').trim();
+  if (!trimmed) {
+    return { ok: false, error: 'Enter your OpenAI API key.' };
+  }
+  if (trimmed.length > 256) {
+    return { ok: false, error: 'API key is too long.' };
+  }
+  return { ok: true };
+}

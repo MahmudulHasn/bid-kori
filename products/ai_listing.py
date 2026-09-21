@@ -32,6 +32,13 @@ AI_LISTING_EMPTY_MESSAGE = (
 AI_LISTING_RATE_LIMIT_MESSAGE = (
     'AI description generation is rate limited. Please try again shortly.'
 )
+AI_LISTING_INVALID_KEY_MESSAGE = (
+    'The API key was rejected by the AI provider. Check the key and try again.'
+)
+AI_LISTING_QUOTA_MESSAGE = (
+    'The AI provider could not complete the request. '
+    'Check your provider account or quota.'
+)
 
 SERVER_INSTRUCTIONS = """You are helping a Seller draft an online marketplace Product description for BidKori.
 
@@ -81,6 +88,16 @@ class AIListingRateLimitError(AIListingError):
         super().__init__(message, status_code=429)
 
 
+class AIListingInvalidKeyError(AIListingError):
+    def __init__(self, message: str = AI_LISTING_INVALID_KEY_MESSAGE):
+        super().__init__(message, status_code=401)
+
+
+class AIListingQuotaError(AIListingError):
+    def __init__(self, message: str = AI_LISTING_QUOTA_MESSAGE):
+        super().__init__(message, status_code=402)
+
+
 class AIListingEmptyOutputError(AIListingError):
     def __init__(self, message: str = AI_LISTING_EMPTY_MESSAGE):
         super().__init__(message, status_code=502)
@@ -98,6 +115,24 @@ def is_ai_listing_configured() -> bool:
     return bool(getattr(settings, 'AI_API_KEY', '').strip()) and bool(
         getattr(settings, 'AI_MODEL', '').strip()
     )
+
+
+def is_ai_listing_available(api_key: str | None = None) -> bool:
+    """True when listing generation can proceed (BYOK key or server key + model)."""
+    has_key = bool((api_key or '').strip()) or bool(
+        getattr(settings, 'AI_API_KEY', '').strip()
+    )
+    return has_key and bool(getattr(settings, 'AI_MODEL', '').strip())
+
+
+def _resolve_api_key(api_key: str | None) -> str:
+    """Return the effective API key: BYOK → server → raise."""
+    if api_key and api_key.strip():
+        return api_key.strip()
+    server_key = getattr(settings, 'AI_API_KEY', '').strip()
+    if server_key:
+        return server_key
+    raise AIListingConfigurationError()
 
 
 def build_user_product_data_text(
@@ -222,8 +257,12 @@ class AIListingService:
         condition_label: str | None = None,
         category_name: str | None = None,
         user_id: int | None = None,
+        api_key: str | None = None,
     ) -> str:
-        if not is_ai_listing_configured():
+        # Resolve effective key (BYOK → server → raise).
+        resolved_key = _resolve_api_key(api_key)
+
+        if not getattr(settings, 'AI_MODEL', '').strip():
             raise AIListingConfigurationError()
 
         started = time.monotonic()
@@ -235,7 +274,7 @@ class AIListingService:
                 category_name=category_name,
                 image_data_url=image_data_url,
             )
-            raw = cls._call_provider(request)
+            raw = cls._call_provider(request, api_key=resolved_key)
             description = clean_description_output(raw)
             if not description:
                 raise AIListingEmptyOutputError()
@@ -262,22 +301,23 @@ class AIListingService:
             raise AIListingProviderError() from None
 
     @classmethod
-    def _build_client(cls):
+    def _build_client(cls, *, api_key: str):
         from openai import OpenAI
 
         timeout = float(getattr(settings, 'AI_TIMEOUT_SECONDS', 20) or 20)
+        # Request-scoped client — never mutates a global/singleton.
         # One Generate click ≈ one provider attempt (no silent billable retries).
         return OpenAI(
-            api_key=settings.AI_API_KEY,
+            api_key=api_key,
             timeout=timeout,
             max_retries=0,
         )
 
     @classmethod
-    def _call_provider(cls, request: AIListingRequest) -> str:
+    def _call_provider(cls, request: AIListingRequest, *, api_key: str) -> str:
         from openai import APIConnectionError, APIStatusError, APITimeoutError, RateLimitError
 
-        client = cls._build_client()
+        client = cls._build_client(api_key=api_key)
         user_text = build_user_product_data_text(
             title=request.title,
             condition_label=request.condition_label,
@@ -311,6 +351,10 @@ class AIListingService:
             raise AIListingProviderError() from exc
         except APIStatusError as exc:
             status = getattr(exc, 'status_code', None)
+            if status in (401, 403):
+                raise AIListingInvalidKeyError() from exc
+            if status == 402:
+                raise AIListingQuotaError() from exc
             if status == 429:
                 raise AIListingRateLimitError() from exc
             raise AIListingProviderError() from exc

@@ -141,6 +141,9 @@ class ProductDescriptionGenerateView(APIView):
         category = data.get('category')
         category_name = category.name if category is not None else None
 
+        # BYOK: pass through Seller-supplied key (None when absent).
+        seller_api_key = data.get('api_key') or None
+
         try:
             description = AIListingService.generate_description(
                 title=data['title'],
@@ -148,6 +151,7 @@ class ProductDescriptionGenerateView(APIView):
                 condition_label=condition_label,
                 category_name=category_name,
                 user_id=getattr(request.user, 'pk', None),
+                api_key=seller_api_key,
             )
         except AIListingError as exc:
             return Response(

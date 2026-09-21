@@ -23,6 +23,8 @@ from .ai_listing import (
 )
 from .models import Category, Product, ProductImage
 
+BYOK_SENTINEL_KEY = 'sk-test-DO-NOT-STORE-123456'
+
 
 def _make_ai_test_image(name='test.png', *, size=(10, 10), fmt='PNG'):
     buffer = BytesIO()
@@ -567,7 +569,8 @@ class AIListingServiceUnitTests(APITestCase):
                 condition_label='Brand New',
                 category_name='Electronics',
                 image_data_url='data:image/png;base64,abc',
-            )
+            ),
+            api_key='test-key',
         )
         self.assertEqual(text, 'Generated listing text.')
         kwargs = mock_client.responses.create.call_args.kwargs
@@ -587,7 +590,7 @@ class AIListingServiceUnitTests(APITestCase):
     def test_build_client_disables_sdk_retries_and_applies_timeout(self):
         with patch('openai.OpenAI') as mock_openai:
             mock_openai.return_value = MagicMock()
-            AIListingService._build_client()
+            AIListingService._build_client(api_key='test-key')
             kwargs = mock_openai.call_args.kwargs
             self.assertEqual(kwargs['max_retries'], 0)
             self.assertEqual(kwargs['timeout'], 20.0)
@@ -638,3 +641,318 @@ class AIListingServiceUnitTests(APITestCase):
         )
         data_url = encode_uploaded_image_as_data_url(uploaded)
         self.assertTrue(data_url.startswith('data:image/jpeg;base64,'))
+
+
+@override_settings(
+    AI_API_KEY='server-ai-key-not-real',
+    AI_MODEL='gpt-test-vision',
+    AI_TIMEOUT_SECONDS=20,
+)
+class SellerBYOKAIListingTests(APITestCase):
+    """AI-DESC02: Seller Bring-Your-Own-Key tests."""
+
+    URL = '/api/products/generate-description/'
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        from products.throttling import AIListingBurstThrottle
+
+        cls._previous_throttle_rates = AIListingBurstThrottle.THROTTLE_RATES
+        AIListingBurstThrottle.THROTTLE_RATES = {
+            **dict(cls._previous_throttle_rates or {}),
+            'ai_listing': '1000/minute',
+        }
+
+    @classmethod
+    def tearDownClass(cls):
+        from products.throttling import AIListingBurstThrottle
+
+        AIListingBurstThrottle.THROTTLE_RATES = cls._previous_throttle_rates
+        super().tearDownClass()
+
+    def setUp(self):
+        from django.core.cache import cache
+
+        cache.clear()
+        self.seller = User.objects.create_user(
+            username='byok_seller',
+            email='byok_seller@test.com',
+            password='pass12345',
+        )
+        self.seller_b = User.objects.create_user(
+            username='byok_seller_b',
+            email='byok_seller_b@test.com',
+            password='pass12345',
+        )
+        self.buyer = User.objects.create_user(
+            username='byok_buyer',
+            email='byok_buyer@test.com',
+            password='pass12345',
+        )
+        ensure_user_profile(self.seller, role=UserProfile.Role.SELLER)
+        ensure_user_profile(self.seller_b, role=UserProfile.Role.SELLER)
+        ensure_user_profile(self.buyer, role=UserProfile.Role.BUYER)
+        self.seller_token = Token.objects.create(user=self.seller)
+        self.seller_b_token = Token.objects.create(user=self.seller_b)
+        self.buyer_token = Token.objects.create(user=self.buyer)
+
+    def _auth(self, token):
+        if token is None:
+            self.client.credentials()
+        else:
+            self.client.credentials(HTTP_AUTHORIZATION=f'Token {token.key}')
+
+    def _post(self, *, token, data=None, files=None):
+        self._auth(token)
+        payload = {}
+        if data:
+            payload.update(data)
+        if files:
+            payload.update(files)
+        return self.client.post(self.URL, payload, format='multipart')
+
+    def _valid_payload(self, **overrides):
+        payload = {
+            'title': 'BYOK Camera',
+            'image': _make_ai_test_image(),
+            'api_key': BYOK_SENTINEL_KEY,
+        }
+        payload.update(overrides)
+        return payload
+
+    # --- BYOK success ---
+
+    @patch.object(
+        AIListingService,
+        'generate_description',
+        return_value='BYOK draft description.',
+    )
+    def test_seller_byok_success(self, mock_generate):
+        response = self._post(
+            token=self.seller_token,
+            files=self._valid_payload(),
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['description'], 'BYOK draft description.')
+        kwargs = mock_generate.call_args.kwargs
+        self.assertEqual(kwargs['api_key'], BYOK_SENTINEL_KEY)
+
+    # --- Key not in response ---
+
+    @patch.object(
+        AIListingService,
+        'generate_description',
+        return_value='Draft text.',
+    )
+    def test_byok_key_not_returned_in_response(self, _mock):
+        response = self._post(
+            token=self.seller_token,
+            files=self._valid_payload(),
+        )
+        self.assertEqual(response.status_code, 200)
+        serialized = str(response.data)
+        self.assertNotIn(BYOK_SENTINEL_KEY, serialized)
+        self.assertNotIn('api_key', serialized)
+        self.assertEqual(set(response.data.keys()), {'description'})
+
+    # --- Invalid key ---
+
+    @patch.object(AIListingService, 'generate_description')
+    def test_seller_byok_invalid_key(self, mock_generate):
+        from products.ai_listing import AIListingInvalidKeyError
+
+        mock_generate.side_effect = AIListingInvalidKeyError()
+        response = self._post(
+            token=self.seller_token,
+            files=self._valid_payload(),
+        )
+        self.assertEqual(response.status_code, 401)
+        self.assertIn('error', response.data)
+        self.assertIn('rejected', response.data['error'].lower())
+        self.assertNotIn(BYOK_SENTINEL_KEY, str(response.data))
+
+    # --- Quota error ---
+
+    @patch.object(AIListingService, 'generate_description')
+    def test_seller_byok_quota_error(self, mock_generate):
+        from products.ai_listing import AIListingQuotaError
+
+        mock_generate.side_effect = AIListingQuotaError()
+        response = self._post(
+            token=self.seller_token,
+            files=self._valid_payload(),
+        )
+        self.assertEqual(response.status_code, 402)
+        self.assertIn('error', response.data)
+        self.assertIn('quota', response.data['error'].lower())
+        self.assertNotIn(BYOK_SENTINEL_KEY, str(response.data))
+
+    # --- Timeout with BYOK ---
+
+    @patch.object(AIListingService, 'generate_description')
+    def test_seller_byok_timeout(self, mock_generate):
+        from products.ai_listing import AIListingTimeoutError
+
+        mock_generate.side_effect = AIListingTimeoutError()
+        response = self._post(
+            token=self.seller_token,
+            files=self._valid_payload(),
+        )
+        self.assertEqual(response.status_code, 504)
+        self.assertNotIn(BYOK_SENTINEL_KEY, str(response.data))
+
+    # --- Rate limit with BYOK ---
+
+    @patch.object(AIListingService, 'generate_description')
+    def test_seller_byok_rate_limit(self, mock_generate):
+        from products.ai_listing import AIListingRateLimitError
+
+        mock_generate.side_effect = AIListingRateLimitError()
+        response = self._post(
+            token=self.seller_token,
+            files=self._valid_payload(),
+        )
+        self.assertEqual(response.status_code, 429)
+        self.assertNotIn(BYOK_SENTINEL_KEY, str(response.data))
+
+    # --- Authorization ---
+
+    def test_anonymous_denied(self):
+        response = self._post(token=None, files=self._valid_payload())
+        self.assertEqual(response.status_code, 401)
+
+    def test_buyer_denied(self):
+        response = self._post(token=self.buyer_token, files=self._valid_payload())
+        self.assertEqual(response.status_code, 403)
+
+    # --- Server key fallback ---
+
+    @patch.object(
+        AIListingService,
+        'generate_description',
+        return_value='Fallback draft.',
+    )
+    def test_server_key_fallback_when_no_byok(self, mock_generate):
+        """Without api_key in request, server AI_API_KEY is used."""
+        response = self._post(
+            token=self.seller_token,
+            files={'title': 'No BYOK', 'image': _make_ai_test_image()},
+        )
+        self.assertEqual(response.status_code, 200)
+        kwargs = mock_generate.call_args.kwargs
+        self.assertIsNone(kwargs['api_key'])
+
+    # --- Missing both keys ---
+
+    @override_settings(AI_API_KEY='', AI_MODEL='gpt-test-vision')
+    def test_missing_both_keys_returns_503(self):
+        response = self._post(
+            token=self.seller_token,
+            files={'title': 'No Key', 'image': _make_ai_test_image()},
+        )
+        self.assertEqual(response.status_code, 503)
+        self.assertNotIn(BYOK_SENTINEL_KEY, str(response.data))
+
+    # --- Prompt remains server-controlled ---
+
+    @patch.object(AIListingService, '_call_provider')
+    def test_prompt_remains_server_controlled_with_byok(self, mock_call):
+        mock_call.return_value = 'BYOK draft via server prompt.'
+        response = self._post(
+            token=self.seller_token,
+            files=self._valid_payload(),
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn('system_prompt', response.data)
+        self.assertNotIn('instructions', response.data)
+
+    # --- Key not in database ---
+
+    @patch.object(
+        AIListingService,
+        'generate_description',
+        return_value='Persisted nowhere.',
+    )
+    def test_byok_key_not_in_database(self, _mock):
+        response = self._post(
+            token=self.seller_token,
+            files=self._valid_payload(),
+        )
+        self.assertEqual(response.status_code, 200)
+        # Verify sentinel key not present in Product rows.
+        self.assertFalse(
+            Product.objects.filter(description__contains=BYOK_SENTINEL_KEY).exists()
+        )
+        self.assertFalse(
+            Product.objects.filter(title__contains=BYOK_SENTINEL_KEY).exists()
+        )
+
+    # --- Key not in logs ---
+
+    @patch.object(
+        AIListingService,
+        'generate_description',
+        return_value='Logged nowhere.',
+    )
+    def test_byok_key_not_in_logs(self, _mock):
+        import logging
+        import logging.handlers
+
+        handler = logging.handlers.MemoryHandler(capacity=100)
+        root_logger = logging.getLogger()
+        root_logger.addHandler(handler)
+        try:
+            response = self._post(
+                token=self.seller_token,
+                files=self._valid_payload(),
+            )
+            self.assertEqual(response.status_code, 200)
+            for record in handler.buffer:
+                self.assertNotIn(
+                    BYOK_SENTINEL_KEY,
+                    record.getMessage(),
+                    'Sentinel key found in log output',
+                )
+        finally:
+            root_logger.removeHandler(handler)
+
+    # --- Concurrent key isolation ---
+
+    @patch.object(AIListingService, '_call_provider')
+    def test_concurrent_sellers_key_isolation(self, mock_call):
+        """Two sellers with different keys get the correct key per request."""
+        key_a = 'sk-seller-a-key-isolated'
+        key_b = 'sk-seller-b-key-isolated'
+
+        mock_call.return_value = 'Draft.'
+
+        self._auth(self.seller_token)
+        self.client.post(
+            self.URL,
+            {'title': 'Item A', 'image': _make_ai_test_image(), 'api_key': key_a},
+            format='multipart',
+        )
+
+        self._auth(self.seller_b_token)
+        self.client.post(
+            self.URL,
+            {'title': 'Item B', 'image': _make_ai_test_image(), 'api_key': key_b},
+            format='multipart',
+        )
+
+        calls = mock_call.call_args_list
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(calls[0].kwargs['api_key'], key_a)
+        self.assertEqual(calls[1].kwargs['api_key'], key_b)
+
+    # --- Build client uses BYOK key ---
+
+    @override_settings(AI_API_KEY='server-key', AI_MODEL='gpt-test', AI_TIMEOUT_SECONDS=20)
+    def test_build_client_uses_byok_key_not_server_key(self):
+        with patch('openai.OpenAI') as mock_openai:
+            mock_openai.return_value = MagicMock()
+            AIListingService._build_client(api_key='byok-override')
+            kwargs = mock_openai.call_args.kwargs
+            self.assertEqual(kwargs['api_key'], 'byok-override')
+

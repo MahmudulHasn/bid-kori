@@ -16,6 +16,8 @@ export {
 /**
  * Call Django multimodal description endpoint.
  * Auth token comes from the shared API client — no provider keys in the browser.
+ * BYOK api_key is sent only to BidKori backend via FormData (never directly
+ * to the AI provider).
  */
 export async function generateProductDescription(
   input: GenerateDescriptionRequest,

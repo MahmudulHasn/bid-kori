@@ -101,7 +101,12 @@ class ProductSerializer(serializers.ModelSerializer):
 
 
 class ProductDescriptionGenerationSerializer(serializers.Serializer):
-    """Multipart payload for AI draft description generation (no persistence)."""
+    """Multipart payload for AI draft description generation (no persistence).
+
+    ``api_key`` is optional Seller BYOK (Bring Your Own Key).  Never stored,
+    never returned, never logged.  When absent the server ``AI_API_KEY`` is
+    used as fallback.
+    """
 
     title = serializers.CharField(max_length=255, allow_blank=False, trim_whitespace=True)
     image = ProductImageUploadField(allow_empty_file=False)
@@ -115,9 +120,16 @@ class ProductDescriptionGenerationSerializer(serializers.Serializer):
         required=False,
         allow_null=True,
     )
+    api_key = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        trim_whitespace=False,
+        max_length=256,
+        help_text='Optional Seller-supplied AI provider API key (BYOK).',
+    )
 
     def to_internal_value(self, data):
-        # Multipart may omit optional keys; treat blank condition as omitted.
+        # Multipart may omit optional keys; treat blank values as omitted.
         mutable = data
         if hasattr(data, 'copy'):
             mutable = data.copy()
@@ -127,4 +139,7 @@ class ProductDescriptionGenerationSerializer(serializers.Serializer):
         category = mutable.get('category')
         if category in ('', None):
             mutable.pop('category', None)
+        api_key = mutable.get('api_key')
+        if api_key in ('', None):
+            mutable.pop('api_key', None)
         return super().to_internal_value(mutable)

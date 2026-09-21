@@ -2,6 +2,9 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import {
+  AI_BYOK_HELPER_TEXT,
+  AI_BYOK_KEY_CLEARED_MESSAGE,
+  AI_BYOK_LABEL,
   AI_DRAFT_DISCLOSURE,
   AI_LISTING_GENERATE_API_PATH,
   AI_LISTING_GENERATE_METHOD,
@@ -13,6 +16,7 @@ import {
   getAiListingErrorMessage,
   shouldApplyAiDraftDirectly,
   validateAiListingImage,
+  validateApiKeyInput,
 } from './aiListing.ts';
 import {
   PRODUCT_IMAGE_ALLOWED_MIME_TYPES,
@@ -99,13 +103,36 @@ describe('buildGenerateDescriptionFormData', () => {
       'prompt',
       'system_prompt',
       'model',
-      'api_key',
       'description',
       'temperature',
       'instructions',
     ]) {
       assert.equal(formData.has(key), false, key);
     }
+  });
+
+  it('appends api_key when provided and non-empty', () => {
+    const formData = buildGenerateDescriptionFormData({
+      title: 'Camera',
+      image: fakeFile('a.jpg'),
+      api_key: 'sk-test-byok-key',
+    });
+    assert.equal(formData.get('api_key'), 'sk-test-byok-key');
+  });
+
+  it('omits api_key when blank or undefined', () => {
+    const noKey = buildGenerateDescriptionFormData({
+      title: 'Camera',
+      image: fakeFile('a.jpg'),
+    });
+    assert.equal(noKey.has('api_key'), false);
+
+    const emptyKey = buildGenerateDescriptionFormData({
+      title: 'Camera',
+      image: fakeFile('a.jpg'),
+      api_key: '   ',
+    });
+    assert.equal(emptyKey.has('api_key'), false);
   });
 });
 
@@ -141,26 +168,29 @@ describe('validateAiListingImage', () => {
 
 describe('canGenerateAiListingDescription', () => {
   const image = fakeFile('ok.jpg');
+  const validApiKey = 'sk-test-valid-key';
 
-  it('allows valid title + image when editable and idle', () => {
+  it('allows valid title + image + apiKey when editable and idle', () => {
     assert.equal(
       canGenerateAiListingDescription({
         title: 'Headphones',
         image,
         generating: false,
         formEditable: true,
+        apiKey: validApiKey,
       }),
       true,
     );
   });
 
-  it('rejects blank title, missing image, generating, or frozen form', () => {
+  it('rejects blank title, missing image, generating, frozen form, or empty apiKey', () => {
     assert.equal(
       canGenerateAiListingDescription({
         title: '   ',
         image,
         generating: false,
         formEditable: true,
+        apiKey: validApiKey,
       }),
       false,
     );
@@ -170,6 +200,7 @@ describe('canGenerateAiListingDescription', () => {
         image: null,
         generating: false,
         formEditable: true,
+        apiKey: validApiKey,
       }),
       false,
     );
@@ -179,6 +210,7 @@ describe('canGenerateAiListingDescription', () => {
         image,
         generating: true,
         formEditable: true,
+        apiKey: validApiKey,
       }),
       false,
     );
@@ -188,6 +220,27 @@ describe('canGenerateAiListingDescription', () => {
         image,
         generating: false,
         formEditable: false,
+        apiKey: validApiKey,
+      }),
+      false,
+    );
+    assert.equal(
+      canGenerateAiListingDescription({
+        title: 'Headphones',
+        image,
+        generating: false,
+        formEditable: true,
+        apiKey: '',
+      }),
+      false,
+    );
+    assert.equal(
+      canGenerateAiListingDescription({
+        title: 'Headphones',
+        image,
+        generating: false,
+        formEditable: true,
+        apiKey: '   ',
       }),
       false,
     );
@@ -221,7 +274,15 @@ describe('AI draft overwrite helpers', () => {
 });
 
 describe('getAiListingErrorMessage', () => {
-  it('maps rate limit, timeout, unavailable, and validation statuses', () => {
+  it('maps rate limit, timeout, unavailable, validation, and auth statuses', () => {
+    assert.match(
+      getAiListingErrorMessage({ response: { status: 401, data: {} } }),
+      /rejected|check the key/i,
+    );
+    assert.match(
+      getAiListingErrorMessage({ response: { status: 402, data: {} } }),
+      /quota|provider account/i,
+    );
     assert.match(
       getAiListingErrorMessage({ response: { status: 429, data: {} } }),
       /too many|try again shortly/i,
@@ -258,6 +319,18 @@ describe('getAiListingErrorMessage', () => {
         },
       }),
       'Custom throttle message.',
+    );
+  });
+
+  it('prefers backend message for 401 when present', () => {
+    assert.equal(
+      getAiListingErrorMessage({
+        response: {
+          status: 401,
+          data: { error: 'Custom auth error.' },
+        },
+      }),
+      'Custom auth error.',
     );
   });
 });
@@ -309,5 +382,33 @@ describe('AI listing constants and product payload regression', () => {
       condition: 'FAIR',
       category: null,
     });
+  });
+});
+
+describe('validateApiKeyInput', () => {
+  it('accepts non-empty keys', () => {
+    assert.equal(validateApiKeyInput('sk-abc123').ok, true);
+    assert.equal(validateApiKeyInput('my-key').ok, true);
+  });
+
+  it('rejects empty or whitespace-only', () => {
+    assert.equal(validateApiKeyInput('').ok, false);
+    assert.equal(validateApiKeyInput('   ').ok, false);
+  });
+
+  it('rejects keys longer than 256 characters', () => {
+    assert.equal(validateApiKeyInput('x'.repeat(257)).ok, false);
+  });
+
+  it('accepts keys of exactly 256 characters', () => {
+    assert.equal(validateApiKeyInput('x'.repeat(256)).ok, true);
+  });
+});
+
+describe('BYOK constants', () => {
+  it('exposes BYOK label and helper text', () => {
+    assert.equal(AI_BYOK_LABEL, 'OpenAI API Key');
+    assert.match(AI_BYOK_HELPER_TEXT, /does not save/i);
+    assert.match(AI_BYOK_KEY_CLEARED_MESSAGE, /cleared/i);
   });
 });

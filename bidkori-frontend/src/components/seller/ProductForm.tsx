@@ -11,6 +11,8 @@ import toast from 'react-hot-toast';
 import useSWR from 'swr';
 
 import {
+  AI_BYOK_HELPER_TEXT,
+  AI_BYOK_LABEL,
   AI_DRAFT_DISCLOSURE,
   AI_IMAGE_NOT_AUTO_UPLOADED_HELP,
   AI_LISTING_IMAGE_ACCEPT,
@@ -19,6 +21,7 @@ import {
   getAiListingErrorMessage,
   shouldApplyAiDraftDirectly,
   validateAiListingImage,
+  validateApiKeyInput,
 } from '@/lib/aiListing';
 import { generateProductDescription } from '@/lib/aiListingApi';
 import {
@@ -76,6 +79,10 @@ export default function ProductForm({
   const [pendingAiDraft, setPendingAiDraft] = useState<string | null>(null);
   const [showAiDraftDisclosure, setShowAiDraftDisclosure] = useState(false);
 
+  // BYOK: Seller API key (component memory only — never persisted).
+  const [apiKey, setApiKey] = useState('');
+  const [showApiKey, setShowApiKey] = useState(false);
+
   const {
     data: categories,
     error: categoriesError,
@@ -110,6 +117,7 @@ export default function ProductForm({
     image: aiImage,
     generating: aiGenerating,
     formEditable,
+    apiKey,
   });
 
   useEffect(() => {
@@ -172,6 +180,12 @@ export default function ProductForm({
       return;
     }
 
+    const keyValidation = validateApiKeyInput(apiKey);
+    if (!keyValidation.ok) {
+      setAiStatusError(keyValidation.error);
+      return;
+    }
+
     setAiGenerating(true);
     try {
       const result = await generateProductDescription({
@@ -179,12 +193,16 @@ export default function ProductForm({
         image: aiImage,
         condition: values.condition,
         category: values.category,
+        api_key: apiKey.trim(),
       });
       if (shouldApplyAiDraftDirectly(values.description)) {
         applyAiDraft(result.description);
       } else {
         setPendingAiDraft(result.description);
       }
+      // Clear key after successful generation (security-preferred behavior).
+      setApiKey('');
+      setShowApiKey(false);
     } catch (error: unknown) {
       const message = getAiListingErrorMessage(error);
       setAiStatusError(message);
@@ -347,6 +365,49 @@ export default function ProductForm({
                 {aiImageError}
               </p>
             ) : null}
+          </div>
+
+          {/* BYOK API Key Input */}
+          <div className="space-y-2">
+            <label
+              htmlFor="product-ai-api-key"
+              className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
+            >
+              {AI_BYOK_LABEL}
+            </label>
+            <div className="flex gap-2">
+              <input
+                id="product-ai-api-key"
+                type={showApiKey ? 'text' : 'password'}
+                name="ai-api-key"
+                value={apiKey}
+                autoComplete="off"
+                spellCheck={false}
+                disabled={controlsDisabled || aiGenerating}
+                placeholder="sk-…"
+                aria-describedby="product-ai-api-key-help"
+                onChange={(event) => {
+                  setApiKey(event.target.value);
+                  setAiStatusError(undefined);
+                }}
+                className={`${fieldClassName} flex-1 min-w-0 font-mono text-xs`}
+              />
+              <button
+                type="button"
+                onClick={() => setShowApiKey((current) => !current)}
+                disabled={controlsDisabled || aiGenerating}
+                aria-label={showApiKey ? 'Hide API key' : 'Show API key'}
+                className="inline-flex shrink-0 items-center justify-center rounded-lg border border-zinc-300 px-3 py-2 text-xs font-medium text-zinc-700 transition hover:bg-zinc-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-600 dark:text-zinc-200 dark:hover:bg-zinc-800"
+              >
+                {showApiKey ? 'Hide' : 'Show'}
+              </button>
+            </div>
+            <p
+              id="product-ai-api-key-help"
+              className="text-xs text-zinc-500 dark:text-zinc-400"
+            >
+              {AI_BYOK_HELPER_TEXT}
+            </p>
           </div>
 
           {aiImage && aiPreviewUrl ? (
