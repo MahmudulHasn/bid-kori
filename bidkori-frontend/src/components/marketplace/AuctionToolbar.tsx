@@ -26,18 +26,18 @@ export default function AuctionToolbar({
   };
 
   return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <form
         onSubmit={handleSubmit}
         role="search"
-        className="flex w-full max-w-xl flex-col gap-2 sm:flex-row sm:items-center"
+        className="flex w-full max-w-xl items-center gap-2"
       >
         <label className="sr-only" htmlFor="marketplace-search">
           Search auctions
         </label>
         <div className="relative flex-1">
           <Search
-            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400"
+            className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400"
             aria-hidden
           />
           <input
@@ -46,19 +46,21 @@ export default function AuctionToolbar({
             name="q"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search by title or description"
-            className="w-full rounded-lg border border-zinc-300 bg-white py-2.5 pl-10 pr-3 text-sm outline-none ring-amber-500/40 focus-visible:ring-2 dark:border-zinc-700 dark:bg-zinc-900"
+            placeholder="Search by title, brand, category…"
+            className="min-h-[44px] w-full rounded-xl border border-zinc-200/90 bg-white py-2.5 pl-10 pr-3.5 text-sm text-zinc-900 shadow-2xs outline-none transition focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 dark:border-zinc-800 dark:bg-zinc-900/90 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500"
           />
         </div>
         <button
           type="submit"
-          className="inline-flex items-center justify-center rounded-lg bg-amber-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-amber-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500"
+          className="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-zinc-900 px-5 text-sm font-semibold text-white shadow-xs transition hover:bg-zinc-800 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
         >
           Search
         </button>
       </form>
       {resultSummary ? (
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">{resultSummary}</p>
+        <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
+          {resultSummary}
+        </span>
       ) : null}
     </div>
   );

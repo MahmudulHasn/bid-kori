@@ -70,55 +70,61 @@ export default function RegisterPage() {
   };
 
   return (
-    <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-4 py-12">
-      <div className="rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
-        <div className="mb-6 flex items-center gap-3">
-          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/15 text-amber-700 dark:text-amber-300">
+    <main className="relative flex min-h-[calc(100vh-4rem)] w-full flex-1 items-center justify-center px-4 py-12">
+      {/* Subtle ambient light */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute top-1/3 left-1/2 -z-10 h-80 w-80 -translate-x-1/2 -translate-y-1/2 rounded-full bg-amber-500/10 blur-3xl dark:bg-amber-500/5"
+      />
+
+      <div className="w-full max-w-md rounded-3xl border border-zinc-200/90 bg-white/95 p-8 shadow-xl shadow-zinc-950/5 backdrop-blur-sm dark:border-zinc-800/90 dark:bg-zinc-900/90 sm:p-10">
+        <div className="mb-6 flex items-center gap-3.5">
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-500/15 text-amber-700 shadow-2xs dark:bg-amber-500/20 dark:text-amber-300">
             <UserPlus className="h-5 w-5" aria-hidden />
-          </span>
+          </div>
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-white">
-              Create your account
+            <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">
+              Join BidKori
             </h1>
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">
-              Join BidKori to list items and place bids.
+            <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
+              Start bidding on live auctions or sell your items.
             </p>
           </div>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <fieldset className="space-y-3">
-            <legend className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+          <fieldset className="space-y-2.5">
+            <legend className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
               Account Type
             </legend>
-            <div className="space-y-2">
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
               {PUBLIC_ACCOUNT_TYPE_OPTIONS.map((option) => {
                 const selected = role === option.role;
                 return (
                   <label
                     key={option.role}
                     className={[
-                      'flex cursor-pointer gap-3 rounded-lg border px-3 py-3 transition',
+                      'relative flex cursor-pointer flex-col rounded-2xl border p-3.5 transition-all active:scale-98',
                       selected
-                        ? 'border-amber-500 bg-amber-500/10'
-                        : 'border-zinc-300 hover:border-zinc-400 dark:border-zinc-700 dark:hover:border-zinc-600',
+                        ? 'border-amber-500 bg-amber-500/10 ring-1 ring-amber-500/30 dark:bg-amber-500/15'
+                        : 'border-zinc-200 bg-zinc-50/50 hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-800/40 dark:hover:border-zinc-700',
                     ].join(' ')}
                   >
-                    <input
-                      type="radio"
-                      name="account-type"
-                      value={option.role}
-                      checked={selected}
-                      onChange={() => setRole(option.role)}
-                      className="mt-1"
-                    />
-                    <span>
-                      <span className="block text-sm font-medium text-zinc-900 dark:text-white">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-bold text-zinc-900 dark:text-white">
                         {option.label}
                       </span>
-                      <span className="block text-xs text-zinc-500 dark:text-zinc-400">
-                        {option.description}
-                      </span>
+                      <input
+                        type="radio"
+                        name="account-type"
+                        value={option.role}
+                        checked={selected}
+                        onChange={() => setRole(option.role)}
+                        className="accent-amber-600"
+                      />
+                    </div>
+                    <span className="mt-1 text-[11px] leading-tight text-zinc-500 dark:text-zinc-400">
+                      {option.description}
                     </span>
                   </label>
                 );
@@ -127,7 +133,7 @@ export default function RegisterPage() {
           </fieldset>
 
           <label className="block space-y-1.5">
-            <span className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
+            <span className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
               Username
             </span>
             <input
@@ -136,12 +142,13 @@ export default function RegisterPage() {
               autoComplete="username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="w-full min-h-[44px] rounded-xl border border-zinc-300 bg-white px-3.5 py-2.5 text-base sm:text-sm text-zinc-900 outline-none ring-amber-500/40 focus:border-amber-500 focus:ring-2 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
+              placeholder="e.g. johndoe"
+              className="min-h-[46px] w-full rounded-xl border border-zinc-200 bg-zinc-50/50 px-4 py-2.5 text-base sm:text-sm text-zinc-900 outline-none transition focus:border-amber-500 focus:bg-white focus:ring-2 focus:ring-amber-500/20 dark:border-zinc-800 dark:bg-zinc-800/60 dark:text-white dark:focus:bg-zinc-900"
             />
           </label>
 
           <label className="block space-y-1.5">
-            <span className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
+            <span className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
               Email
             </span>
             <input
@@ -150,12 +157,13 @@ export default function RegisterPage() {
               autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full min-h-[44px] rounded-xl border border-zinc-300 bg-white px-3.5 py-2.5 text-base sm:text-sm text-zinc-900 outline-none ring-amber-500/40 focus:border-amber-500 focus:ring-2 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
+              placeholder="you@example.com"
+              className="min-h-[46px] w-full rounded-xl border border-zinc-200 bg-zinc-50/50 px-4 py-2.5 text-base sm:text-sm text-zinc-900 outline-none transition focus:border-amber-500 focus:bg-white focus:ring-2 focus:ring-amber-500/20 dark:border-zinc-800 dark:bg-zinc-800/60 dark:text-white dark:focus:bg-zinc-900"
             />
           </label>
 
           <label className="block space-y-1.5">
-            <span className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
+            <span className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
               Password
             </span>
             <input
@@ -165,12 +173,13 @@ export default function RegisterPage() {
               autoComplete="new-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full min-h-[44px] rounded-xl border border-zinc-300 bg-white px-3.5 py-2.5 text-base sm:text-sm text-zinc-900 outline-none ring-amber-500/40 focus:border-amber-500 focus:ring-2 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
+              placeholder="At least 8 characters"
+              className="min-h-[46px] w-full rounded-xl border border-zinc-200 bg-zinc-50/50 px-4 py-2.5 text-base sm:text-sm text-zinc-900 outline-none transition focus:border-amber-500 focus:bg-white focus:ring-2 focus:ring-amber-500/20 dark:border-zinc-800 dark:bg-zinc-800/60 dark:text-white dark:focus:bg-zinc-900"
             />
           </label>
 
           <label className="block space-y-1.5">
-            <span className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
+            <span className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
               Confirm password
             </span>
             <input
@@ -180,26 +189,27 @@ export default function RegisterPage() {
               autoComplete="new-password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full min-h-[44px] rounded-xl border border-zinc-300 bg-white px-3.5 py-2.5 text-base sm:text-sm text-zinc-900 outline-none ring-amber-500/40 focus:border-amber-500 focus:ring-2 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
+              placeholder="Repeat password"
+              className="min-h-[46px] w-full rounded-xl border border-zinc-200 bg-zinc-50/50 px-4 py-2.5 text-base sm:text-sm text-zinc-900 outline-none transition focus:border-amber-500 focus:bg-white focus:ring-2 focus:ring-amber-500/20 dark:border-zinc-800 dark:bg-zinc-800/60 dark:text-white dark:focus:bg-zinc-900"
             />
           </label>
 
           <button
             type="submit"
             disabled={submitting}
-            className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl bg-amber-600 px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-amber-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-500 disabled:cursor-not-allowed disabled:opacity-60"
+            className="mt-2 flex min-h-[46px] w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 px-4 py-3 text-sm font-bold text-white shadow-sm shadow-amber-600/20 transition hover:from-amber-500 hover:to-amber-400 active:scale-98 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-500 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {submitting ? 'Creating account…' : 'Create account'}
+            {submitting ? 'Creating account…' : 'Create Account'}
           </button>
         </form>
 
-        <p className="mt-6 text-center text-sm text-zinc-500 dark:text-zinc-400">
-          Already registered?{' '}
+        <p className="mt-6 text-center text-xs text-zinc-500 dark:text-zinc-400">
+          Already have an account?{' '}
           <Link
             href="/auth/login"
-            className="font-medium text-amber-700 hover:underline dark:text-amber-300"
+            className="font-bold text-amber-700 hover:underline dark:text-amber-400"
           >
-            Sign in
+            Sign in &rarr;
           </Link>
         </p>
       </div>

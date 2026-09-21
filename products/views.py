@@ -48,6 +48,7 @@ class CategoryListView(generics.ListAPIView):
     queryset = Category.objects.all().order_by('name', 'id')
     serializer_class = CategorySerializer
     permission_classes = [AllowAny]
+    throttle_classes = []
     pagination_class = None
     http_method_names = ['get', 'head', 'options']
 
@@ -58,6 +59,7 @@ class CategoryDetailView(generics.RetrieveAPIView):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
     permission_classes = [AllowAny]
+    throttle_classes = []
     http_method_names = ['get', 'head', 'options']
 
 

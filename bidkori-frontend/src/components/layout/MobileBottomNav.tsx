@@ -71,7 +71,7 @@ export default function MobileBottomNav() {
   return (
     <nav
       aria-label="Mobile Navigation"
-      className="fixed bottom-0 left-0 right-0 z-40 border-t border-zinc-200/90 bg-white/95 backdrop-blur-md dark:border-zinc-800/90 dark:bg-zinc-950/95 md:hidden"
+      className="fixed bottom-0 left-0 right-0 z-40 border-t border-zinc-200/80 bg-white/95 backdrop-blur-lg shadow-lg shadow-zinc-950/5 dark:border-zinc-800/80 dark:bg-zinc-950/95 md:hidden"
       style={{
         paddingBottom: 'env(safe-area-inset-bottom, 0px)',
       }}
@@ -89,17 +89,31 @@ export default function MobileBottomNav() {
               key={item.href}
               href={item.href}
               aria-current={isActive ? 'page' : undefined}
-              className={`flex min-h-[44px] min-w-[44px] flex-1 flex-col items-center justify-center gap-1 rounded-xl py-1 text-center transition-colors ${
+              className={`relative flex min-h-[48px] min-w-[48px] flex-1 flex-col items-center justify-center gap-1 rounded-2xl py-1 text-center transition-all duration-200 active:scale-95 ${
                 isActive
-                  ? 'font-semibold text-amber-700 dark:text-amber-400'
+                  ? 'text-amber-800 dark:text-amber-300 font-semibold'
                   : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
               }`}
             >
-              <Icon
-                className={`h-5 w-5 ${isActive ? 'scale-110 text-amber-600 dark:text-amber-400' : ''} transition-transform`}
-                aria-hidden
-              />
-              <span className="text-[11px] leading-none tracking-tight">
+              {isActive ? (
+                <span
+                  aria-hidden
+                  className="absolute -top-1 h-0.5 w-6 rounded-full bg-amber-600 dark:bg-amber-400"
+                />
+              ) : null}
+              <div
+                className={`flex h-7 w-7 items-center justify-center rounded-xl transition-all duration-200 ${
+                  isActive
+                    ? 'bg-amber-500/15 text-amber-700 dark:bg-amber-400/20 dark:text-amber-300'
+                    : ''
+                }`}
+              >
+                <Icon
+                  className="h-4.5 w-4.5 transition-transform duration-200"
+                  aria-hidden
+                />
+              </div>
+              <span className="text-[10.5px] leading-none tracking-tight">
                 {item.label}
               </span>
             </Link>

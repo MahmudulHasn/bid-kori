@@ -414,8 +414,8 @@ REST_FRAMEWORK = {
         'rest_framework.throttling.UserRateThrottle',
     ],
     'DEFAULT_THROTTLE_RATES': {
-        'anon': '100/day',
-        'user': '1000/day',
+        'anon': os.getenv('REST_FRAMEWORK_THROTTLE_ANON', '1000/minute').strip(),
+        'user': os.getenv('REST_FRAMEWORK_THROTTLE_USER', '2000/minute').strip(),
         'bids': '10/minute',
         'ai_listing': AI_LISTING_RATE,
         'ai_chat': AI_CHAT_RATE,

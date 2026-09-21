@@ -11,7 +11,12 @@ from drf_spectacular.utils import OpenApiParameter, OpenApiTypes, extend_schema
 from rest_framework import generics, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
-from rest_framework.permissions import IsAdminUser, IsAuthenticated, IsAuthenticatedOrReadOnly
+from rest_framework.permissions import (
+    AllowAny,
+    IsAdminUser,
+    IsAuthenticated,
+    IsAuthenticatedOrReadOnly,
+)
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -243,6 +248,8 @@ class AuctionViewSet(viewsets.ModelViewSet):
     def get_throttles(self):
         if getattr(self, 'action', None) == 'place_bid':
             return [BidBurstThrottle()]
+        if getattr(self, 'action', None) in ('list', 'retrieve'):
+            return []
         return super().get_throttles()
 
     def permission_denied(self, request, message=None, code=None):
@@ -543,6 +550,9 @@ class TransitionAuctionStateView(APIView):
 
 class ActiveAuctionListView(APIView):
     """Return auctions that are ACTIVE and have not yet reached end_time."""
+
+    permission_classes = [AllowAny]
+    throttle_classes = []
 
     @extend_schema(
         tags=['Auctions'],
