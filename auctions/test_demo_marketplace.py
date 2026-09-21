@@ -1,4 +1,5 @@
-"""Tests for SHOW-D01 demo marketplace seeder."""
+import shutil
+import tempfile
 
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
@@ -18,6 +19,21 @@ from users.models import resolve_user_role
 
 @override_settings(DEBUG=True)
 class DemoMarketplaceSeedTests(TestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls._temp_media = tempfile.mkdtemp()
+        cls._settings_ctx = override_settings(MEDIA_ROOT=cls._temp_media)
+        cls._settings_ctx.enable()
+
+    @classmethod
+    def tearDownClass(cls):
+        try:
+            cls._settings_ctx.disable()
+        finally:
+            shutil.rmtree(cls._temp_media, ignore_errors=True)
+            super().tearDownClass()
+
     def tearDown(self):
         clear_demo_marketplace()
 
@@ -117,6 +133,7 @@ class DemoMarketplaceSeedTests(TestCase):
         with self.captureOnCommitCallbacks(execute=True):
             summary = seed_demo_marketplace(reset=True)
 
+        from django.core.files.storage import default_storage
         from products.models import ProductImage
         from auctions.models import AuctionImage
 
@@ -126,6 +143,10 @@ class DemoMarketplaceSeedTests(TestCase):
             ProductImage.objects.filter(product__in=demo_products).count(),
             demo_products.count(),
         )
+        for pi in ProductImage.objects.filter(product__in=demo_products):
+            self.assertTrue(bool(pi.image))
+            self.assertTrue(default_storage.exists(pi.image.name))
+
         auctioned = Auction.objects.filter(
             product__title__startswith=DEMO_TITLE_PREFIX,
         )
@@ -134,6 +155,10 @@ class DemoMarketplaceSeedTests(TestCase):
             AuctionImage.objects.filter(auction__in=auctioned).count(),
             auctioned.count(),
         )
+        for ai in AuctionImage.objects.filter(auction__in=auctioned):
+            self.assertTrue(bool(ai.image))
+            self.assertTrue(default_storage.exists(ai.image.name))
+
         # Idempotent reseed without reset must not duplicate images.
         with self.captureOnCommitCallbacks(execute=True):
             seed_demo_marketplace(reset=False)
@@ -145,6 +170,66 @@ class DemoMarketplaceSeedTests(TestCase):
             AuctionImage.objects.filter(auction__in=auctioned).count(),
             auctioned.count(),
         )
+
+    def test_demo_media_storage_consistency_and_idempotent_cleanup(self):
+        from django.core.files.base import ContentFile
+        from django.core.files.storage import default_storage
+        from products.models import ProductImage
+        from auctions.models import AuctionImage
+
+        # Create a non-demo user with an image to verify safety
+        User = get_user_model()
+        seller = User.objects.create_user(
+            username='real_seller_media_test',
+            email='media_test@example.com',
+            password='Password123!',
+        )
+        real_product = Product.objects.create(
+            seller=seller,
+            title='Real Product For Media Safety',
+            description='Must keep file after demo reset',
+            condition=Product.Condition.NEW,
+        )
+        real_img = ProductImage.objects.create(
+            product=real_product,
+            image=ContentFile(b'fake-real-user-image-content', name='real_user_image.jpg'),
+        )
+        real_img_path = real_img.image.name
+        self.assertTrue(default_storage.exists(real_img_path))
+
+        try:
+            # Seed demo marketplace with reset
+            with self.captureOnCommitCallbacks(execute=True):
+                seed_demo_marketplace(reset=True)
+
+            demo_pi = list(ProductImage.objects.filter(product__title__startswith=DEMO_TITLE_PREFIX))
+            demo_ai = list(AuctionImage.objects.filter(auction__product__title__startswith=DEMO_TITLE_PREFIX))
+            self.assertGreater(len(demo_pi), 0)
+            self.assertGreater(len(demo_ai), 0)
+
+            demo_pi_paths = [pi.image.name for pi in demo_pi]
+            demo_ai_paths = [ai.image.name for ai in demo_ai]
+
+            for path in demo_pi_paths + demo_ai_paths:
+                self.assertTrue(default_storage.exists(path))
+
+            # Non-demo file must still exist
+            self.assertTrue(default_storage.exists(real_img_path))
+
+            # Second reset must be clean and idempotent
+            with self.captureOnCommitCallbacks(execute=True):
+                seed_demo_marketplace(reset=True)
+
+            # Non-demo file must still exist after second reset
+            self.assertTrue(default_storage.exists(real_img_path))
+
+            # New demo images must exist
+            new_demo_pi = ProductImage.objects.filter(product__title__startswith=DEMO_TITLE_PREFIX)
+            for pi in new_demo_pi:
+                self.assertTrue(default_storage.exists(pi.image.name))
+        finally:
+            if real_img_path and default_storage.exists(real_img_path):
+                default_storage.delete(real_img_path)
 
     def test_integrity_cancelled_and_reserve_close(self):
         with self.captureOnCommitCallbacks(execute=True):

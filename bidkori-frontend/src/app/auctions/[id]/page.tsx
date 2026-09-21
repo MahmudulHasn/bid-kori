@@ -72,6 +72,7 @@ export default function AuctionDetailPage() {
   const [bidAmount, setBidAmount] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [imageErrorMap, setImageErrorMap] = useState<Record<string, boolean>>({});
 
   const {
     data: auction,
@@ -435,7 +436,7 @@ export default function AuctionDetailPage() {
           <AuctionStatusBadge state={displayState} size="md" />
         </div>
         {product?.description ? (
-          <p className="mt-2 max-w-3xl text-zinc-600 dark:text-zinc-400">
+          <p className="mt-2 max-w-3xl whitespace-pre-line text-zinc-600 dark:text-zinc-400">
             {product.description}
           </p>
         ) : null}
@@ -454,7 +455,7 @@ export default function AuctionDetailPage() {
       <div className="grid gap-8 lg:grid-cols-[1.4fr_0.9fr]">
         <section className="space-y-4">
           <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900">
-            {activeImage ? (
+            {activeImage && !imageErrorMap[activeImage] ? (
               <Image
                 src={activeImage}
                 alt={getAuctionTitle(auction)}
@@ -462,6 +463,12 @@ export default function AuctionDetailPage() {
                 priority
                 sizes="(max-width: 1024px) 100vw, 60vw"
                 className="object-cover"
+                onError={() =>
+                  setImageErrorMap((prev) => ({
+                    ...prev,
+                    [activeImage]: true,
+                  }))
+                }
               />
             ) : (
               <div className="flex h-full flex-col items-center justify-center gap-2 text-zinc-400">

@@ -140,10 +140,15 @@ def _category_demo_asset_path(category: Category | None) -> Path | None:
 def _ensure_product_demo_image(product: Product) -> bool:
     """Attach one ProductImage from the category demo pack if missing.
 
+    Validates that existing image files physically exist on storage; if a broken
+    reference is found, it is replaced cleanly with verified demo file bytes.
     Returns True when a new ProductImage row was created.
     """
-    if product.images.exists():
-        return False
+    for existing in list(product.images.all()):
+        if existing.image and existing.image.storage.exists(existing.image.name):
+            return False
+        existing.delete()
+
     asset = _category_demo_asset_path(product.category)
     if asset is None:
         return False
@@ -160,14 +165,20 @@ def _ensure_auction_demo_image(auction: Auction, product: Product) -> bool:
 
     Marketplace UI reads ``auction.images`` (AuctionImage), while Seller catalog
     uses ProductImage. Reuse the same category asset file for both.
+    Validates physical existence on storage; replaces broken references cleanly.
     """
-    if auction.images.exists():
-        return False
+    for existing in list(auction.images.all()):
+        if existing.image and existing.image.storage.exists(existing.image.name):
+            return False
+        existing.delete()
+
     asset = _category_demo_asset_path(product.category)
     if asset is None and product.images.exists():
         # Fall back to copying the already-attached product image bytes.
         product_image = product.images.order_by('uploaded_at', 'id').first()
         if product_image is None or not product_image.image:
+            return False
+        if not product_image.image.storage.exists(product_image.image.name):
             return False
         with product_image.image.open('rb') as handle:
             AuctionImage.objects.create(
@@ -183,6 +194,39 @@ def _ensure_auction_demo_image(auction: Auction, product: Product) -> bool:
             image=File(handle, name=asset.name),
         )
     return True
+
+
+def _cleanup_stale_demo_storage_files():
+    """Remove unreferenced demo image files from storage to prevent uncontrolled accumulation.
+
+    Strictly scoped to filenames matching demo category image stems (e.g. sneakers_*.jpg).
+    Never touches files referenced in ProductImage or AuctionImage database rows.
+    """
+    from django.core.files.storage import default_storage
+
+    demo_stems = tuple(Path(f).stem for f in CATEGORY_DEMO_IMAGE_FILES.values())
+    referenced_paths = set(
+        ProductImage.objects.values_list('image', flat=True)
+    ) | set(AuctionImage.objects.values_list('image', flat=True))
+
+    for directory in ('product_images', 'auction_images'):
+        try:
+            _, files = default_storage.listdir(directory)
+        except Exception:
+            continue
+        for fname in files:
+            path = f'{directory}/{fname}'
+            if path in referenced_paths:
+                continue
+            stem = Path(fname).stem
+            if any(
+                stem == d_stem or stem.startswith(f'{d_stem}_')
+                for d_stem in demo_stems
+            ):
+                try:
+                    default_storage.delete(path)
+                except Exception:
+                    pass
 
 
 def demo_product_title(name: str) -> str:
@@ -228,12 +272,22 @@ def clear_demo_marketplace() -> int:
     Notification.objects.filter(auction_id__in=auction_ids).update(auction=None)
     Notification.objects.filter(user__in=users).delete()
     Bid.objects.filter(auction_id__in=auction_ids).delete()
-    AuctionImage.objects.filter(auction_id__in=auction_ids).delete()
+
+    # Clean up physical storage files for demo auction images
+    for ai in list(AuctionImage.objects.filter(auction_id__in=auction_ids)):
+        ai.delete()
+
     Auction.objects.filter(id__in=auction_ids).delete()
-    ProductImage.objects.filter(product__in=products).delete()
+
+    # Clean up physical storage files for demo product images
+    for pi in list(ProductImage.objects.filter(product__in=products)):
+        pi.delete()
+
     products.delete()
     Token.objects.filter(user__in=users).delete()
     users.delete()
+
+    _cleanup_stale_demo_storage_files()
     return user_count
 
 

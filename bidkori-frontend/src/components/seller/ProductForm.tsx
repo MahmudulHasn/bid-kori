@@ -384,7 +384,7 @@ export default function ProductForm({
                 autoComplete="off"
                 spellCheck={false}
                 disabled={controlsDisabled || aiGenerating}
-                placeholder="sk-…"
+                placeholder="AQ.… / gsk_… / sk-…"
                 aria-describedby="product-ai-api-key-help"
                 onChange={(event) => {
                   setApiKey(event.target.value);

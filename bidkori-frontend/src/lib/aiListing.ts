@@ -181,7 +181,7 @@ export const AI_LISTING_IMAGE_MAX_BYTES = PRODUCT_IMAGE_MAX_BYTES;
 export const AI_BYOK_LABEL = 'OpenAI API Key';
 
 export const AI_BYOK_HELPER_TEXT =
-  'Used only for this generation request. BidKori does not save your API key.';
+  'Used only for this generation request. Supports Gemini (AQ.…), Groq (gsk_…), or OpenAI (sk-…). BidKori does not save your API key.';
 
 export const AI_BYOK_KEY_CLEARED_MESSAGE =
   'Your API key has been cleared for security.';

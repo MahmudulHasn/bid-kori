@@ -169,7 +169,135 @@ class AIChatService:
         )
 
     @classmethod
-    def _call_provider(cls, *, message: str, role_label: str) -> str:
+    def _detect_provider(cls) -> str:
+        k = getattr(settings, 'AI_API_KEY', '').strip()
+        if k.startswith('AQ.') or k.startswith('AIza'):
+            return 'gemini'
+        if k.startswith('gsk_'):
+            return 'groq'
+        if k.startswith('sk-'):
+            return 'openai'
+
+        model = getattr(settings, 'AI_CHAT_MODEL', '').strip().lower()
+        if 'gemini' in model:
+            return 'gemini'
+        if 'gpt' in model:
+            return 'openai'
+        if 'qwen' in model or 'llama' in model:
+            return 'groq'
+
+        forced = getattr(settings, 'AI_PROVIDER', '').strip().lower()
+        if forced:
+            return forced
+        return 'openai'
+
+    @classmethod
+    def _call_gemini(cls, *, message: str, role_label: str) -> str:
+        import requests
+
+        api_key = settings.AI_API_KEY
+        model = getattr(settings, 'AI_CHAT_MODEL', '').strip()
+        if not model or 'gemini' not in model.lower():
+            model = 'gemini-3-flash-preview'
+
+        url = f'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}'
+        instructions = build_support_instructions(role_label=role_label)
+        user_payload = build_user_message_payload(message)
+        max_tokens = int(getattr(settings, 'AI_CHAT_MAX_OUTPUT_TOKENS', 400) or 400)
+
+        payload = {
+            'systemInstruction': {
+                'parts': [{'text': instructions}]
+            },
+            'contents': [
+                {
+                    'parts': [{'text': user_payload}]
+                }
+            ],
+            'generationConfig': {
+                'maxOutputTokens': max_tokens + 300,
+                'thinkingConfig': {'thinkingBudget': 0}
+            }
+        }
+
+        timeout = float(getattr(settings, 'AI_TIMEOUT_SECONDS', 20) or 20)
+        try:
+            res = requests.post(url, json=payload, timeout=timeout)
+        except requests.Timeout as exc:
+            raise AIChatTimeoutError() from exc
+        except requests.RequestException as exc:
+            raise AIChatProviderError() from exc
+
+        if res.status_code in (401, 403):
+            raise AIChatProviderError()
+        if res.status_code == 429:
+            raise AIChatRateLimitError()
+        if res.status_code != 200:
+            raise AIChatProviderError()
+
+        data = res.json()
+        candidates = data.get('candidates', [])
+        if not candidates:
+            raise AIChatEmptyOutputError()
+        parts = candidates[0].get('content', {}).get('parts', [])
+        for p in parts:
+            if 'text' in p and p['text'].strip():
+                return p['text'].strip()
+        raise AIChatEmptyOutputError()
+
+    @classmethod
+    def _call_groq(cls, *, message: str, role_label: str) -> str:
+        from openai import (
+            APIConnectionError,
+            APIStatusError,
+            APITimeoutError,
+            OpenAI,
+            RateLimitError,
+        )
+
+        api_key = settings.AI_API_KEY
+        model = getattr(settings, 'AI_CHAT_MODEL', '').strip()
+        if not model or ('qwen' not in model.lower() and 'llama' not in model.lower() and 'gpt-oss' not in model.lower()):
+            model = 'qwen/qwen3.8-27b'
+
+        timeout = float(getattr(settings, 'AI_TIMEOUT_SECONDS', 20) or 20)
+        client = OpenAI(
+            api_key=api_key,
+            base_url='https://api.groq.com/openai/v1',
+            timeout=timeout,
+            max_retries=0,
+        )
+        instructions = build_support_instructions(role_label=role_label)
+        user_payload = build_user_message_payload(message)
+        max_tokens = int(getattr(settings, 'AI_CHAT_MAX_OUTPUT_TOKENS', 400) or 400)
+
+        try:
+            response = client.chat.completions.create(
+                model=model,
+                messages=[
+                    {'role': 'system', 'content': instructions},
+                    {'role': 'user', 'content': user_payload},
+                ],
+                max_tokens=max_tokens,
+            )
+            content = response.choices[0].message.content or ''
+            if not content.strip():
+                raise AIChatEmptyOutputError()
+            return content.strip()
+        except RateLimitError as exc:
+            raise AIChatRateLimitError() from exc
+        except APITimeoutError as exc:
+            raise AIChatTimeoutError() from exc
+        except APIConnectionError as exc:
+            raise AIChatProviderError() from exc
+        except APIStatusError as exc:
+            status = getattr(exc, 'status_code', None)
+            if status == 429:
+                raise AIChatRateLimitError() from exc
+            raise AIChatProviderError() from exc
+
+    @classmethod
+    def _call_openai(cls, *, message: str, role_label: str) -> str:
         from openai import (
             APIConnectionError,
             APIStatusError,
@@ -216,3 +344,12 @@ class AIChatService:
             raise AIChatProviderError() from exc
 
         return extract_response_text(response)
+
+    @classmethod
+    def _call_provider(cls, *, message: str, role_label: str) -> str:
+        provider = cls._detect_provider()
+        if provider == 'gemini':
+            return cls._call_gemini(message=message, role_label=role_label)
+        if provider == 'groq':
+            return cls._call_groq(message=message, role_label=role_label)
+        return cls._call_openai(message=message, role_label=role_label)

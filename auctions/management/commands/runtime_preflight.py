@@ -47,6 +47,7 @@ class Command(BaseCommand):
             self._check_celery_broker()
 
         self._check_migrations()
+        self._check_media()
         call_command('check', verbosity=0)
         self.stdout.write(self.style.SUCCESS('Django system check: OK'))
         self.stdout.write(self.style.SUCCESS('runtime_preflight passed'))
@@ -89,3 +90,41 @@ class Command(BaseCommand):
             names = ', '.join(f'{mig.app_label}.{mig.name}' for mig, _ in plan)
             raise CommandError(f'Unapplied migrations: {names}')
         self.stdout.write(self.style.SUCCESS('Migrations: all applied'))
+
+    def _check_media(self):
+        from pathlib import Path
+        from django.conf import settings
+        from django.core.files.storage import default_storage
+        from products.models import ProductImage
+        from auctions.models import AuctionImage
+
+        media_root = getattr(settings, 'MEDIA_ROOT', '')
+        if not media_root:
+            raise CommandError('MEDIA_ROOT is not configured in settings')
+
+        media_path = Path(media_root)
+        if not media_path.exists():
+            try:
+                media_path.mkdir(parents=True, exist_ok=True)
+            except Exception as exc:
+                raise CommandError(f'MEDIA_ROOT {media_root!r} does not exist and cannot be created: {exc}') from exc
+
+        broken: list[str] = []
+        verified_count = 0
+        for model in (ProductImage, AuctionImage):
+            for item in model.objects.all():
+                if not item.image or not default_storage.exists(item.image.name):
+                    broken.append(f'{model.__name__} #{item.pk} ({item.image.name if item.image else "None"})')
+                else:
+                    verified_count += 1
+
+        if broken:
+            sample = ', '.join(broken[:3])
+            raise CommandError(
+                f'Found {len(broken)} broken media reference(s) in database (e.g. {sample}). '
+                f'Run `python manage.py seed_demo_marketplace --reset` to resync demo media files.'
+            )
+
+        self.stdout.write(
+            self.style.SUCCESS(f'Media storage: consistent ({verified_count} files verified at {media_root})')
+        )

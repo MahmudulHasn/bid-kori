@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowRight, Clock3, Tag } from 'lucide-react';
@@ -32,6 +33,7 @@ function formatRemaining(timer: ReturnType<typeof useAuctionTimer>): string {
  * Designed for mobile-first scanning (~360-430px) and desktop grids.
  */
 export default function AuctionCard({ auction }: AuctionCardProps) {
+  const [imgError, setImgError] = useState(false);
   const title = getAuctionTitle(auction);
   const product = getAuctionProduct(auction);
   const imageUrl = resolveMediaUrl(auction.images?.[0]?.image);
@@ -60,13 +62,14 @@ export default function AuctionCard({ auction }: AuctionCardProps) {
     >
       {/* Thumbnail area */}
       <div className="relative aspect-[4/3] w-full overflow-hidden bg-zinc-100 dark:bg-zinc-800">
-        {imageUrl ? (
+        {imageUrl && !imgError ? (
           <Image
             src={imageUrl}
             alt={`Photo of ${title}`}
             fill
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
             className="object-cover transition-transform duration-300 group-hover:scale-105"
+            onError={() => setImgError(true)}
           />
         ) : (
           <div className="flex h-full items-center justify-center text-xs font-medium text-zinc-400">

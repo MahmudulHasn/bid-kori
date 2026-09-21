@@ -117,6 +117,17 @@ class AuctionImage(models.Model):
     def __str__(self):
         return f'Image {self.pk} for {self.auction}'
 
+    def delete(self, using=None, keep_parents=False):
+        """Remove the DB row and the underlying storage object."""
+        name = self.image.name if self.image else ''
+        storage = self.image.storage if self.image else None
+        super().delete(using=using, keep_parents=keep_parents)
+        if name and storage is not None:
+            try:
+                storage.delete(name)
+            except Exception:
+                pass
+
 
 class Bid(models.Model):
     """A single bid placed by a registered user on an auction."""

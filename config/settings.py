@@ -337,19 +337,31 @@ PLATFORM_SUCCESS_FEE_PERCENT = _parse_platform_success_fee_percent()
 PRODUCT_IMAGE_ALLOWED_FORMATS = ('JPEG', 'PNG', 'WEBP', 'GIF')
 
 # ---------------------------------------------------------------------------
-# AI listing description generation (AI-B01) — backend-only secrets
+# AI listing description generation (AI-B01) & Chat (AI-B02)
+# Supports Google Gemini, Groq, and OpenAI
 # ---------------------------------------------------------------------------
-# Django boots without these; only POST /api/products/generate-description/
-# fails clearly when generation is attempted without configuration.
+AI_PROVIDER = os.getenv('AI_PROVIDER', '').strip().lower()
 AI_API_KEY = os.getenv('AI_API_KEY', '').strip()
-AI_MODEL = os.getenv('AI_MODEL', 'gpt-4o-mini').strip()
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '').strip()
+GROQ_API_KEY = os.getenv('GROQ_API_KEY', '').strip()
+
+_effective_key = AI_API_KEY or GEMINI_API_KEY or GROQ_API_KEY
+_default_model = 'gpt-4o-mini'
+_default_chat_model = 'gpt-4o-mini'
+if _effective_key.startswith('AQ.') or _effective_key.startswith('AIza') or AI_PROVIDER == 'gemini':
+    _default_model = 'gemini-3-flash-preview'
+    _default_chat_model = 'gemini-3-flash-preview'
+elif _effective_key.startswith('gsk_') or AI_PROVIDER == 'groq':
+    _default_model = 'qwen/qwen3.8-27b'
+    _default_chat_model = 'qwen/qwen3.8-27b'
+
+AI_MODEL = os.getenv('AI_MODEL', _default_model).strip()
 AI_TIMEOUT_SECONDS = int(os.getenv('AI_TIMEOUT_SECONDS', '20') or '20')
 AI_LISTING_RATE = os.getenv('AI_LISTING_RATE', '5/minute').strip() or '5/minute'
 AI_LISTING_MAX_OUTPUT_TOKENS = int(
-    os.getenv('AI_LISTING_MAX_OUTPUT_TOKENS', '450') or '450'
+    os.getenv('AI_LISTING_MAX_OUTPUT_TOKENS', '800') or '800'
 )
-# Support chatbot (AI-B02) — text-only model, separate from listing vision model.
-AI_CHAT_MODEL = os.getenv('AI_CHAT_MODEL', 'gpt-4o-mini').strip()
+AI_CHAT_MODEL = os.getenv('AI_CHAT_MODEL', _default_chat_model).strip()
 AI_CHAT_RATE = os.getenv('AI_CHAT_RATE', '10/minute').strip() or '10/minute'
 AI_CHAT_MAX_OUTPUT_TOKENS = int(
     os.getenv('AI_CHAT_MAX_OUTPUT_TOKENS', '400') or '400'
