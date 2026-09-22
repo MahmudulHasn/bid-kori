@@ -47,6 +47,7 @@ urlpatterns = [
     path('api/users/', include('users.urls')),
     path('api/admin/users/', include('users.admin_urls')),
     path('api/admin/products/', include('products.admin_urls')),
+    path('api/admin/categories/', include('products.admin_category_urls')),
     path('api/admin/auctions/', include('auctions.admin_urls')),
     path('api/admin/finance/', include('auctions.admin_finance_urls')),
     path('api/admin/dashboard/', include('auctions.admin_dashboard_urls')),

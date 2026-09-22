@@ -14,6 +14,7 @@ import { ADMIN_AUCTIONS_PATH } from './adminAuctions.ts';
 import { ADMIN_BIDS_PATH } from './adminBids.ts';
 import { ADMIN_ANALYTICS_PATH } from './adminAnalytics.ts';
 import { ADMIN_USERS_PATH } from './adminUsers.ts';
+import { ADMIN_CATEGORIES_PATH } from './adminCategories.ts';
 
 export type WorkspaceNavItem = {
   id: string;
@@ -49,7 +50,9 @@ export {
   ADMIN_BIDS_PATH,
   ADMIN_ANALYTICS_PATH,
   ADMIN_USERS_PATH,
+  ADMIN_CATEGORIES_PATH,
 };
+export const ADMIN_MODERATION_PATH = '/admin/moderation';
 export const SELLER_PRODUCTS_PATH = '/seller/products';
 export const SELLER_PRODUCT_CREATE_PATH = '/seller/products/create';
 export const SELLER_AUCTIONS_PATH = '/seller/auctions';

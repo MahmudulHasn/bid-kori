@@ -1,9 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { format } from 'date-fns';
-import { Gavel, Layers, Percent, Receipt, Trophy, Wallet } from 'lucide-react';
+import { Calendar, Gavel, Layers, Percent, Receipt, RefreshCw, Trophy, Wallet } from 'lucide-react';
 import useSWR from 'swr';
 
 import {
@@ -31,6 +31,8 @@ import { adminFinancialSummaryFetcher } from '@/lib/adminFinanceApi';
 import { formatAdminMoney } from '@/lib/adminDashboard';
 import { adminAuctionDetailPath } from '@/lib/adminAuctions';
 import { getApiErrorMessage } from '@/lib/apiErrors';
+import BiddingTimelineChart from '@/components/admin/charts/BiddingTimelineChart';
+import CategoryBarChart from '@/components/admin/charts/CategoryBarChart';
 
 function MetricCard({
   label,
@@ -46,12 +48,12 @@ function MetricCard({
   loading?: boolean;
 }) {
   return (
-    <article className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+    <article className="rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-sm transition hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900/90">
       <div className="flex items-start justify-between gap-3">
-        <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
+        <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
           {label}
         </p>
-        <span className="text-violet-700 dark:text-violet-300" aria-hidden>
+        <span className="rounded-xl bg-violet-50 p-2 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300" aria-hidden>
           {icon}
         </span>
       </div>
@@ -80,13 +82,34 @@ function formatBidTime(value: string): string {
   return format(date, 'MMM d, yyyy, h:mm a');
 }
 
+type DateRangeOption = {
+  id: 'today' | '7d' | '30d' | '90d' | 'all';
+  label: string;
+};
+
+const DATE_RANGES: DateRangeOption[] = [
+  { id: 'today', label: 'Today' },
+  { id: '7d', label: '7 Days' },
+  { id: '30d', label: '30 Days' },
+  { id: '90d', label: '90 Days' },
+  { id: 'all', label: 'All Time' },
+];
+
 export default function AdminAnalyticsPage() {
+  const [selectedRange, setSelectedRange] = useState<'today' | '7d' | '30d' | '90d' | 'all'>('all');
+
+  const analyticsUrl =
+    selectedRange === 'all'
+      ? ADMIN_ANALYTICS_API_PATH
+      : `${ADMIN_ANALYTICS_API_PATH}?range=${selectedRange}`;
+
   const {
     data: analytics,
     error,
     isLoading,
     mutate,
-  } = useSWR(ADMIN_ANALYTICS_API_PATH, adminAnalyticsFetcher);
+    isValidating,
+  } = useSWR(analyticsUrl, adminAnalyticsFetcher);
 
   const {
     data: finance,
@@ -125,19 +148,64 @@ export default function AdminAnalyticsPage() {
 
   return (
     <div className="space-y-8">
-      <header className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-white sm:text-3xl">
-          Platform Analytics
-        </h1>
-        <p className="max-w-2xl text-sm text-zinc-600 dark:text-zinc-400">
-          Staff-only auction and bidding metrics from the live analytics API,
-          plus a separate mock-checkout financial summary. Bidding volume is not
-          platform revenue.
-        </p>
-        <p className="text-xs text-zinc-500 dark:text-zinc-500">
-          Source: <code>{ADMIN_ANALYTICS_API_PATH}</code> · Route:{' '}
-          <code>{ADMIN_ANALYTICS_PATH}</code>
-        </p>
+      {/* Header & Date Range Filter */}
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-white sm:text-3xl">
+              Platform Analytics
+            </h1>
+            <span className="rounded-full bg-violet-100 px-2.5 py-0.5 text-xs font-semibold text-violet-800 dark:bg-violet-950/60 dark:text-violet-300">
+              Live Intelligence
+            </span>
+          </div>
+          <p className="max-w-2xl text-sm text-zinc-600 dark:text-zinc-400">
+            Staff-only auction and bidding metrics from the live analytics API,
+            plus a separate mock-checkout financial summary. Bidding volume is not
+            platform revenue.
+          </p>
+          <p className="text-xs text-zinc-500 dark:text-zinc-500">
+            Source: <code>{analyticsUrl}</code> · Route:{' '}
+            <code>{ADMIN_ANALYTICS_PATH}</code>
+          </p>
+        </div>
+
+        {/* Range Selector & Refresh */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center rounded-xl border border-zinc-200 bg-white p-1 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+            <span className="flex items-center gap-1 px-2 text-xs font-medium text-zinc-400">
+              <Calendar className="h-3.5 w-3.5" aria-hidden />
+              Range:
+            </span>
+            {DATE_RANGES.map((r) => (
+              <button
+                key={r.id}
+                type="button"
+                onClick={() => setSelectedRange(r.id)}
+                className={`rounded-lg px-2.5 py-1 text-xs font-medium transition ${
+                  selectedRange === r.id
+                    ? 'bg-violet-600 text-white shadow-sm'
+                    : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white'
+                }`}
+              >
+                {r.label}
+              </button>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => void mutate()}
+            disabled={isValidating}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-xs font-medium text-zinc-700 shadow-sm transition hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+            title="Refresh metrics"
+          >
+            <RefreshCw
+              className={`h-3.5 w-3.5 ${isValidating ? 'animate-spin text-violet-600' : ''}`}
+              aria-hidden
+            />
+          </button>
+        </div>
       </header>
 
       {errorMessage ? (
@@ -196,6 +264,61 @@ export default function AdminAnalyticsPage() {
           />
         </div>
       </section>
+
+      {/* CHARTS ROW: Interactive Bidding Escalation Timeline + Category Distribution */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <section
+          aria-labelledby="timeline-chart-heading"
+          className="rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/90"
+        >
+          <div className="flex items-center justify-between pb-4">
+            <div>
+              <h2
+                id="timeline-chart-heading"
+                className="text-base font-semibold text-zinc-900 dark:text-white"
+              >
+                Bidding Escalation Timeline
+              </h2>
+              <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+                Bid progression curve ({selectedRange.toUpperCase()})
+              </p>
+            </div>
+            <span className="text-xs font-semibold tabular-nums text-violet-600 dark:text-violet-400">
+              {analytics?.bid_escalation_history?.length ?? 0} data points
+            </span>
+          </div>
+          <BiddingTimelineChart
+            points={analytics?.bid_escalation_history ?? []}
+            height={260}
+          />
+        </section>
+
+        <section
+          aria-labelledby="category-chart-heading"
+          className="rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/90"
+        >
+          <div className="flex items-center justify-between pb-4">
+            <div>
+              <h2
+                id="category-chart-heading"
+                className="text-base font-semibold text-zinc-900 dark:text-white"
+              >
+                Category Auction Volume
+              </h2>
+              <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+                Auctions per top marketplace categories
+              </p>
+            </div>
+            <span className="text-xs font-semibold tabular-nums text-indigo-600 dark:text-indigo-400">
+              {categories.length} categories
+            </span>
+          </div>
+          <CategoryBarChart
+            items={analytics?.category_breakdown ?? []}
+            height={260}
+          />
+        </section>
+      </div>
 
       <section aria-labelledby="admin-finance-heading" className="space-y-4">
         <div>

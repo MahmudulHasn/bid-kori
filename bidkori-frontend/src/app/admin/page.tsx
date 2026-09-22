@@ -16,7 +16,9 @@ import {
   Settings,
   Shield,
   ShieldAlert,
+  Sparkles,
   Store,
+  TrendingUp,
   Trophy,
   User,
   UserCheck,
@@ -34,6 +36,8 @@ import {
   ADMIN_BIDS_PATH,
   ADMIN_ANALYTICS_PATH,
   ADMIN_USERS_PATH,
+  ADMIN_CATEGORIES_PATH,
+  ADMIN_MODERATION_PATH,
 } from '@/lib/workspaceNavigation';
 import {
   formatAdminMoney,
@@ -44,7 +48,16 @@ import {
   ADMIN_DASHBOARD_SUMMARY_API_PATH,
   adminDashboardSummaryFetcher,
 } from '@/lib/adminDashboardApi';
+import {
+  ADMIN_ANALYTICS_API_PATH,
+  type AdminAnalytics,
+} from '@/lib/adminAnalytics';
+import { adminAnalyticsFetcher } from '@/lib/adminAnalyticsApi';
 import { getApiErrorMessage } from '@/lib/apiErrors';
+import LifecycleDonutChart from '@/components/admin/charts/LifecycleDonutChart';
+import UserRolesChart from '@/components/admin/charts/UserRolesChart';
+import FinancialVolumeBar from '@/components/admin/charts/FinancialVolumeBar';
+import BiddingTimelineChart from '@/components/admin/charts/BiddingTimelineChart';
 
 function MetricCard({
   label,
@@ -62,23 +75,23 @@ function MetricCard({
   badge?: ReactNode;
 }) {
   return (
-    <article className="relative overflow-hidden rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm transition hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900">
+    <article className="group relative overflow-hidden rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-zinc-300 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900/90 dark:hover:border-zinc-700">
       <div className="flex items-start justify-between gap-2">
-        <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
+        <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
           {label}
         </p>
-        <span className="rounded-lg bg-zinc-100 p-2 text-violet-700 dark:bg-zinc-800 dark:text-violet-300">
+        <span className="rounded-xl bg-zinc-100 p-2.5 text-violet-600 transition-colors group-hover:bg-violet-50 group-hover:text-violet-700 dark:bg-zinc-800 dark:text-violet-400 dark:group-hover:bg-violet-950/50">
           {icon}
         </span>
       </div>
       {loading ? (
-        <div className="mt-3 h-8 w-24 animate-pulse rounded-md bg-zinc-100 dark:bg-zinc-800" />
+        <div className="mt-3 h-8 w-28 animate-pulse rounded-lg bg-zinc-100 dark:bg-zinc-800" />
       ) : (
         <p className="mt-2 text-2xl font-bold tracking-tight tabular-nums text-zinc-900 dark:text-white sm:text-3xl">
           {value ?? '—'}
         </p>
       )}
-      <div className="mt-2 flex items-center justify-between gap-2">
+      <div className="mt-3 flex items-center justify-between gap-2 border-t border-zinc-100 pt-2.5 dark:border-zinc-800/80">
         <p className="text-xs text-zinc-500 dark:text-zinc-400">{hint}</p>
         {badge}
       </div>
@@ -98,7 +111,7 @@ function SectionCard({
   action?: ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+    <section className="rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/90">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-100 pb-4 dark:border-zinc-800">
         <div>
           <h2 className="text-base font-semibold text-zinc-900 dark:text-white">
@@ -139,6 +152,15 @@ export default function AdminHomePage() {
     },
   );
 
+  const { data: analyticsData } = useSWR<AdminAnalytics>(
+    ADMIN_ANALYTICS_API_PATH,
+    adminAnalyticsFetcher,
+    {
+      revalidateOnFocus: false,
+      dedupingInterval: 10000,
+    },
+  );
+
   const errorMessage = error
     ? getApiErrorMessage(error, 'Could not load administrative command center data.')
     : null;
@@ -155,6 +177,17 @@ export default function AdminHomePage() {
   const dbHealth = formatHealthStatus(health?.database);
   const redisHealth = formatHealthStatus(health?.redis);
   const celeryHealth = formatHealthStatus(health?.celery_broker);
+
+  // Fallback to recent.bids if analytics not loaded yet
+  const timelinePoints =
+    analyticsData?.bid_escalation_history && analyticsData.bid_escalation_history.length > 0
+      ? analyticsData.bid_escalation_history
+      : (recent?.bids || []).map((b) => ({
+          amount: b.amount,
+          timestamp: b.timestamp || '',
+          bidder_username: b.bidder_username,
+          auction_id: b.auction_id,
+        }));
 
   return (
     <div className="space-y-8">
@@ -193,6 +226,12 @@ export default function AdminHomePage() {
             />
             {isValidating ? 'Updating…' : 'Refresh'}
           </button>
+          <Link
+            href={ADMIN_CATEGORIES_PATH}
+            className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-xs font-semibold text-zinc-700 shadow-sm transition hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
+          >
+            Categories
+          </Link>
           <Link
             href={ADMIN_USERS_PATH}
             className="rounded-lg bg-violet-700 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-violet-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500"
@@ -235,7 +274,7 @@ export default function AdminHomePage() {
       )}
 
       {/* SECTION 12 — SYSTEM HEALTH STRIP */}
-      <section aria-labelledby="system-health-heading" className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+      <section aria-labelledby="system-health-heading" className="rounded-2xl border border-zinc-200/80 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/90">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <Activity className="h-4 w-4 text-violet-600 dark:text-violet-400" aria-hidden />
@@ -244,7 +283,7 @@ export default function AdminHomePage() {
             </h2>
           </div>
           <div className="flex flex-wrap items-center gap-3 text-xs">
-            <span className="flex items-center gap-1.5 rounded-full bg-zinc-100 px-2.5 py-1 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+            <span className="flex items-center gap-1.5 rounded-full bg-zinc-100 px-3 py-1 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
               {dbHealth.isHealthy ? (
                 <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
               ) : (
@@ -252,7 +291,7 @@ export default function AdminHomePage() {
               )}
               PostgreSQL 16: <strong className="font-semibold">{dbHealth.label}</strong>
             </span>
-            <span className="flex items-center gap-1.5 rounded-full bg-zinc-100 px-2.5 py-1 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+            <span className="flex items-center gap-1.5 rounded-full bg-zinc-100 px-3 py-1 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
               {redisHealth.isHealthy ? (
                 <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
               ) : (
@@ -260,7 +299,7 @@ export default function AdminHomePage() {
               )}
               Redis Channels: <strong className="font-semibold">{redisHealth.label}</strong>
             </span>
-            <span className="flex items-center gap-1.5 rounded-full bg-zinc-100 px-2.5 py-1 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+            <span className="flex items-center gap-1.5 rounded-full bg-zinc-100 px-3 py-1 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
               {celeryHealth.isHealthy ? (
                 <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
               ) : (
@@ -288,6 +327,12 @@ export default function AdminHomePage() {
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              <Link
+                href={ADMIN_MODERATION_PATH}
+                className="rounded-lg bg-amber-600 px-3 py-1 text-xs font-semibold text-white shadow-sm hover:bg-amber-700"
+              >
+                Open Moderation Center
+              </Link>
               {moderation.suspended_users_count > 0 && (
                 <Link
                   href={`${ADMIN_USERS_PATH}?is_active=false`}
@@ -392,7 +437,24 @@ export default function AdminHomePage() {
         </div>
       </section>
 
-      {/* SECTION 6 & 7 — AUCTION STATUS & USER BREAKDOWNS */}
+      {/* REAL-TIME BIDDING TIMELINE CHART */}
+      <SectionCard
+        title="Live Bidding Activity Progression"
+        subtitle="Real-time escalation history from live marketplace auctions"
+        action={
+          <Link
+            href={ADMIN_ANALYTICS_PATH}
+            className="flex items-center gap-1 text-xs font-semibold text-violet-700 hover:underline dark:text-violet-300"
+          >
+            <span>Full Analytics</span>
+            <ArrowUpRight className="h-3.5 w-3.5" />
+          </Link>
+        }
+      >
+        <BiddingTimelineChart points={timelinePoints} height={260} />
+      </SectionCard>
+
+      {/* SECTION 6 & 7 — AUCTION STATUS & USER BREAKDOWNS WITH REAL CHARTS */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* SECTION 6 — AUCTION LIFECYCLE OVERVIEW */}
         <SectionCard
@@ -407,38 +469,9 @@ export default function AdminHomePage() {
             </Link>
           }
         >
-          <div className="space-y-4">
-            {/* Visual distribution bar */}
-            <div className="flex h-3 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
-              <div
-                style={{
-                  width: `${auctions?.total ? ((auctions.live / auctions.total) * 100) : 0}%`,
-                }}
-                className="bg-emerald-500 transition-all"
-                title={`Live: ${auctions?.live ?? 0}`}
-              />
-              <div
-                style={{
-                  width: `${auctions?.total ? ((auctions.upcoming / auctions.total) * 100) : 0}%`,
-                }}
-                className="bg-blue-500 transition-all"
-                title={`Upcoming: ${auctions?.upcoming ?? 0}`}
-              />
-              <div
-                style={{
-                  width: `${auctions?.total ? ((auctions.closed / auctions.total) * 100) : 0}%`,
-                }}
-                className="bg-zinc-400 dark:bg-zinc-600 transition-all"
-                title={`Closed: ${auctions?.closed ?? 0}`}
-              />
-              <div
-                style={{
-                  width: `${auctions?.total ? ((auctions.cancelled / auctions.total) * 100) : 0}%`,
-                }}
-                className="bg-rose-500 transition-all"
-                title={`Cancelled: ${auctions?.cancelled ?? 0}`}
-              />
-            </div>
+          <div className="space-y-6">
+            {/* Interactive Donut Chart */}
+            <LifecycleDonutChart counts={auctions} height={200} />
 
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               <div className="rounded-xl border border-zinc-100 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-800/50">
@@ -501,7 +534,10 @@ export default function AdminHomePage() {
             </Link>
           }
         >
-          <div className="space-y-4">
+          <div className="space-y-6">
+            {/* Interactive User Roles Donut Chart */}
+            <UserRolesChart counts={users} height={200} />
+
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               <div className="rounded-xl border border-zinc-100 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-800/50">
                 <p className="text-xs text-zinc-500 dark:text-zinc-400">Buyers</p>
@@ -549,45 +585,15 @@ export default function AdminHomePage() {
         title="Financial Ledger Overview"
         subtitle="Platform revenue and settlement snapshots from completed mock checkout payments"
       >
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-xl border border-zinc-100 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-800/50">
-            <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Gross Paid Volume (GMV)</span>
-            <p className="mt-1 text-2xl font-bold text-zinc-900 dark:text-white tabular-nums">
-              {isLoading ? '…' : formatAdminMoney(finance?.gross_paid_volume)}
-            </p>
-            <p className="mt-1 text-[11px] text-zinc-400 dark:text-zinc-500">Total payments collected</p>
-          </div>
+        <div className="space-y-6">
+          <FinancialVolumeBar finance={finance} />
 
-          <div className="rounded-xl border border-violet-100 bg-violet-50/50 p-4 dark:border-violet-900/40 dark:bg-violet-950/20">
-            <span className="text-xs font-medium text-violet-800 dark:text-violet-300">Platform Revenue</span>
-            <p className="mt-1 text-2xl font-bold text-violet-900 dark:text-violet-200 tabular-nums">
-              {isLoading ? '…' : formatAdminMoney(finance?.platform_revenue)}
-            </p>
-            <p className="mt-1 text-[11px] text-violet-700/80 dark:text-violet-400">Exact 5.00% fee snapshots</p>
-          </div>
-
-          <div className="rounded-xl border border-zinc-100 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-800/50">
-            <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Seller Net Total</span>
-            <p className="mt-1 text-2xl font-bold text-zinc-900 dark:text-white tabular-nums">
-              {isLoading ? '…' : formatAdminMoney(finance?.seller_net_total)}
-            </p>
-            <p className="mt-1 text-[11px] text-zinc-400 dark:text-zinc-500">Credited to seller balances</p>
-          </div>
-
-          <div className="rounded-xl border border-zinc-100 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-800/50">
-            <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Completed Payments</span>
-            <p className="mt-1 text-2xl font-bold text-zinc-900 dark:text-white tabular-nums">
-              {isLoading ? '…' : finance?.completed_sales_count ?? 0}
-            </p>
-            <p className="mt-1 text-[11px] text-zinc-400 dark:text-zinc-500">Recorded transactions</p>
-          </div>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            <strong>Accounting Disclosure:</strong>{' '}
+            {finance?.disclosure ??
+              'Mock completed checkout ledger totals. Platform revenue is stored fee snapshots only — not bidding volume or external bank settlement.'}
+          </p>
         </div>
-
-        <p className="mt-4 text-xs text-zinc-500 dark:text-zinc-400">
-          <strong>Accounting Disclosure:</strong>{' '}
-          {finance?.disclosure ??
-            'Mock completed checkout ledger totals. Platform revenue is stored fee snapshots only — not bidding volume or external bank settlement.'}
-        </p>
       </SectionCard>
 
       {/* SECTION 9 — RECENT ACTIVITY CENTER */}

@@ -3,7 +3,7 @@
 import { Suspense, type ReactNode } from 'react';
 
 import RoleGuard from '@/components/auth/RoleGuard';
-import RoleWorkspaceLayout from '@/components/layout/RoleWorkspaceLayout';
+import AdminWorkspaceLayout from '@/components/admin/AdminWorkspaceLayout';
 
 function GuardFallback() {
   return (
@@ -15,18 +15,11 @@ function GuardFallback() {
   );
 }
 
-/**
- * Frontend admin workspace layout.
- *
- * Note: Django's HTML admin remains at backend `/admin/` (typically :8000).
- * This Next.js `/admin` tree is the BidKori frontend admin workspace only.
- * Reverse-proxy coexistence is out of scope for this foundation task.
- */
 export default function AdminLayout({ children }: { children: ReactNode }) {
   return (
     <Suspense fallback={<GuardFallback />}>
       <RoleGuard allowedRoles={['ADMIN']}>
-        <RoleWorkspaceLayout role="ADMIN">{children}</RoleWorkspaceLayout>
+        <AdminWorkspaceLayout>{children}</AdminWorkspaceLayout>
       </RoleGuard>
     </Suspense>
   );

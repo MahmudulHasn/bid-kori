@@ -1,3 +1,4 @@
+from datetime import timedelta
 from decimal import Decimal, InvalidOperation
 
 from django.contrib.auth.mixins import UserPassesTestMixin
@@ -682,15 +683,33 @@ class AnalyticsSummaryView(APIView):
     )
     def get(self, request):
         now = timezone.now()
+        range_param = (request.query_params.get('range') or 'all').lower().strip()
+        start_date = None
+        if range_param == 'today':
+            start_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        elif range_param == '7d':
+            start_date = now - timedelta(days=7)
+        elif range_param == '30d':
+            start_date = now - timedelta(days=30)
+        elif range_param == '90d':
+            start_date = now - timedelta(days=90)
+
+        bids_qs = Bid.objects.all()
+        auctions_qs = Auction.objects.all()
+        if start_date is not None:
+            bids_qs = bids_qs.filter(timestamp__gte=start_date)
+            auctions_qs = auctions_qs.filter(
+                Q(created_at__gte=start_date) | Q(start_time__gte=start_date)
+            )
 
         total_active_auctions = Auction.objects.filter(
             status=Auction.Status.ACTIVE,
             end_time__gt=now,
         ).count()
 
-        total_bids_placed = Bid.objects.count()
+        total_bids_placed = bids_qs.count()
 
-        volume_aggregate = Auction.objects.aggregate(
+        volume_aggregate = auctions_qs.aggregate(
             total_bidding_volume=Sum('current_highest_bid'),
         )
         total_bidding_volume = volume_aggregate['total_bidding_volume'] or Decimal('0.00')
@@ -703,7 +722,7 @@ class AnalyticsSummaryView(APIView):
                 'avg_price_growth': row['avg_price_growth'],
                 'auction_count': row['auction_count'],
             }
-            for row in Auction.objects.select_related('product__category')
+            for row in auctions_qs.select_related('product__category')
             .values('product__category__name')
             .annotate(
                 avg_starting_price=Avg('starting_bid'),
@@ -724,7 +743,7 @@ class AnalyticsSummaryView(APIView):
                 'timestamp': bid['timestamp'].isoformat(),
                 'bidder_username': bid['bidder__username'],
             }
-            for bid in Bid.objects.select_related('bidder')
+            for bid in bids_qs.select_related('bidder')
             .order_by('-timestamp', '-id')
             .values('id', 'auction_id', 'amount', 'timestamp', 'bidder__username')[:100]
         ]
@@ -735,7 +754,7 @@ class AnalyticsSummaryView(APIView):
                 'bid_count': row['bid_count'],
                 'total_bid_amount': row['total_bid_amount'],
             }
-            for row in Bid.objects.values('bidder__username')
+            for row in bids_qs.values('bidder__username')
             .annotate(
                 bid_count=Count('id'),
                 total_bid_amount=Sum('amount'),
