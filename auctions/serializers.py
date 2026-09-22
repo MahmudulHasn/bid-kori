@@ -115,6 +115,9 @@ class AuctionSerializer(serializers.ModelSerializer):
         default=None,
         help_text='Public username of the winning bidder when assigned.',
     )
+    winner_fulfillment_status = serializers.SerializerMethodField(
+        help_text='Fulfillment status for the winning buyer (NOT_STARTED, DRAFT, COMPLETED). None for others.',
+    )
 
     class Meta:
         model = Auction
@@ -142,6 +145,7 @@ class AuctionSerializer(serializers.ModelSerializer):
             'images',
             'uploaded_images',
             'server_time',
+            'winner_fulfillment_status',
         ]
         read_only_fields = [
             'current_highest_bid',
@@ -159,7 +163,21 @@ class AuctionSerializer(serializers.ModelSerializer):
             'has_reserve',
             'reserve_met',
             'bid_count',
+            'winner_fulfillment_status',
         ]
+
+    def get_winner_fulfillment_status(self, obj):
+        """Context-sensitive fulfillment status visible ONLY to the winning bidder."""
+        request = self.context.get('request')
+        if not request or not request.user or not request.user.is_authenticated:
+            return None
+        if obj.winning_bidder_id != request.user.pk:
+            return None
+        try:
+            details = obj.winner_fulfillment_details
+            return details.status
+        except Exception:
+            return 'NOT_STARTED'
 
     def get_server_time(self, obj):
         """Return timezone.now() at serialization — zero DB work."""
@@ -633,6 +651,7 @@ class AuctionDetailSerializer(serializers.ModelSerializer):
     is_active = serializers.SerializerMethodField()
     recent_bids = serializers.SerializerMethodField()
     images = AuctionImageSerializer(many=True, read_only=True)
+    winner_fulfillment_status = serializers.SerializerMethodField()
 
     class Meta:
         model = Auction
@@ -651,12 +670,27 @@ class AuctionDetailSerializer(serializers.ModelSerializer):
             'is_active',
             'recent_bids',
             'images',
+            'winner_fulfillment_status',
         ]
         read_only_fields = fields
 
     def get_is_active(self, obj):
         return obj.is_active()
 
+    def get_winner_fulfillment_status(self, obj):
+        """Context-sensitive fulfillment status visible ONLY to the winning bidder."""
+        request = self.context.get('request')
+        if not request or not request.user or not request.user.is_authenticated:
+            return None
+        if obj.winning_bidder_id != request.user.pk:
+            return None
+        try:
+            details = obj.winner_fulfillment_details
+            return details.status
+        except Exception:
+            return 'NOT_STARTED'
+
     def get_recent_bids(self, obj):
         bids = obj.bids.select_related('bidder').all()[:5]
         return BidSerializer(bids, many=True, context=self.context).data
+

@@ -7,6 +7,8 @@ export const MARKETPLACE_ROUTES = {
   auctions: '/auctions',
   search: '/search',
   auctionDetail: (id: string | number) => `/auctions/${id}`,
+  buyerWon: '/buyer/won',
+  buyerWonDetails: (id: string | number) => `/buyer/won/${id}/details`,
 } as const;
 
 /** Primary public navbar marketplace links (legacy dashboard/create excluded). */

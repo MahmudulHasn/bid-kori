@@ -653,3 +653,205 @@ class CheckoutService:
 
 # Backwards-compatible alias for imports that reference AuctionStateMachine.
 AuctionStateMachine = AuctionLifecycleService
+
+
+class WinnerDetailsForbidden(Exception):
+    """Authenticated user is not the winning bidder or lacks permission."""
+
+    def __init__(self, message=None):
+        self.message = message or 'Only the winning bidder can access winner details.'
+        super().__init__(self.message)
+
+
+class WinnerDetailsValidationError(Exception):
+    """Domain rejection for winner fulfillment data or auction state."""
+
+    def __init__(self, message=None):
+        self.message = message or 'Invalid winner fulfillment data.'
+        super().__init__(self.message)
+
+
+class WinnerFulfillmentService:
+    """Service governing buyer winner-fulfillment details lifecycle and authorization.
+
+    Ensures:
+    - Only the verified winning bidder of a CLOSED auction can access or edit details.
+    - Incremental drafts are saved safely to PostgreSQL without race duplicates.
+    - Final submission validates all required fields and transitions to COMPLETED.
+    - Post-completion edits retain COMPLETED status without re-drafting.
+    """
+
+    @classmethod
+    def verify_winner_access(cls, auction_id, user, for_update=False):
+        """Authoritatively verify that user is authenticated and won the closed auction."""
+        if not user or not getattr(user, 'is_authenticated', False):
+            raise WinnerDetailsForbidden('Authentication required.')
+
+        queryset = Auction.objects.select_related('winning_bidder', 'product__seller')
+        if for_update:
+            queryset = apply_select_for_update(queryset)
+
+        auction = get_object_or_404(
+            queryset,
+            pk=auction_id,
+        )
+
+        if auction.status != Auction.Status.CLOSED:
+            raise WinnerDetailsValidationError(
+                'Winner details are only available for CLOSED auctions.'
+            )
+
+        if auction.winning_bidder_id is None:
+            raise WinnerDetailsValidationError(
+                'This auction ended with no winning bidder.'
+            )
+
+        if user.pk != auction.winning_bidder_id:
+            raise WinnerDetailsForbidden(
+                'Action forbidden: Only the winning bidder can access winner details.'
+            )
+
+        return auction
+
+    @classmethod
+    def get_details_for_winner(cls, auction_id, user):
+        """Retrieve existing details for the winning buyer, or None if not started."""
+        auction = cls.verify_winner_access(auction_id, user)
+        from .models import WinnerFulfillmentDetails
+
+        details = WinnerFulfillmentDetails.objects.filter(auction=auction).first()
+        return auction, details
+
+    @classmethod
+    def save_draft(cls, auction_id, user, data, completed_step=None):
+        """Persist incremental draft progress across steps in PostgreSQL."""
+        from .models import WinnerFulfillmentDetails
+        from .winner_fulfillment_serializers import WinnerFulfillmentSubmitSerializer
+
+        with transaction.atomic():
+            auction = cls.verify_winner_access(auction_id, user, for_update=True)
+
+            details, _ = WinnerFulfillmentDetails.objects.get_or_create(
+                auction=auction,
+                defaults={
+                    'buyer': user,
+                    'status': WinnerFulfillmentDetails.Status.DRAFT,
+                    'completed_step': 0,
+                },
+            )
+
+            allowed_fields = [
+                'full_name',
+                'phone',
+                'email',
+                'address_line',
+                'area',
+                'district',
+                'division',
+                'postal_code',
+                'preferred_contact_method',
+                'delivery_note',
+            ]
+            update_fields = ['updated_at']
+            for field in allowed_fields:
+                if field in data:
+                    setattr(details, field, data[field])
+                    update_fields.append(field)
+
+            # If already COMPLETED, ensure the edit does not invalidate required fulfillment data
+            if details.status == WinnerFulfillmentDetails.Status.COMPLETED:
+                validation_payload = {
+                    'full_name': details.full_name,
+                    'phone': details.phone,
+                    'email': details.email,
+                    'address_line': details.address_line,
+                    'area': details.area,
+                    'district': details.district,
+                    'division': details.division,
+                    'postal_code': details.postal_code,
+                    'preferred_contact_method': details.preferred_contact_method,
+                    'delivery_note': details.delivery_note,
+                }
+                serializer = WinnerFulfillmentSubmitSerializer(data=validation_payload)
+                if not serializer.is_valid():
+                    first_error = next(iter(serializer.errors.values()))[0]
+                    field_name = next(iter(serializer.errors.keys()))
+                    raise WinnerDetailsValidationError(
+                        f'Cannot invalidate completed details ({field_name}: {first_error})'
+                    )
+            elif completed_step is not None:
+                step_val = min(3, max(0, int(completed_step)))
+                details.completed_step = max(details.completed_step, step_val)
+                update_fields.append('completed_step')
+
+            details.save(update_fields=list(set(update_fields)))
+            return details
+
+    @classmethod
+    def submit_details(cls, auction_id, user, data=None):
+        """Validate all required fields across all steps and mark COMPLETED."""
+        from .models import WinnerFulfillmentDetails
+        from .winner_fulfillment_serializers import WinnerFulfillmentSubmitSerializer
+
+        with transaction.atomic():
+            auction = cls.verify_winner_access(auction_id, user, for_update=True)
+
+            details, _ = WinnerFulfillmentDetails.objects.get_or_create(
+                auction=auction,
+                defaults={
+                    'buyer': user,
+                    'status': WinnerFulfillmentDetails.Status.DRAFT,
+                    'completed_step': 0,
+                },
+            )
+
+            # Apply any incoming data first
+            if data:
+                allowed_fields = [
+                    'full_name',
+                    'phone',
+                    'email',
+                    'address_line',
+                    'area',
+                    'district',
+                    'division',
+                    'postal_code',
+                    'preferred_contact_method',
+                    'delivery_note',
+                ]
+                for field in allowed_fields:
+                    if field in data:
+                        setattr(details, field, data[field])
+
+            # Compile full payload for strict validation
+            validation_payload = {
+                'full_name': details.full_name,
+                'phone': details.phone,
+                'email': details.email,
+                'address_line': details.address_line,
+                'area': details.area,
+                'district': details.district,
+                'division': details.division,
+                'postal_code': details.postal_code,
+                'preferred_contact_method': details.preferred_contact_method,
+                'delivery_note': details.delivery_note,
+            }
+
+            serializer = WinnerFulfillmentSubmitSerializer(data=validation_payload)
+            if not serializer.is_valid():
+                first_error = next(iter(serializer.errors.values()))[0]
+                field_name = next(iter(serializer.errors.keys()))
+                raise WinnerDetailsValidationError(f'{field_name}: {first_error}')
+
+            # Update cleaned/normalized fields
+            for key, val in serializer.validated_data.items():
+                setattr(details, key, val)
+
+            details.status = WinnerFulfillmentDetails.Status.COMPLETED
+            details.completed_step = 4
+            if not details.submitted_at:
+                details.submitted_at = timezone.now()
+
+            details.save()
+            return details
+

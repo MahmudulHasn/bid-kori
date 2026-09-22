@@ -241,3 +241,77 @@ class Payment(models.Model):
 
     def __str__(self):
         return f'Payment {self.transaction_id or self.pk} ({self.status})'
+
+
+class WinnerFulfillmentDetails(models.Model):
+    """Post-auction delivery and contact fulfillment details submitted by the winning buyer.
+
+    Strictly scoped to Phase 1 (WIN-F01). Accessible only by the winning bidder.
+    Persists incremental draft progress across form steps before final completion.
+    """
+
+    class Status(models.TextChoices):
+        DRAFT = 'DRAFT', 'Draft'
+        COMPLETED = 'COMPLETED', 'Completed'
+
+    class ContactMethod(models.TextChoices):
+        PHONE = 'PHONE', 'Phone'
+        EMAIL = 'EMAIL', 'Email'
+
+    auction = models.OneToOneField(
+        Auction,
+        on_delete=models.CASCADE,
+        related_name='winner_fulfillment_details',
+    )
+    buyer = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='winner_fulfillment_details',
+    )
+
+    # Step 1: Personal Information
+    full_name = models.CharField(max_length=150, blank=True, default='')
+    phone = models.CharField(max_length=32, blank=True, default='')
+    email = models.EmailField(max_length=254, blank=True, default='')
+
+    # Step 2: Delivery Address (Bangladesh-appropriate)
+    address_line = models.CharField(max_length=255, blank=True, default='')
+    area = models.CharField(max_length=100, blank=True, default='')
+    district = models.CharField(max_length=100, blank=True, default='')
+    division = models.CharField(max_length=100, blank=True, default='')
+    postal_code = models.CharField(max_length=20, blank=True, default='')
+
+    # Step 3: Delivery Preferences
+    preferred_contact_method = models.CharField(
+        max_length=20,
+        choices=ContactMethod.choices,
+        default=ContactMethod.PHONE,
+    )
+    delivery_note = models.TextField(max_length=500, blank=True, default='')
+
+    # Lifecycle & Draft Progress
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.DRAFT,
+    )
+    completed_step = models.PositiveSmallIntegerField(
+        default=0,
+        help_text='Last successfully saved step (0=None, 1=Personal, 2=Address, 3=Preferences, 4=Submitted)',
+    )
+    submitted_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Winner Fulfillment Details'
+        verbose_name_plural = 'Winner Fulfillment Details'
+        indexes = [
+            models.Index(fields=['auction', 'status'], name='win_ful_auction_status_idx'),
+            models.Index(fields=['buyer', 'status'], name='win_ful_buyer_status_idx'),
+        ]
+
+    def __str__(self):
+        return f'Fulfillment for Auction #{self.auction_id} ({self.status})'
+

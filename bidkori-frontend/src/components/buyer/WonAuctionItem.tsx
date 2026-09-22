@@ -50,6 +50,42 @@ function paymentClass(state: AuctionPaymentState): string {
   }
 }
 
+function fulfillmentLabel(status?: string | null): string {
+  switch (status) {
+    case 'COMPLETED':
+      return 'Completed';
+    case 'DRAFT':
+      return 'In Progress';
+    case 'NOT_STARTED':
+    default:
+      return 'Not Started';
+  }
+}
+
+function fulfillmentClass(status?: string | null): string {
+  switch (status) {
+    case 'COMPLETED':
+      return 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300';
+    case 'DRAFT':
+      return 'bg-sky-50 text-sky-800 dark:bg-sky-950/40 dark:text-sky-300';
+    case 'NOT_STARTED':
+    default:
+      return 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300';
+  }
+}
+
+function fulfillmentCtaText(status?: string | null): string {
+  switch (status) {
+    case 'COMPLETED':
+      return 'View / Edit Details';
+    case 'DRAFT':
+      return 'Continue Winner Details';
+    case 'NOT_STARTED':
+    default:
+      return 'Complete Winner Details';
+  }
+}
+
 export default function WonAuctionItem({
   auction,
   checkout,
@@ -65,6 +101,7 @@ export default function WonAuctionItem({
   const submitting = checkout?.status === 'submitting';
   const showCheckout = payment !== 'paid';
   const finalAmount = Number(auction.current_highest_bid);
+  const fulfillmentStatus = auction.winner_fulfillment_status ?? 'NOT_STARTED';
 
   return (
     <article className="rounded-2xl border border-zinc-200/90 bg-white p-5 shadow-xs dark:border-zinc-800 dark:bg-zinc-900/60 sm:p-6 transition-all hover:shadow-md">
@@ -97,13 +134,23 @@ export default function WonAuctionItem({
                 )}
               </dd>
             </div>
-            <div className="flex justify-between gap-3 sm:col-span-2 sm:block">
+            <div className="flex justify-between gap-3 sm:block">
               <dt className="text-zinc-500 dark:text-zinc-400 font-medium">Payment Status</dt>
               <dd className="mt-1">
                 <span
                   className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider ${paymentClass(payment)}`}
                 >
                   {paymentLabel(payment)}
+                </span>
+              </dd>
+            </div>
+            <div className="flex justify-between gap-3 sm:block">
+              <dt className="text-zinc-500 dark:text-zinc-400 font-medium">Fulfillment Details</dt>
+              <dd className="mt-1">
+                <span
+                  className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider ${fulfillmentClass(fulfillmentStatus)}`}
+                >
+                  {fulfillmentLabel(fulfillmentStatus)}
                 </span>
               </dd>
             </div>
@@ -120,7 +167,14 @@ export default function WonAuctionItem({
           ) : null}
         </div>
 
-        <div className="flex w-full shrink-0 flex-col gap-2 sm:w-48">
+        <div className="flex w-full shrink-0 flex-col gap-2.5 sm:w-52">
+          <Link
+            href={MARKETPLACE_ROUTES.buyerWonDetails(auction.id)}
+            className="inline-flex w-full min-h-[44px] items-center justify-center rounded-xl bg-amber-600 px-4 text-xs font-bold text-white shadow-sm shadow-amber-600/20 transition hover:bg-amber-500 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500"
+          >
+            {fulfillmentCtaText(fulfillmentStatus)}
+          </Link>
+
           {showCheckout ? (
             <button
               type="button"
@@ -128,18 +182,18 @@ export default function WonAuctionItem({
               disabled={submitting}
               aria-busy={submitting}
               aria-label={`Complete mock checkout for ${title}`}
-              className="inline-flex w-full min-h-[44px] items-center justify-center rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 px-4 text-sm font-bold text-white shadow-sm shadow-amber-600/20 transition hover:from-amber-500 hover:to-amber-400 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex w-full min-h-[40px] items-center justify-center rounded-xl bg-gradient-to-r from-zinc-800 to-zinc-700 px-4 text-xs font-bold text-white shadow-sm transition hover:from-zinc-700 hover:to-zinc-600 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-500 disabled:cursor-not-allowed disabled:opacity-60 dark:from-zinc-700 dark:to-zinc-600"
             >
               {submitting ? 'Completing checkout...' : 'Complete Checkout'}
             </button>
           ) : (
-            <div className="rounded-xl bg-emerald-500/15 py-2.5 text-center text-xs font-bold text-emerald-800 dark:text-emerald-300">
+            <div className="rounded-xl bg-emerald-500/15 py-2 text-center text-xs font-bold text-emerald-800 dark:text-emerald-300">
               Paid ✓
             </div>
           )}
           <Link
             href={MARKETPLACE_ROUTES.auctionDetail(auction.id)}
-            className="inline-flex w-full min-h-[40px] items-center justify-center rounded-xl border border-zinc-200/90 bg-zinc-50 px-4 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-100 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-400 dark:border-zinc-800 dark:bg-zinc-800/60 dark:text-zinc-300 dark:hover:bg-zinc-800"
+            className="inline-flex w-full min-h-[38px] items-center justify-center rounded-xl border border-zinc-200/90 bg-zinc-50 px-4 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-100 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-400 dark:border-zinc-800 dark:bg-zinc-800/60 dark:text-zinc-300 dark:hover:bg-zinc-800"
           >
             View Listing
           </Link>
@@ -148,3 +202,4 @@ export default function WonAuctionItem({
     </article>
   );
 }
+

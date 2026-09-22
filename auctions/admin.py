@@ -2,7 +2,7 @@ from django.contrib import admin
 
 from config.admin import bidkori_admin_site
 
-from .models import Auction, AuctionImage, Bid, Payment
+from .models import Auction, AuctionImage, Bid, Payment, WinnerFulfillmentDetails
 
 
 class AuctionImageInline(admin.TabularInline):
@@ -53,4 +53,23 @@ class PaymentAdmin(admin.ModelAdmin):
     )
     list_filter = ('status', 'created_at')
     search_fields = ('transaction_id', 'user__username', 'auction__product__title')
+
+
+@admin.register(WinnerFulfillmentDetails, site=bidkori_admin_site)
+class WinnerFulfillmentDetailsAdmin(admin.ModelAdmin):
+    """Admin registration with minimal list columns to avoid exposing sensitive PII broadly."""
+
+    list_display = (
+        'id',
+        'auction',
+        'buyer',
+        'status',
+        'completed_step',
+        'submitted_at',
+        'created_at',
+    )
+    list_filter = ('status', 'completed_step')
+    search_fields = ('auction__product__title', 'buyer__username')
+    readonly_fields = ('created_at', 'updated_at')
+
 

@@ -38,7 +38,7 @@ export default function AuctionCard({ auction }: AuctionCardProps) {
   const product = getAuctionProduct(auction);
   const imageUrl = resolveMediaUrl(
     auction.images?.[0]?.image
-    ?? (product as Record<string, unknown>)?.images?.[0]?.image as string | undefined
+    ?? (product as { images?: { image?: string }[] } | null)?.images?.[0]?.image
   );
   const price = getAuctionPriceLabel(auction);
   const timer = useAuctionTimer(auction.end_time, auction.server_time, {

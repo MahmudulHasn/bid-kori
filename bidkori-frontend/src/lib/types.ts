@@ -131,6 +131,8 @@ export type Auction = {
   is_hidden?: boolean;
   moderation_reason?: string;
   moderated_at?: string | null;
+  /** Context-sensitive fulfillment status for the winning buyer (NOT_STARTED, DRAFT, COMPLETED). */
+  winner_fulfillment_status?: WinnerFulfillmentStatus | null;
 };
 
 /** Compact Admin hide/restore response from ModerationStateSerializer. */
@@ -158,3 +160,30 @@ export type PaymentSummary = {
   transaction_id: string;
   created_at?: string;
 };
+
+export type WinnerFulfillmentStatus = 'NOT_STARTED' | 'DRAFT' | 'COMPLETED';
+
+export type ContactMethod = 'PHONE' | 'EMAIL';
+
+export type WinnerFulfillmentDetails = {
+  id?: number;
+  auction_id: number;
+  buyer_id?: number;
+  buyer_username?: string;
+  full_name: string;
+  phone: string;
+  email?: string;
+  address_line: string;
+  area: string;
+  district: string;
+  division: string;
+  postal_code?: string;
+  preferred_contact_method: ContactMethod;
+  delivery_note?: string;
+  status: WinnerFulfillmentStatus;
+  completed_step: number;
+  submitted_at?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+

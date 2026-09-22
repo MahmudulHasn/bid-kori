@@ -13,6 +13,10 @@ from .views import (
     TransitionAuctionStateView,
     UserBidsView,
 )
+from .winner_fulfillment_views import (
+    WinnerFulfillmentDetailsView,
+    WinnerFulfillmentSubmitView,
+)
 
 app_name = 'auctions'
 
@@ -27,6 +31,16 @@ urlpatterns = [
     ),
     path('', AuctionListCreateView, name='auction-list-create'),
     path('<int:pk>/', AuctionDetailView, name='auction-detail'),
+    path(
+        '<int:pk>/winner-details/',
+        WinnerFulfillmentDetailsView.as_view(),
+        name='auction-winner-details',
+    ),
+    path(
+        '<int:pk>/winner-details/submit/',
+        WinnerFulfillmentSubmitView.as_view(),
+        name='auction-winner-details-submit',
+    ),
     path(
         '<int:pk>/transition/',
         TransitionAuctionStateView.as_view(),

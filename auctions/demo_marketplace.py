@@ -20,7 +20,13 @@ from django.utils import timezone
 from django.utils.text import slugify
 from rest_framework.authtoken.models import Token
 
-from auctions.models import Auction, AuctionImage, Bid, Payment
+from auctions.models import (
+    Auction,
+    AuctionImage,
+    Bid,
+    Payment,
+    WinnerFulfillmentDetails,
+)
 from auctions.services import (
     AuctionLifecycleService,
     BidService,
@@ -684,6 +690,7 @@ def seed_demo_marketplace(
                 ('demo_buyer_c', 3),
             ],  # A lost; electronics seller gets paid sale
             'checkout': True,
+            'fulfillment': 'completed',
         },
         {
             'seller': seller_c,
@@ -716,6 +723,7 @@ def seed_demo_marketplace(
                 ('demo_buyer_d', 3),
             ],  # D wins
             'checkout': True,
+            'fulfillment': 'draft',
         },
         # --- CLOSED reserve unmet (3) ---
         {
@@ -886,6 +894,47 @@ def seed_demo_marketplace(
                         closed.winning_bidder,
                     )
                     summary.payments += 1
+
+                fulfillment_kind = item.get('fulfillment')
+                if fulfillment_kind and closed.winning_bidder_id:
+                    if fulfillment_kind == 'completed':
+                        WinnerFulfillmentDetails.objects.update_or_create(
+                            auction=closed,
+                            defaults={
+                                'buyer': closed.winning_bidder,
+                                'full_name': 'Demo Buyer C',
+                                'phone': '01712345678',
+                                'email': 'demo_buyer_c@bidkori.local',
+                                'address_line': 'House 42, Road 7, Sector 3',
+                                'area': 'Uttara',
+                                'district': 'Dhaka',
+                                'division': 'Dhaka',
+                                'postal_code': '1230',
+                                'preferred_contact_method': WinnerFulfillmentDetails.ContactMethod.PHONE,
+                                'delivery_note': 'Leave with building security.',
+                                'status': WinnerFulfillmentDetails.Status.COMPLETED,
+                                'completed_step': 4,
+                                'submitted_at': now - timedelta(hours=1),
+                            },
+                        )
+                    elif fulfillment_kind == 'draft':
+                        WinnerFulfillmentDetails.objects.update_or_create(
+                            auction=closed,
+                            defaults={
+                                'buyer': closed.winning_bidder,
+                                'full_name': 'Demo Buyer D',
+                                'phone': '01812345678',
+                                'email': 'demo_buyer_d@bidkori.local',
+                                'address_line': 'Road 11, Banani',
+                                'area': 'Banani',
+                                'district': 'Dhaka',
+                                'division': 'Dhaka',
+                                'postal_code': '1213',
+                                'preferred_contact_method': WinnerFulfillmentDetails.ContactMethod.PHONE,
+                                'status': WinnerFulfillmentDetails.Status.DRAFT,
+                                'completed_step': 2,
+                            },
+                        )
 
             elif kind == 'closed_reserve':
                 reserve = item['reserve']
