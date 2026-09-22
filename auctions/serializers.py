@@ -64,6 +64,11 @@ class AuctionSerializer(serializers.ModelSerializer):
 
     product = ProductSerializer(read_only=True)
     images = AuctionImageSerializer(many=True, read_only=True)
+    category_name = serializers.CharField(
+        source='product.category.name',
+        read_only=True,
+        default=None,
+    )
     uploaded_images = serializers.ListField(
         child=AuctionImageField(max_length=None, allow_empty_file=False),
         write_only=True,
@@ -116,6 +121,7 @@ class AuctionSerializer(serializers.ModelSerializer):
         fields = [
             'id',
             'product',
+            'category_name',
             'starting_bid',
             'current_highest_bid',
             'min_increment',
@@ -141,6 +147,7 @@ class AuctionSerializer(serializers.ModelSerializer):
             'current_highest_bid',
             'winning_bidder',
             'winning_bidder_username',
+            'category_name',
             'status',
             'is_paid',
             # Featured placement is a platform capability (Django admin / staff).
@@ -413,6 +420,13 @@ class AuctionSerializer(serializers.ModelSerializer):
             for image_file in uploaded_images:
                 AuctionImage.objects.create(auction=auction, image=image_file)
 
+            # Auto-bridge: copy product catalog images when no auction images
+            # were uploaded and auction was created from an existing product.
+            if not uploaded_images and existing_product is not None:
+                from products.models import ProductImage
+                for pi in ProductImage.objects.filter(product=existing_product):
+                    AuctionImage.objects.create(auction=auction, image=pi.image)
+
         return auction
 
     def update(self, instance, validated_data):
@@ -605,6 +619,11 @@ class AuctionDetailSerializer(serializers.ModelSerializer):
     """Detailed auction payload including product labels and recent bids."""
 
     product_title = serializers.ReadOnlyField(source='product.title')
+    category_name = serializers.CharField(
+        source='product.category.name',
+        read_only=True,
+        default=None,
+    )
     winning_bidder_username = serializers.CharField(
         source='winning_bidder.username',
         read_only=True,
@@ -621,6 +640,7 @@ class AuctionDetailSerializer(serializers.ModelSerializer):
             'id',
             'product',
             'product_title',
+            'category_name',
             'start_time',
             'end_time',
             'current_highest_bid',

@@ -67,6 +67,8 @@ export type Product = {
   description?: string;
   condition?: string;
   category?: number | null;
+  /** Human-readable category name resolved by the backend. */
+  category_name?: string | null;
   seller?: number | string | null;
   /** Nested Product images ordered by uploaded_at, id (first = display default). */
   images?: ProductImage[];
@@ -121,6 +123,8 @@ export type Auction = {
   /** Bid row count — preferred over current_highest_bid for “no bids yet”. */
   bid_count?: number;
   images?: AuctionImage[];
+  /** Human-readable category name from the backend serializer. */
+  category_name?: string | null;
   /** Optional recent bids (active list); used for honest starting vs current labels. */
   recent_bids?: UserBid[];
   /** Visibility moderation (Seller/Admin/private responses). */

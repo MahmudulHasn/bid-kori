@@ -70,7 +70,7 @@ function ProductDetailBody({
   const created = formatTimestamp(product.created_at);
   const updated = formatTimestamp(product.updated_at);
   const title = product.title.trim() ? product.title : 'Untitled product';
-  const categoryLabel = formatAdminProductCategory(product.category);
+  const categoryLabel = formatAdminProductCategory(product.category, product.category_name);
   const description = product.description?.trim();
 
   const { data: auctions } = useSWR(AUCTIONS_LIST_API_PATH, auctionListFetcher);

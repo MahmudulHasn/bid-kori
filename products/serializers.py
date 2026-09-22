@@ -61,6 +61,11 @@ class ProductSerializer(serializers.ModelSerializer):
     """Serializes product catalog fields only (no auction pricing)."""
 
     images = ProductImageSerializer(many=True, read_only=True)
+    category_name = serializers.CharField(
+        source='category.name',
+        read_only=True,
+        default=None,
+    )
 
     class Meta:
         model = Product
@@ -68,6 +73,7 @@ class ProductSerializer(serializers.ModelSerializer):
             'id',
             'seller',
             'category',
+            'category_name',
             'title',
             'description',
             'condition',
@@ -81,6 +87,7 @@ class ProductSerializer(serializers.ModelSerializer):
         read_only_fields = [
             'seller',
             'images',
+            'category_name',
             'is_hidden',
             'moderation_reason',
             'moderated_at',

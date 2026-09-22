@@ -62,6 +62,13 @@ test('category formatting never invents names', () => {
   assert.equal(formatAdminProductCategory(undefined), null);
 });
 
+test('category formatting prefers category_name when available', () => {
+  assert.equal(formatAdminProductCategory(3, 'Electronics'), 'Electronics');
+  assert.equal(formatAdminProductCategory(null, 'Art'), 'Art');
+  assert.equal(formatAdminProductCategory(3, null), 'Category ID #3');
+  assert.equal(formatAdminProductCategory(3, undefined), 'Category ID #3');
+});
+
 test('client-side product search and sorts do not mutate sources', () => {
   const products: Product[] = [
     {

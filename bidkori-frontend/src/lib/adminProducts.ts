@@ -47,12 +47,16 @@ export function formatAdminProductSeller(
 }
 
 /**
- * Category is a FK id on ProductSerializer — not a nested name.
- * Show ID carefully; never invent category names.
+ * Category is now returned as both FK id and human-readable name from the
+ * backend. Prefer `category_name` when available; fall back to numeric ID.
  */
 export function formatAdminProductCategory(
   category: Product['category'],
+  categoryName?: Product['category_name'],
 ): string | null {
+  if (categoryName) {
+    return categoryName;
+  }
   if (category === null || category === undefined) {
     return null;
   }

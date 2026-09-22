@@ -181,7 +181,7 @@ export default function HomePage() {
               {categories.map((cat) => (
                 <Link
                   key={cat.id}
-                  href={`${MARKETPLACE_ROUTES.auctions}?category=${cat.id}`}
+                  href={`${MARKETPLACE_ROUTES.auctions}?category=${encodeURIComponent(cat.slug || cat.name)}`}
                   className="inline-flex min-h-[40px] shrink-0 items-center gap-2 rounded-xl border border-zinc-200 bg-white px-3.5 py-2 text-xs font-medium text-zinc-800 shadow-2xs transition hover:border-amber-400 hover:bg-amber-50/50 hover:text-amber-900 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:border-amber-500 dark:hover:bg-zinc-800"
                 >
                   <Sparkles className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" aria-hidden />
