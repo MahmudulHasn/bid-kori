@@ -194,6 +194,8 @@ export type SellerWinnerDetailsStatus = {
   can_unlock: boolean;
   is_unlocked: boolean;
   unlock_fee: string;
+  unlock_fee_percent?: string;
+  total_amount?: string;
   currency: string;
 };
 

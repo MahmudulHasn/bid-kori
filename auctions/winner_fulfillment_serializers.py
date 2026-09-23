@@ -171,6 +171,16 @@ class WinnerDetailsUnlockStatusSerializer(serializers.Serializer):
     can_unlock = serializers.BooleanField()
     is_unlocked = serializers.BooleanField()
     unlock_fee = serializers.DecimalField(max_digits=10, decimal_places=2)
+    unlock_fee_percent = serializers.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        required=False,
+    )
+    total_amount = serializers.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        required=False,
+    )
     currency = serializers.CharField()
 
 

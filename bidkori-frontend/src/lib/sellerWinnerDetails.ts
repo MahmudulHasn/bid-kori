@@ -74,7 +74,24 @@ export function normalizeSellerWinnerDetailsStatus(
       : 'NOT_STARTED') as WinnerFulfillmentStatus,
     can_unlock: Boolean(d.can_unlock),
     is_unlocked: Boolean(d.is_unlocked),
-    unlock_fee: typeof d.unlock_fee === 'string' ? d.unlock_fee : '0.00',
+    unlock_fee:
+      typeof d.unlock_fee === 'string'
+        ? d.unlock_fee
+        : d.unlock_fee != null
+          ? String(d.unlock_fee)
+          : '0.00',
+    unlock_fee_percent:
+      typeof d.unlock_fee_percent === 'string'
+        ? d.unlock_fee_percent
+        : d.unlock_fee_percent != null
+          ? String(d.unlock_fee_percent)
+          : '2.00',
+    total_amount:
+      typeof d.total_amount === 'string'
+        ? d.total_amount
+        : d.total_amount != null
+          ? String(d.total_amount)
+          : undefined,
     currency: typeof d.currency === 'string' ? d.currency : 'BDT',
   };
 }

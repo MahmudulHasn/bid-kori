@@ -941,7 +941,7 @@ def seed_demo_marketplace(
                                 'submitted_at': now - timedelta(hours=2),
                             },
                         )
-                        unlock_fee = get_winner_details_unlock_fee()
+                        unlock_fee = get_winner_details_unlock_fee(closed)
                         WinnerDetailsUnlock.objects.update_or_create(
                             auction=closed,
                             defaults={

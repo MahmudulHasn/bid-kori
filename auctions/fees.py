@@ -125,6 +125,9 @@ def calculate_sale_fee_snapshot(
     )
 
 
+DEFAULT_WINNER_DETAILS_UNLOCK_FEE_PERCENT = Decimal('2.00')
+
+
 def parse_winner_details_unlock_fee(raw: str | Decimal | int | float) -> Decimal:
     """Parse and validate a seller winner-details unlock fee (non-negative Decimal)."""
     try:
@@ -149,12 +152,57 @@ def parse_winner_details_unlock_fee(raw: str | Decimal | int | float) -> Decimal
     return quantized
 
 
-def get_winner_details_unlock_fee() -> Decimal:
-    """Return the configured seller winner-details unlock fee (Decimal)."""
+def calculate_winner_details_unlock_fee(total_amount: Decimal | str | int | float) -> Decimal:
+    """Compute the fixed 2% seller unlock fee based on auction total winning amount.
+
+    Formula: quantize(total_amount * 2 / 100, MONEY_QUANTUM, rounding=ROUND_HALF_UP)
+    """
+    try:
+        amount = Decimal(str(total_amount))
+    except (InvalidOperation, AttributeError) as exc:
+        raise FeeCalculationError('total_amount must be a Decimal-compatible number.') from exc
+
+    if not amount.is_finite():
+        raise FeeCalculationError('total_amount must be finite.')
+
+    if amount < ZERO:
+        raise FeeCalculationError('total_amount must be >= 0.')
+
+    rate = getattr(settings, 'WINNER_DETAILS_UNLOCK_FEE_PERCENT', DEFAULT_WINNER_DETAILS_UNLOCK_FEE_PERCENT)
+    if isinstance(rate, (str, int, float)):
+        try:
+            rate = Decimal(str(rate))
+        except (InvalidOperation, AttributeError):
+            rate = DEFAULT_WINNER_DETAILS_UNLOCK_FEE_PERCENT
+
+    quantized_amount = amount.quantize(MONEY_QUANTUM, rounding=ROUND_HALF_UP)
+    fee = (quantized_amount * rate / HUNDRED).quantize(MONEY_QUANTUM, rounding=ROUND_HALF_UP)
+    return fee
+
+
+def get_winner_details_unlock_fee(auction=None) -> Decimal:
+    """Return the seller winner-details unlock fee (2% of auction total amount).
+
+    If an explicit override setting (WINNER_DETAILS_UNLOCK_FEE) is provided that differs
+    from the default 50.00, it takes precedence.
+    Otherwise, computes 2% of the auction's winning / total amount.
+    """
     configured = getattr(settings, 'WINNER_DETAILS_UNLOCK_FEE', None)
-    if configured is None:
-        return Decimal('50.00')
-    if isinstance(configured, Decimal):
+    if configured is not None and configured != Decimal('50.00') and str(configured).strip() != '50.00':
         return parse_winner_details_unlock_fee(configured)
-    return parse_winner_details_unlock_fee(configured)
+
+    if auction is not None:
+        if hasattr(auction, 'current_highest_bid'):
+            highest_bid = getattr(auction, 'current_highest_bid', None)
+            starting_bid = getattr(auction, 'starting_bid', None)
+            amount = highest_bid if (highest_bid and highest_bid > ZERO) else (starting_bid or ZERO)
+        else:
+            amount = auction
+        return calculate_winner_details_unlock_fee(amount)
+
+    if configured is not None:
+        return parse_winner_details_unlock_fee(configured)
+
+    return Decimal('50.00')
+
 

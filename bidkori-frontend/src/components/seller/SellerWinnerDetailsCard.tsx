@@ -249,8 +249,7 @@ export default function SellerWinnerDetailsCard({
                 </span>
               </div>
               <p className="text-xs text-zinc-600 dark:text-zinc-400 max-w-md">
-                Buyer completed fulfillment details. Unlock their contact and delivery
-                address to arrange shipping.
+                Buyer completed fulfillment details. Pay the fixed 2% unlock fee ({feeDisplay}) to reveal their contact and delivery address to arrange shipping.
               </p>
             </div>
           </div>
@@ -258,11 +257,16 @@ export default function SellerWinnerDetailsCard({
           <div className="flex items-center gap-4 sm:flex-col sm:items-end sm:gap-1.5 shrink-0">
             <div className="text-left sm:text-right">
               <span className="text-[11px] uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
-                Unlock Fee
+                Unlock Fee (2% Fixed)
               </span>
               <p className="text-base font-semibold tabular-nums text-zinc-900 dark:text-white">
                 {feeDisplay}
               </p>
+              {status.total_amount ? (
+                <p className="text-[11px] text-zinc-500 dark:text-zinc-400 tabular-nums">
+                  2% of {formatUnlockFee(status.total_amount, status.currency)} winning bid
+                </p>
+              ) : null}
             </div>
 
             <button
@@ -285,6 +289,8 @@ export default function SellerWinnerDetailsCard({
           onConfirm={handleUnlockConfirm}
           auctionTitle={auctionTitle}
           unlockFee={status.unlock_fee}
+          totalAmount={status.total_amount}
+          unlockFeePercent={status.unlock_fee_percent}
           currency={status.currency}
           loading={unlocking}
           error={unlockError}

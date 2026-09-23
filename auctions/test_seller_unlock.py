@@ -154,7 +154,8 @@ class SellerWinnerDetailsUnlockTests(APITestCase):
         self.assertEqual(response.data['details_status'], 'COMPLETED')
         self.assertTrue(response.data['can_unlock'])
         self.assertFalse(response.data['is_unlocked'])
-        self.assertEqual(Decimal(str(response.data['unlock_fee'])), Decimal('50.00'))
+        self.assertEqual(Decimal(str(response.data['unlock_fee'])), Decimal('90.00'))
+        self.assertEqual(Decimal(str(response.data['unlock_fee_percent'])), Decimal('2.00'))
         self.assertEqual(response.data['currency'], 'BDT')
         # ZERO Buyer PII
         self.assertNotIn('full_name', response.data)
@@ -175,7 +176,7 @@ class SellerWinnerDetailsUnlockTests(APITestCase):
         self.assertEqual(response.data['status'], 'PAID')
         self.assertTrue(response.data['is_unlocked'])
         self.assertFalse(response.data['already_unlocked'])
-        self.assertEqual(Decimal(str(response.data['fee_amount'])), Decimal('50.00'))
+        self.assertEqual(Decimal(str(response.data['fee_amount'])), Decimal('90.00'))
         self.assertEqual(response.data['currency'], 'BDT')
         self.assertTrue(response.data['payment_reference'].startswith('WDU-'))
         self.assertIsNotNone(response.data['unlocked_at'])
@@ -184,7 +185,7 @@ class SellerWinnerDetailsUnlockTests(APITestCase):
         unlock = WinnerDetailsUnlock.objects.get(auction=self.closed_auction)
         self.assertEqual(unlock.seller, self.seller)
         self.assertEqual(unlock.status, WinnerDetailsUnlock.Status.PAID)
-        self.assertEqual(unlock.fee_amount, Decimal('50.00'))
+        self.assertEqual(unlock.fee_amount, Decimal('90.00'))
         self.assertEqual(unlock.currency, 'BDT')
         self.assertIsNotNone(unlock.paid_at)
         self.assertIsNotNone(unlock.unlocked_at)
@@ -316,13 +317,13 @@ class SellerWinnerDetailsUnlockTests(APITestCase):
         self.assertEqual(response.status_code, 200)
 
         # Authoritative fields must be server-controlled
-        self.assertEqual(Decimal(str(response.data['fee_amount'])), Decimal('50.00'))
+        self.assertEqual(Decimal(str(response.data['fee_amount'])), Decimal('90.00'))
         self.assertEqual(response.data['currency'], 'BDT')
         self.assertEqual(response.data['status'], 'PAID')
         self.assertNotEqual(response.data['payment_reference'], 'HACKED-REF')
 
         unlock = WinnerDetailsUnlock.objects.get(auction=self.closed_auction)
-        self.assertEqual(unlock.fee_amount, Decimal('50.00'))
+        self.assertEqual(unlock.fee_amount, Decimal('90.00'))
         self.assertEqual(unlock.currency, 'BDT')
         self.assertEqual(unlock.seller, self.seller)
 
@@ -618,4 +619,4 @@ class SellerWinnerDetailsConcurrencyTests(APITransactionTestCase):
         )
         unlock = WinnerDetailsUnlock.objects.get(auction=self.auction)
         self.assertEqual(unlock.status, WinnerDetailsUnlock.Status.PAID)
-        self.assertEqual(unlock.fee_amount, Decimal('50.00'))
+        self.assertEqual(unlock.fee_amount, Decimal('70.00'))

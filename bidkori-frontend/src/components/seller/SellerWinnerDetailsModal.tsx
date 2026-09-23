@@ -10,6 +10,8 @@ export interface SellerWinnerDetailsModalProps {
   onConfirm: () => Promise<void>;
   auctionTitle: string;
   unlockFee: string;
+  totalAmount?: string;
+  unlockFeePercent?: string;
   currency?: string;
   loading?: boolean;
   error?: string | null;
@@ -21,6 +23,8 @@ export default function SellerWinnerDetailsModal({
   onConfirm,
   auctionTitle,
   unlockFee,
+  totalAmount,
+  unlockFeePercent = '2.00',
   currency = 'BDT',
   loading = false,
   error = null,
@@ -134,8 +138,9 @@ export default function SellerWinnerDetailsModal({
                 <p className="font-semibold">Mock / Internal Payment Mode</p>
                 <p>
                   This development version uses BidKori&apos;s internal mock payment
-                  flow. Confirming will unlock the winner details for{' '}
-                  <span className="font-bold tabular-nums">{formattedFee}</span>.
+                  flow. Confirming will unlock the winner details for a fixed {Number(unlockFeePercent)}% fee of{' '}
+                  <span className="font-bold tabular-nums">{formattedFee}</span>
+                  {totalAmount ? ` (calculated from winning amount ${formatUnlockFee(totalAmount, currency)})` : ''}.
                 </p>
               </div>
             </div>

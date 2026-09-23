@@ -1,3 +1,4 @@
+from decimal import Decimal
 import uuid
 
 from django.core.exceptions import ValidationError
@@ -981,7 +982,16 @@ class WinnerDetailsUnlockService:
         is_closed = bool(auction.status == Auction.Status.CLOSED)
 
         can_unlock = bool(is_closed and winner_exists and completed and not is_unlocked)
-        fee = get_winner_details_unlock_fee()
+        if is_unlocked and unlock is not None:
+            fee = unlock.fee_amount
+        else:
+            fee = get_winner_details_unlock_fee(auction)
+
+        total_amount = (
+            auction.current_highest_bid
+            if (auction.current_highest_bid and auction.current_highest_bid > Decimal('0.00'))
+            else (auction.starting_bid or Decimal('0.00'))
+        )
 
         return {
             'auction_id': auction.pk,
@@ -990,6 +1000,8 @@ class WinnerDetailsUnlockService:
             'can_unlock': can_unlock,
             'is_unlocked': is_unlocked,
             'unlock_fee': fee,
+            'unlock_fee_percent': Decimal('2.00'),
+            'total_amount': total_amount,
             'currency': 'BDT',
         }
 
@@ -1040,7 +1052,7 @@ class WinnerDetailsUnlockService:
                     'Fulfillment details record is invalid.'
                 )
 
-            fee_amount = get_winner_details_unlock_fee()
+            fee_amount = get_winner_details_unlock_fee(auction)
             payment_ref = f'WDU-{uuid.uuid4().hex[:16].upper()}'
             now = timezone.now()
 

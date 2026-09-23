@@ -180,6 +180,24 @@ export function resolvePostAuthPath(
   role: UserRole,
 ): string {
   if (isSafeNextPath(next)) {
+    // Never redirect to the unauthorized error page
+    if (next === '/unauthorized' || next.startsWith('/unauthorized/')) {
+      return getRoleHome(role);
+    }
+    // Prevent landing on a workspace that belongs to a different role
+    if (next.startsWith('/buyer') && role !== 'BUYER') {
+      return getRoleHome(role);
+    }
+    if (next.startsWith('/seller') && role !== 'SELLER') {
+      return getRoleHome(role);
+    }
+    if (next.startsWith('/admin') && role !== 'ADMIN') {
+      return getRoleHome(role);
+    }
+    // Buyers cannot create auctions on legacy /auctions/create
+    if (next.startsWith('/auctions/create') && role !== 'SELLER') {
+      return getRoleHome(role);
+    }
     return next;
   }
   return getRoleHome(role);
