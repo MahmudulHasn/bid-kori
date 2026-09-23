@@ -148,6 +148,22 @@ class Bid(models.Model):
 
     class Meta:
         ordering = ['-amount']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['auction', 'amount'],
+                name='unique_auction_bid_amount',
+            ),
+            models.CheckConstraint(
+                condition=Q(amount__gt=0),
+                name='bid_amount_positive',
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=['auction', '-amount', 'timestamp'],
+                name='bid_auction_amt_time_idx',
+            ),
+        ]
 
     def __str__(self):
         return f'{self.bidder} bid {self.amount} on {self.auction}'

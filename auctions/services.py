@@ -264,6 +264,46 @@ class AuctionLifecycleService:
         raise ValidationError(f'Unsupported transition to {new_status}.')
 
 
+class BidPlacementError(ValidationError):
+    """Structured domain rejection for an attempted bid.
+
+    Subclasses Django's ValidationError so existing exception handlers catch it
+    seamlessly while exposing structured error_code, messages, and state snapshots.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        error_code: str = 'BID_REJECTED',
+        current_bid: Decimal | None = None,
+        min_increment: Decimal | None = None,
+        minimum_required: Decimal | None = None,
+        status_code: int = 400,
+    ):
+        super().__init__(message)
+        self.message = message
+        self.error_code = error_code
+        self.current_bid = current_bid
+        self.min_increment = min_increment
+        self.minimum_required = minimum_required
+        self.status_code = status_code
+
+    def to_dict(self) -> dict:
+        data = {
+            'success': False,
+            'status': 'REJECTED',
+            'error_code': self.error_code,
+            'message': self.message,
+            'error': self.message,
+        }
+        if self.current_bid is not None:
+            data['current_bid'] = f'{Decimal(str(self.current_bid)):.2f}'
+        if self.minimum_required is not None:
+            data['minimum_required'] = f'{Decimal(str(self.minimum_required)):.2f}'
+        return data
+
+
 class BidService:
     """Atomically place a bid with row-level locking to prevent race conditions.
 
@@ -276,9 +316,17 @@ class BidService:
     @classmethod
     def _validate_bidder(cls, bidder):
         if bidder is None or not getattr(bidder, 'is_authenticated', False):
-            raise ValidationError('Authentication required to place a bid.')
+            raise BidPlacementError(
+                'Authentication required to place a bid.',
+                error_code='AUTHENTICATION_REQUIRED',
+                status_code=401,
+            )
         if not getattr(bidder, 'pk', None):
-            raise ValidationError('Authentication required to place a bid.')
+            raise BidPlacementError(
+                'Authentication required to place a bid.',
+                error_code='AUTHENTICATION_REQUIRED',
+                status_code=401,
+            )
 
     @classmethod
     def _validate_amount(cls, amount):
@@ -287,10 +335,18 @@ class BidService:
         try:
             value = amount if isinstance(amount, Decimal) else Decimal(str(amount))
         except (InvalidOperation, TypeError, ValueError) as exc:
-            raise ValidationError('Bid amount must be a valid number.') from exc
+            raise BidPlacementError(
+                'Bid amount must be a valid number.',
+                error_code='INVALID_AMOUNT',
+                status_code=400,
+            ) from exc
 
-        if value <= 0:
-            raise ValidationError('Bid amount must be greater than zero.')
+        if not value.is_finite() or value <= 0:
+            raise BidPlacementError(
+                'Bid amount must be greater than zero.',
+                error_code='INVALID_AMOUNT',
+                status_code=400,
+            )
         return value
 
     @classmethod
@@ -326,8 +382,8 @@ class BidService:
         """
         cls._validate_bidder(bidder)
         amount = cls._validate_amount(amount)
-        reject_bid = False
 
+        reject_error = None
         with transaction.atomic():
             queryset = Auction.objects.select_related('product__seller')
             queryset = apply_select_for_update(queryset)
@@ -335,28 +391,48 @@ class BidService:
             auction = get_object_or_404(queryset, pk=auction_id)
             now = timezone.now()
 
-            if auction.product.seller_id == bidder.pk:
-                raise ValidationError(
-                    'Action forbidden: Sellers cannot bid on their own listings.'
-                )
-
             from .visibility import auction_accepts_new_bids
 
-            if not auction_accepts_new_bids(auction):
-                raise ValidationError(
-                    'This auction is not available for bidding.'
+            if auction.product.seller_id == bidder.pk:
+                reject_error = BidPlacementError(
+                    'Action forbidden: Sellers cannot bid on their own listings.',
+                    error_code='SELLER_CANNOT_BID',
+                    status_code=403,
                 )
-
-            if auction.status == Auction.Status.ACTIVE and now >= auction.end_time:
+            elif not auction_accepts_new_bids(auction):
+                reject_error = BidPlacementError(
+                    'This auction is not available for bidding.',
+                    error_code='AUCTION_NOT_AVAILABLE',
+                    status_code=400,
+                )
+            elif auction.status == Auction.Status.ACTIVE and now >= auction.end_time:
                 AuctionLifecycleService._finalize_close(auction)
-                reject_bid = True
+                reject_error = BidPlacementError(
+                    'Auction is not active.',
+                    error_code='AUCTION_EXPIRED',
+                    current_bid=auction.current_highest_bid,
+                    status_code=400,
+                )
             elif auction.status in (
                 Auction.Status.CLOSED,
                 Auction.Status.CANCELLED,
             ):
-                reject_bid = True
+                reject_error = BidPlacementError(
+                    'Auction is not active.',
+                    error_code='AUCTION_NOT_ACTIVE',
+                    current_bid=auction.current_highest_bid,
+                    status_code=400,
+                )
             elif not auction.is_biddable(now):
-                reject_bid = True
+                reject_error = BidPlacementError(
+                    'Auction is not active.',
+                    error_code='AUCTION_NOT_ACTIVE',
+                    current_bid=auction.current_highest_bid,
+                    status_code=400,
+                )
+
+            if reject_error is not None:
+                pass
             else:
                 highest_row = cls._current_highest_bid_row(auction)
                 previous_bidder_id = (
@@ -368,28 +444,82 @@ class BidService:
                     else cls._minimum_to_beat(auction)
                 )
 
+                # Idempotency: if this exact bidder already holds the current highest bid with this exact amount
+                if (
+                    highest_row is not None
+                    and highest_row.bidder_id == bidder.pk
+                    and highest_row.amount == amount
+                ):
+                    highest_row.is_duplicate = True
+                    highest_row.auction = auction
+                    highest_row.bidder = bidder
+                    return highest_row
+
+                # Reject equal or lower bids
                 if amount <= minimum_to_beat:
-                    raise ValidationError(
-                        'Bid amount must be higher than the current highest bid.'
+                    raise BidPlacementError(
+                        'Another buyer has already placed an equal or higher bid. Please submit a higher amount.',
+                        error_code='BID_AMOUNT_NO_LONGER_VALID',
+                        current_bid=minimum_to_beat,
+                        min_increment=auction.min_increment,
+                        minimum_required=minimum_to_beat + auction.min_increment,
+                        status_code=400,
                     )
 
                 minimum_required = minimum_to_beat + auction.min_increment
                 if amount < minimum_required:
-                    raise ValidationError(
+                    raise BidPlacementError(
                         f'Bid amount must be at least {minimum_required} '
-                        f'(current highest bid plus minimum increment).'
+                        f'(current highest bid plus minimum increment).',
+                        error_code='BID_INCREMENT_TOO_LOW',
+                        current_bid=minimum_to_beat,
+                        min_increment=auction.min_increment,
+                        minimum_required=minimum_required,
+                        status_code=400,
                     )
 
-                bid = Bid.objects.create(
-                    auction=auction,
-                    bidder=bidder,
-                    amount=amount,
-                )
+                try:
+                    with transaction.atomic():
+                        bid = Bid.objects.create(
+                            auction=auction,
+                            bidder=bidder,
+                            amount=amount,
+                        )
+                except IntegrityError:
+                    # Concurrent race hit the DB unique constraint on (auction, amount)
+                    auction.refresh_from_db(fields=['current_highest_bid'])
+                    latest_high = cls._current_highest_bid_row(auction)
+                    latest_amount = (
+                        latest_high.amount if latest_high else auction.current_highest_bid
+                    )
+                    if (
+                        latest_high
+                        and latest_high.bidder_id == bidder.pk
+                        and latest_high.amount == amount
+                    ):
+                        latest_high.is_duplicate = True
+                        latest_high.auction = auction
+                        latest_high.bidder = bidder
+                        return latest_high
+                    raise BidPlacementError(
+                        'Another buyer has already placed an equal or higher bid. Please submit a higher amount.',
+                        error_code='BID_AMOUNT_NO_LONGER_VALID',
+                        current_bid=latest_amount,
+                        min_increment=auction.min_increment,
+                        minimum_required=(latest_amount + auction.min_increment)
+                        if latest_amount
+                        else None,
+                        status_code=400,
+                    )
+
                 auction.current_highest_bid = amount
                 # Do not set winning_bidder here — final winner is assigned at close.
                 auction.save(update_fields=['current_highest_bid'])
-                # Attach bidder for payload (same in-memory user used for create).
+                # Attach bidder and auction for payload.
                 bid.bidder = bidder
+                bid.auction = auction
+                bid.is_duplicate = False
+
                 # Broadcast only after this atomic block commits successfully.
                 from .realtime import schedule_bid_accepted_broadcast
 
@@ -407,8 +537,8 @@ class BidService:
                     product_title=product_title,
                 )
 
-        if reject_bid:
-            raise ValidationError('Auction is not active.')
+        if reject_error is not None:
+            raise reject_error
 
         return bid
 
@@ -1056,54 +1186,55 @@ class WinnerDetailsUnlockService:
             payment_ref = f'WDU-{uuid.uuid4().hex[:16].upper()}'
             now = timezone.now()
 
-            try:
-                from notifications.services import schedule_winner_details_unlocked_notification
+            from notifications.services import schedule_winner_details_unlocked_notification
 
-                schedule_winner_details_unlocked_notification(
-                    buyer_id=auction.winning_bidder_id,
-                    auction_id=auction.pk,
-                    product_title=auction.product.title,
-                )
+            schedule_winner_details_unlocked_notification(
+                buyer_id=auction.winning_bidder_id,
+                auction_id=auction.pk,
+                product_title=auction.product.title,
+            )
 
-                if existing_unlock is not None:
-                    existing_unlock.fee_amount = fee_amount
-                    existing_unlock.status = WinnerDetailsUnlock.Status.PAID
-                    existing_unlock.payment_reference = payment_ref
-                    existing_unlock.paid_at = now
-                    existing_unlock.unlocked_at = now
-                    existing_unlock.winner_details = details
-                    existing_unlock.save(
-                        update_fields=[
-                            'fee_amount',
-                            'status',
-                            'payment_reference',
-                            'paid_at',
-                            'unlocked_at',
-                            'winner_details',
-                            'updated_at',
-                        ]
-                    )
-                    return existing_unlock, True
-                else:
-                    unlock = WinnerDetailsUnlock.objects.create(
-                        auction=auction,
-                        seller=user,
-                        winner_details=details,
-                        fee_amount=fee_amount,
-                        currency='BDT',
-                        status=WinnerDetailsUnlock.Status.PAID,
-                        payment_reference=payment_ref,
-                        paid_at=now,
-                        unlocked_at=now,
-                    )
-                    return unlock, True
-            except IntegrityError:
-                raced = WinnerDetailsUnlock.objects.filter(auction_id=auction.pk).first()
-                if raced is not None and raced.status == WinnerDetailsUnlock.Status.PAID:
-                    return raced, False
-                raise WinnerDetailsUnlockValidationError(
-                    'Unable to complete unlock due to a conflicting record.'
+            if existing_unlock is not None:
+                existing_unlock.fee_amount = fee_amount
+                existing_unlock.status = WinnerDetailsUnlock.Status.PAID
+                existing_unlock.payment_reference = payment_ref
+                existing_unlock.paid_at = now
+                existing_unlock.unlocked_at = now
+                existing_unlock.winner_details = details
+                existing_unlock.save(
+                    update_fields=[
+                        'fee_amount',
+                        'status',
+                        'payment_reference',
+                        'paid_at',
+                        'unlocked_at',
+                        'winner_details',
+                        'updated_at',
+                    ]
                 )
+                return existing_unlock, True
+            else:
+                try:
+                    with transaction.atomic():
+                        unlock = WinnerDetailsUnlock.objects.create(
+                            auction=auction,
+                            seller=user,
+                            winner_details=details,
+                            fee_amount=fee_amount,
+                            currency='BDT',
+                            status=WinnerDetailsUnlock.Status.PAID,
+                            payment_reference=payment_ref,
+                            paid_at=now,
+                            unlocked_at=now,
+                        )
+                        return unlock, True
+                except IntegrityError:
+                    raced = WinnerDetailsUnlock.objects.filter(auction_id=auction.pk).first()
+                    if raced is not None and raced.status == WinnerDetailsUnlock.Status.PAID:
+                        return raced, False
+                    raise WinnerDetailsUnlockValidationError(
+                        'Unable to complete unlock due to a conflicting record.'
+                    )
 
     @classmethod
     def seller_has_access(cls, auction_id, user):

@@ -71,6 +71,11 @@ export default function AuctionDetailPage() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const [bidAmount, setBidAmount] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [bidConflict, setBidConflict] = useState<{
+    message: string;
+    currentBid: string | number;
+    suggestedBid: string;
+  } | null>(null);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [imageErrorMap, setImageErrorMap] = useState<Record<string, boolean>>({});
 
@@ -294,6 +299,8 @@ export default function AuctionDetailPage() {
   const handlePlaceBid = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
+    if (submitting) return;
+
     if (authLoading) {
       toast.error('Checking your session… please try again in a moment.');
       return;
@@ -333,11 +340,44 @@ export default function AuctionDetailPage() {
     setSubmitting(true);
     try {
       await api.post(`/auctions/${auctionId}/place-bid/`, { amount });
+      setBidConflict(null);
       toast.success('Bid placed successfully.');
       setBidAmount('');
       await Promise.all([mutate(), mutateHistory(), mutateMyBids()]);
     } catch (err: unknown) {
-      toast.error(getPlaceBidErrorMessage(err));
+      const errResponse = (
+        err as { response?: { data?: Record<string, unknown> } }
+      )?.response?.data;
+      const errorCode = errResponse?.error_code;
+      const errorMsg = String(
+        errResponse?.message || errResponse?.error || '',
+      );
+
+      if (
+        errorCode === 'BID_AMOUNT_NO_LONGER_VALID' ||
+        errorMsg.toLowerCase().includes('equal or higher') ||
+        errorMsg.toLowerCase().includes('already placed')
+      ) {
+        const latestFromApi =
+          errResponse?.current_bid != null
+            ? Number(errResponse.current_bid)
+            : null;
+        const effectiveCurrent = latestFromApi ?? currentBid ?? 0;
+        const nextAmt = (effectiveCurrent + minIncrement).toFixed(2);
+
+        setBidConflict({
+          message:
+            errorMsg ||
+            'Another buyer has already placed an equal or higher bid.',
+          currentBid: effectiveCurrent,
+          suggestedBid: nextAmt,
+        });
+        toast.error('Another buyer has placed an equal or higher bid.');
+        void Promise.all([mutate(), mutateHistory()]);
+      } else {
+        toast.error(getPlaceBidErrorMessage(err));
+      }
+
       if (getApiStatus(err) === 401 && auctionId) {
         router.push(
           buildLoginHref(MARKETPLACE_ROUTES.auctionDetail(auctionId)),
@@ -777,19 +817,50 @@ export default function AuctionDetailPage() {
                 </p>
               ) : (
                 <form onSubmit={handlePlaceBid} className="space-y-4">
+                  {bidConflict && (
+                    <div
+                      className="rounded-xl border border-amber-300 bg-amber-50 p-3.5 dark:border-amber-800 dark:bg-amber-950/40"
+                      role="alert"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="space-y-1">
+                          <p className="text-xs font-bold text-amber-900 dark:text-amber-200">
+                            Bid Updated
+                          </p>
+                          <p className="text-xs text-amber-800 dark:text-amber-300">
+                            Another buyer has placed an equal or higher bid.
+                          </p>
+                          <p className="text-xs font-semibold text-zinc-900 dark:text-white">
+                            Current Bid: {formatAuctionDetailMoney(Number(bidConflict.currentBid))}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setBidAmount(bidConflict.suggestedBid);
+                            setBidConflict(null);
+                          }}
+                          className="inline-flex shrink-0 items-center justify-center rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-amber-500 active:scale-95"
+                        >
+                          Increase Bid
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   <div>
                     <label
                       htmlFor="bid-input-field"
                       className="block text-xs font-semibold text-zinc-800 dark:text-zinc-200"
                     >
-                      Bid amount ($ USD)
+                      Bid amount (৳ BDT)
                     </label>
 
                     {/* Quick increment buttons */}
                     {displayState === 'LIVE' && (
                       <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                         <span className="text-[11px] text-zinc-400">Quick add:</span>
-                        {[10, 50, 100].map((inc) => {
+                        {[100, 500, 1000].map((inc) => {
                           const base = suggestedBid
                             ? Number(suggestedBid)
                             : currentBid != null
@@ -802,10 +873,11 @@ export default function AuctionDetailPage() {
                               onClick={() => {
                                 const cur = Number(bidAmount) || base;
                                 setBidAmount((cur + inc).toFixed(2));
+                                if (bidConflict) setBidConflict(null);
                               }}
                               className="inline-flex min-h-[28px] items-center rounded-lg border border-zinc-200 bg-zinc-50 px-2.5 py-1 text-[11px] font-semibold text-zinc-700 transition hover:border-amber-400 hover:bg-amber-50 hover:text-amber-900 active:scale-95 dark:border-zinc-800 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:border-amber-500"
                             >
-                              +${inc}
+                              +৳{inc}
                             </button>
                           );
                         })}
@@ -814,7 +886,7 @@ export default function AuctionDetailPage() {
 
                     <div className="relative mt-2">
                       <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-sm font-bold text-zinc-400">
-                        $
+                        ৳
                       </span>
                       <input
                         id="bid-input-field"
@@ -825,7 +897,10 @@ export default function AuctionDetailPage() {
                         required
                         inputMode="decimal"
                         value={bidAmount}
-                        onChange={(e) => setBidAmount(e.target.value)}
+                        onChange={(e) => {
+                          setBidAmount(e.target.value);
+                          if (bidConflict) setBidConflict(null);
+                        }}
                         placeholder={suggestedBid}
                         disabled={submitting}
                         className="min-h-[44px] w-full rounded-xl border border-zinc-300 bg-white pl-8 pr-4 py-2.5 text-base font-semibold text-zinc-900 outline-none transition focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"

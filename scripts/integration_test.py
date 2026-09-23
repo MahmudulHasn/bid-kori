@@ -356,7 +356,8 @@ class IntegrationTestRunner:
         self._check(
             'Low-bid error message present',
             'higher than the current highest bid' in error_text.lower()
-            or 'must be' in error_text.lower(),
+            or 'must be' in error_text.lower()
+            or 'equal or higher bid' in error_text.lower(),
             f'body={error_body}',
         )
 

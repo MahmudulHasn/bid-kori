@@ -274,6 +274,17 @@ export function getPlaceBidErrorMessage(
     return 'Auction not found or unavailable.';
   }
   if (status === 400) {
+    if (
+      lower.includes('equal or higher') ||
+      lower.includes('no longer valid') ||
+      (data as Record<string, unknown> | undefined)?.error_code ===
+        'BID_AMOUNT_NO_LONGER_VALID'
+    ) {
+      return (
+        apiMessage ||
+        'Another buyer has already placed an equal or higher bid. Please submit a higher amount.'
+      );
+    }
     if (lower.includes('own')) {
       return 'You cannot bid on your own auction.';
     }

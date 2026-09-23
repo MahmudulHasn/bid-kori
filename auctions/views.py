@@ -48,6 +48,7 @@ from .serializers import (
 )
 from .services import (
     AuctionLifecycleService,
+    BidPlacementError,
     BidService,
     CheckoutAlreadyCompleted,
     CheckoutForbidden,
@@ -310,9 +311,11 @@ class AuctionViewSet(viewsets.ModelViewSet):
         if request.user == auction.product.seller:
             return Response(
                 {
-                    'error': (
-                        'Action forbidden: Sellers cannot bid on their own listings.'
-                    ),
+                    'success': False,
+                    'status': 'REJECTED',
+                    'error_code': 'SELLER_CANNOT_BID',
+                    'message': 'Action forbidden: Sellers cannot bid on their own listings.',
+                    'error': 'Action forbidden: Sellers cannot bid on their own listings.',
                 },
                 status=status.HTTP_403_FORBIDDEN,
             )
@@ -320,7 +323,13 @@ class AuctionViewSet(viewsets.ModelViewSet):
         raw_amount = request.data.get('amount', request.data.get('bid_amount'))
         if raw_amount is None or raw_amount == '':
             return Response(
-                {'error': 'Bid amount must be a valid number.'},
+                {
+                    'success': False,
+                    'status': 'REJECTED',
+                    'error_code': 'INVALID_AMOUNT',
+                    'message': 'Bid amount must be a valid number.',
+                    'error': 'Bid amount must be a valid number.',
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -328,13 +337,25 @@ class AuctionViewSet(viewsets.ModelViewSet):
             bid_amount = Decimal(str(raw_amount))
         except (InvalidOperation, TypeError, ValueError):
             return Response(
-                {'error': 'Bid amount must be a valid number.'},
+                {
+                    'success': False,
+                    'status': 'REJECTED',
+                    'error_code': 'INVALID_AMOUNT',
+                    'message': 'Bid amount must be a valid number.',
+                    'error': 'Bid amount must be a valid number.',
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        if bid_amount <= 0:
+        if not bid_amount.is_finite() or bid_amount <= 0:
             return Response(
-                {'error': 'Bid amount must be greater than zero.'},
+                {
+                    'success': False,
+                    'status': 'REJECTED',
+                    'error_code': 'INVALID_AMOUNT',
+                    'message': 'Bid amount must be greater than zero.',
+                    'error': 'Bid amount must be greater than zero.',
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -344,24 +365,42 @@ class AuctionViewSet(viewsets.ModelViewSet):
                 bidder=request.user,
                 amount=bid_amount,
             )
+        except BidPlacementError as exc:
+            return Response(exc.to_dict(), status=exc.status_code)
         except ValidationError as exc:
             message = exc.messages[0] if getattr(exc, 'messages', None) else str(exc)
-            if 'higher than the current highest bid' in message:
-                return Response(
-                    {
-                        'error': (
-                            'Bid amount must be higher than the current highest bid.'
-                        ),
-                    },
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
             return Response(
-                {'error': message},
+                {
+                    'success': False,
+                    'status': 'REJECTED',
+                    'error_code': 'VALIDATION_ERROR',
+                    'message': message,
+                    'error': message,
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        serializer = BidSerializer(bid, context={'request': request})
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        auction = getattr(bid, 'auction', None) or auction
+        current_highest = getattr(auction, 'current_highest_bid', bid.amount)
+        response_data = {
+            'success': True,
+            'status': 'ACCEPTED',
+            'bid_id': bid.pk,
+            'auction_id': auction.pk,
+            'accepted_amount': f'{Decimal(str(bid.amount)):.2f}',
+            'current_bid': f'{Decimal(str(current_highest)):.2f}',
+            'is_highest_bidder': True,
+            # Backward-compatible fields
+            'id': bid.pk,
+            'auction': auction.pk,
+            'bidder_username': bid.bidder.username if getattr(bid, 'bidder', None) else request.user.username,
+            'amount': f'{Decimal(str(bid.amount)):.2f}',
+            'timestamp': bid.timestamp.isoformat() if bid.timestamp else '',
+        }
+        if getattr(bid, 'is_duplicate', False):
+            response_data['duplicate'] = True
+
+        return Response(response_data, status=status.HTTP_201_CREATED)
 
     @extend_schema(
         tags=['Payments'],
