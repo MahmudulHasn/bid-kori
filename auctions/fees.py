@@ -123,3 +123,38 @@ def calculate_sale_fee_snapshot(
         platform_fee=platform_fee,
         seller_net_amount=seller_net,
     )
+
+
+def parse_winner_details_unlock_fee(raw: str | Decimal | int | float) -> Decimal:
+    """Parse and validate a seller winner-details unlock fee (non-negative Decimal)."""
+    try:
+        value = Decimal(str(raw).strip())
+    except (InvalidOperation, AttributeError) as exc:
+        raise ImproperlyConfigured(
+            'WINNER_DETAILS_UNLOCK_FEE must be a Decimal-compatible number '
+            f'(got {raw!r}).'
+        ) from exc
+
+    if not value.is_finite():
+        raise ImproperlyConfigured(
+            'WINNER_DETAILS_UNLOCK_FEE must be a finite number.'
+        )
+
+    quantized = value.quantize(MONEY_QUANTUM)
+    if quantized < ZERO:
+        raise ImproperlyConfigured(
+            'WINNER_DETAILS_UNLOCK_FEE must be non-negative '
+            f'(got {quantized}).'
+        )
+    return quantized
+
+
+def get_winner_details_unlock_fee() -> Decimal:
+    """Return the configured seller winner-details unlock fee (Decimal)."""
+    configured = getattr(settings, 'WINNER_DETAILS_UNLOCK_FEE', None)
+    if configured is None:
+        return Decimal('50.00')
+    if isinstance(configured, Decimal):
+        return parse_winner_details_unlock_fee(configured)
+    return parse_winner_details_unlock_fee(configured)
+

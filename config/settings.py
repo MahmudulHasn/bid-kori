@@ -334,6 +334,33 @@ def _parse_platform_success_fee_percent():
 
 PLATFORM_SUCCESS_FEE_PERCENT = _parse_platform_success_fee_percent()
 
+
+def _parse_winner_details_unlock_fee():
+    from decimal import Decimal, InvalidOperation
+
+    raw = os.getenv('WINNER_DETAILS_UNLOCK_FEE', '50.00')
+    try:
+        value = Decimal(str(raw).strip())
+    except (InvalidOperation, AttributeError) as exc:
+        raise ImproperlyConfigured(
+            'WINNER_DETAILS_UNLOCK_FEE must be a Decimal-compatible number '
+            f'(got {raw!r}).'
+        ) from exc
+    if not value.is_finite():
+        raise ImproperlyConfigured(
+            'WINNER_DETAILS_UNLOCK_FEE must be a finite number.'
+        )
+    quantized = value.quantize(Decimal('0.01'))
+    if quantized < Decimal('0.00'):
+        raise ImproperlyConfigured(
+            'WINNER_DETAILS_UNLOCK_FEE must be non-negative '
+            f'(got {quantized}).'
+        )
+    return quantized
+
+
+WINNER_DETAILS_UNLOCK_FEE = _parse_winner_details_unlock_fee()
+
 PRODUCT_IMAGE_ALLOWED_FORMATS = ('JPEG', 'PNG', 'WEBP', 'GIF')
 
 # ---------------------------------------------------------------------------

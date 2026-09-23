@@ -30,6 +30,7 @@ def api_root(request):
             "admin_dashboard": "/api/admin/dashboard/summary/",
             "seller_sales": "/api/seller/sales/",
             "seller_earnings": "/api/seller/earnings/",
+            "seller_winner_details": "/api/seller/auctions/<auction_id>/winner-details/",
             "buyer_winner_details": "/api/buyer/won/<auction_id>/winner-details/",
             "notifications": "/api/notifications/",
             "ai_chat": "/api/ai/chat/",

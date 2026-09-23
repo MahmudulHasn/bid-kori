@@ -20,11 +20,13 @@ from django.utils import timezone
 from django.utils.text import slugify
 from rest_framework.authtoken.models import Token
 
+from auctions.fees import get_winner_details_unlock_fee
 from auctions.models import (
     Auction,
     AuctionImage,
     Bid,
     Payment,
+    WinnerDetailsUnlock,
     WinnerFulfillmentDetails,
 )
 from auctions.services import (
@@ -124,6 +126,7 @@ class SeedSummary:
     cancelled_auctions: int = 0
     bids: int = 0
     payments: int = 0
+    winner_details_unlocks: int = 0
     notifications: int = 0
     reset_deleted_users: int = 0
     notes: list[str] = field(default_factory=list)
@@ -707,6 +710,7 @@ def seed_demo_marketplace(
                 ('demo_buyer_c', 3),
             ],  # C wins
             'checkout': True,
+            'fulfillment': 'unlocked',
         },
         {
             'seller': seller_g,
@@ -917,6 +921,41 @@ def seed_demo_marketplace(
                                 'submitted_at': now - timedelta(hours=1),
                             },
                         )
+                    elif fulfillment_kind == 'unlocked':
+                        ful_details, _ = WinnerFulfillmentDetails.objects.update_or_create(
+                            auction=closed,
+                            defaults={
+                                'buyer': closed.winning_bidder,
+                                'full_name': 'Demo Buyer C',
+                                'phone': '01712345678',
+                                'email': 'demo_buyer_c@bidkori.local',
+                                'address_line': 'Apartment 4B, Road 18, Block B',
+                                'area': 'Bashundhara R/A',
+                                'district': 'Dhaka',
+                                'division': 'Dhaka',
+                                'postal_code': '1229',
+                                'preferred_contact_method': WinnerFulfillmentDetails.ContactMethod.PHONE,
+                                'delivery_note': 'Call upon arrival.',
+                                'status': WinnerFulfillmentDetails.Status.COMPLETED,
+                                'completed_step': 4,
+                                'submitted_at': now - timedelta(hours=2),
+                            },
+                        )
+                        unlock_fee = get_winner_details_unlock_fee()
+                        WinnerDetailsUnlock.objects.update_or_create(
+                            auction=closed,
+                            defaults={
+                                'seller': closed.product.seller,
+                                'winner_details': ful_details,
+                                'fee_amount': unlock_fee,
+                                'currency': 'BDT',
+                                'status': WinnerDetailsUnlock.Status.PAID,
+                                'payment_reference': f'WDU-DEMO-{closed.pk}',
+                                'paid_at': now - timedelta(hours=1, minutes=30),
+                                'unlocked_at': now - timedelta(hours=1, minutes=30),
+                            },
+                        )
+                        summary.winner_details_unlocks += 1
                     elif fulfillment_kind == 'draft':
                         WinnerFulfillmentDetails.objects.update_or_create(
                             auction=closed,

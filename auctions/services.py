@@ -855,3 +855,232 @@ class WinnerFulfillmentService:
             details.save()
             return details
 
+
+class WinnerDetailsUnlockForbidden(Exception):
+    """Authenticated user is not authorized for seller winner-details operations."""
+
+    def __init__(self, message=None):
+        self.message = (
+            message
+            or 'Action forbidden: Only the auction seller can access or unlock winner details.'
+        )
+        super().__init__(self.message)
+
+
+class WinnerDetailsUnlockValidationError(Exception):
+    """Domain rejection for winner details unlock state or eligibility."""
+
+    def __init__(self, message=None):
+        self.message = message or 'Invalid winner details unlock state.'
+        super().__init__(self.message)
+
+
+class WinnerDetailsUnlockService:
+    """Service governing seller winner-fulfillment details unlock and entitlement lifecycle.
+
+    Guarantees:
+    - Only the authenticated seller who owns the closed auction can view status, pay unlock, and read details.
+    - Unlock requires auction to be CLOSED with an authoritative winning bidder.
+    - Unlock requires WinnerFulfillmentDetails to exist with status == COMPLETED.
+    - Idempotency: repeated unlock requests do not double charge or create duplicate records.
+    - Concurrency safety: simultaneous unlock requests under PostgreSQL serialize safely without duplicate charges or unhandled 500s.
+    - Privacy: status endpoint never leaks Buyer PII.
+    """
+
+    @classmethod
+    def verify_seller_eligibility(cls, auction_id, user, for_update=False):
+        """Authoritatively verify that user is authenticated and is the seller of the auction."""
+        if not user or not getattr(user, 'is_authenticated', False):
+            raise WinnerDetailsUnlockForbidden('Authentication required.')
+
+        queryset = Auction.objects.select_related(
+            'product',
+            'product__seller',
+            'winning_bidder',
+            'winner_fulfillment_details',
+            'winner_details_unlock',
+        )
+        if for_update:
+            queryset = apply_select_for_update(queryset)
+
+        auction = get_object_or_404(queryset, pk=auction_id)
+
+        if auction.product.seller_id != user.pk:
+            raise WinnerDetailsUnlockForbidden(
+                'Action forbidden: You do not own this auction.'
+            )
+
+        return auction
+
+    @classmethod
+    def get_status_for_seller(cls, auction_id, user):
+        """Return status payload for the auction seller without exposing Buyer PII."""
+        auction = cls.verify_seller_eligibility(auction_id, user, for_update=False)
+        from .fees import get_winner_details_unlock_fee
+        from .models import WinnerDetailsUnlock, WinnerFulfillmentDetails
+
+        try:
+            unlock = auction.winner_details_unlock
+            is_unlocked = bool(unlock.status == WinnerDetailsUnlock.Status.PAID)
+        except WinnerDetailsUnlock.DoesNotExist:
+            is_unlocked = False
+
+        try:
+            details = auction.winner_fulfillment_details
+            details_status = details.status
+            completed = bool(details.status == WinnerFulfillmentDetails.Status.COMPLETED)
+        except WinnerFulfillmentDetails.DoesNotExist:
+            details = None
+            details_status = 'NOT_STARTED'
+            completed = False
+
+        winner_exists = bool(auction.winning_bidder_id is not None)
+        is_closed = bool(auction.status == Auction.Status.CLOSED)
+
+        can_unlock = bool(is_closed and winner_exists and completed and not is_unlocked)
+        fee = get_winner_details_unlock_fee()
+
+        return {
+            'auction_id': auction.pk,
+            'winner_exists': winner_exists,
+            'details_status': details_status,
+            'can_unlock': can_unlock,
+            'is_unlocked': is_unlocked,
+            'unlock_fee': fee,
+            'currency': 'BDT',
+        }
+
+    @classmethod
+    def unlock_for_seller(cls, auction_id, user):
+        """Atomically process mock payment and record persistent seller access entitlement.
+
+        Returns tuple of (unlock_record, created_bool).
+        """
+        import uuid
+        from .fees import get_winner_details_unlock_fee
+        from .models import WinnerDetailsUnlock, WinnerFulfillmentDetails
+
+        with transaction.atomic():
+            auction = cls.verify_seller_eligibility(auction_id, user, for_update=True)
+
+            if auction.status != Auction.Status.CLOSED:
+                raise WinnerDetailsUnlockValidationError(
+                    f'Winner details unlock is only available for CLOSED auctions (current status: {auction.status}).'
+                )
+
+            if auction.winning_bidder_id is None:
+                raise WinnerDetailsUnlockValidationError(
+                    'This auction ended with no winning bidder.'
+                )
+
+            # Check existing unlock
+            try:
+                existing_unlock = auction.winner_details_unlock
+                if existing_unlock.status == WinnerDetailsUnlock.Status.PAID:
+                    return existing_unlock, False
+            except WinnerDetailsUnlock.DoesNotExist:
+                existing_unlock = None
+
+            # Check WinnerFulfillmentDetails
+            try:
+                details = auction.winner_fulfillment_details
+            except WinnerFulfillmentDetails.DoesNotExist:
+                details = None
+
+            if details is None or details.status != WinnerFulfillmentDetails.Status.COMPLETED:
+                raise WinnerDetailsUnlockValidationError(
+                    'Winner details are not ready to unlock yet.'
+                )
+
+            if details.buyer_id != auction.winning_bidder_id:
+                raise WinnerDetailsUnlockValidationError(
+                    'Fulfillment details record is invalid.'
+                )
+
+            fee_amount = get_winner_details_unlock_fee()
+            payment_ref = f'WDU-{uuid.uuid4().hex[:16].upper()}'
+            now = timezone.now()
+
+            try:
+                with transaction.atomic():
+                    if existing_unlock is not None:
+                        existing_unlock.fee_amount = fee_amount
+                        existing_unlock.status = WinnerDetailsUnlock.Status.PAID
+                        existing_unlock.payment_reference = payment_ref
+                        existing_unlock.paid_at = now
+                        existing_unlock.unlocked_at = now
+                        existing_unlock.winner_details = details
+                        existing_unlock.save(
+                            update_fields=[
+                                'fee_amount',
+                                'status',
+                                'payment_reference',
+                                'paid_at',
+                                'unlocked_at',
+                                'winner_details',
+                                'updated_at',
+                            ]
+                        )
+                        return existing_unlock, True
+                    else:
+                        unlock = WinnerDetailsUnlock.objects.create(
+                            auction=auction,
+                            seller=user,
+                            winner_details=details,
+                            fee_amount=fee_amount,
+                            currency='BDT',
+                            status=WinnerDetailsUnlock.Status.PAID,
+                            payment_reference=payment_ref,
+                            paid_at=now,
+                            unlocked_at=now,
+                        )
+                        return unlock, True
+            except IntegrityError:
+                raced = WinnerDetailsUnlock.objects.filter(auction_id=auction.pk).first()
+                if raced is not None and raced.status == WinnerDetailsUnlock.Status.PAID:
+                    return raced, False
+                raise WinnerDetailsUnlockValidationError(
+                    'Unable to complete unlock due to a conflicting record.'
+                )
+
+    @classmethod
+    def seller_has_access(cls, auction_id, user):
+        """Return True if user is the seller and a valid PAID unlock record exists."""
+        from .models import WinnerDetailsUnlock
+
+        if not user or not getattr(user, 'is_authenticated', False):
+            return False
+
+        return WinnerDetailsUnlock.objects.filter(
+            auction_id=auction_id,
+            seller=user,
+            status=WinnerDetailsUnlock.Status.PAID,
+        ).exists()
+
+    @classmethod
+    def get_unlocked_details(cls, auction_id, user):
+        """Retrieve latest buyer fulfillment details after verifying seller entitlement."""
+        auction = cls.verify_seller_eligibility(auction_id, user, for_update=False)
+
+        if not cls.seller_has_access(auction_id, user):
+            raise WinnerDetailsUnlockForbidden(
+                'Winner details must be unlocked before viewing.'
+            )
+
+        from .models import WinnerFulfillmentDetails
+
+        try:
+            details = auction.winner_fulfillment_details
+        except WinnerFulfillmentDetails.DoesNotExist:
+            raise WinnerDetailsUnlockValidationError(
+                'Winner fulfillment details not found.'
+            )
+
+        if details.buyer_id != auction.winning_bidder_id:
+            raise WinnerDetailsUnlockValidationError(
+                'Fulfillment details record is invalid.'
+            )
+
+        return details
+
+

@@ -2,7 +2,14 @@ from django.contrib import admin
 
 from config.admin import bidkori_admin_site
 
-from .models import Auction, AuctionImage, Bid, Payment, WinnerFulfillmentDetails
+from .models import (
+    Auction,
+    AuctionImage,
+    Bid,
+    Payment,
+    WinnerDetailsUnlock,
+    WinnerFulfillmentDetails,
+)
 
 
 class AuctionImageInline(admin.TabularInline):
@@ -71,5 +78,26 @@ class WinnerFulfillmentDetailsAdmin(admin.ModelAdmin):
     list_filter = ('status', 'completed_step')
     search_fields = ('auction__product__title', 'buyer__username')
     readonly_fields = ('created_at', 'updated_at')
+
+
+@admin.register(WinnerDetailsUnlock, site=bidkori_admin_site)
+class WinnerDetailsUnlockAdmin(admin.ModelAdmin):
+    """Admin registration for seller winner-details unlock entitlements."""
+
+    list_display = (
+        'id',
+        'auction',
+        'seller',
+        'status',
+        'fee_amount',
+        'currency',
+        'paid_at',
+        'unlocked_at',
+        'created_at',
+    )
+    list_filter = ('status', 'currency', 'created_at')
+    search_fields = ('auction__product__title', 'seller__username', 'payment_reference')
+    readonly_fields = ('created_at', 'updated_at', 'paid_at', 'unlocked_at')
+
 
 

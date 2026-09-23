@@ -315,3 +315,80 @@ class WinnerFulfillmentDetails(models.Model):
     def __str__(self):
         return f'Fulfillment for Auction #{self.auction_id} ({self.status})'
 
+
+class WinnerDetailsUnlock(models.Model):
+    """Persistent authorization and mock payment entitlement record for a seller
+
+    to view the winning buyer's post-auction fulfillment details.
+    Does NOT contain buyer PII (PII remains isolated in WinnerFulfillmentDetails).
+    """
+
+    class Status(models.TextChoices):
+        PENDING = 'PENDING', 'Pending'
+        PAID = 'PAID', 'Paid'
+        FAILED = 'FAILED', 'Failed'
+
+    auction = models.OneToOneField(
+        Auction,
+        on_delete=models.CASCADE,
+        related_name='winner_details_unlock',
+    )
+    seller = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='winner_details_unlocks',
+    )
+    winner_details = models.ForeignKey(
+        WinnerFulfillmentDetails,
+        on_delete=models.CASCADE,
+        related_name='unlock_records',
+        null=True,
+        blank=True,
+    )
+    fee_amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        help_text='Immutable snapshot of unlock fee charged (BDT).',
+    )
+    currency = models.CharField(
+        max_length=10,
+        default='BDT',
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.PAID,
+    )
+    payment_reference = models.CharField(
+        max_length=100,
+        unique=True,
+        blank=True,
+    )
+    paid_at = models.DateTimeField(null=True, blank=True)
+    unlocked_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Winner Details Unlock'
+        verbose_name_plural = 'Winner Details Unlocks'
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(fee_amount__gte=0),
+                name='winner_details_unlock_fee_non_negative',
+            ),
+            models.UniqueConstraint(
+                fields=['auction', 'seller'],
+                name='unique_seller_auction_winner_details_unlock',
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['seller', 'status'], name='wdu_seller_status_idx'),
+            models.Index(fields=['auction', 'status'], name='wdu_auction_status_idx'),
+        ]
+
+    def __str__(self):
+        return f'Unlock #{self.pk} for Auction #{self.auction_id} by Seller {self.seller_id} ({self.status})'
+
+

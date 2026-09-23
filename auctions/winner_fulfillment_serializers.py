@@ -128,3 +128,61 @@ class WinnerFulfillmentSubmitSerializer(serializers.Serializer):
                     'email': 'Email is required when preferred contact method is Email.'
                 })
         return attrs
+
+
+class WinnerFulfillmentSellerUnlockedSerializer(serializers.ModelSerializer):
+    """Read-only view of buyer fulfillment details for the verified auction seller after unlock."""
+
+    auction_id = serializers.IntegerField(source='auction.pk', read_only=True)
+    buyer_username = serializers.CharField(source='buyer.username', read_only=True)
+
+    class Meta:
+        model = WinnerFulfillmentDetails
+        fields = [
+            'auction_id',
+            'buyer_username',
+            'full_name',
+            'phone',
+            'email',
+            'address_line',
+            'area',
+            'district',
+            'division',
+            'postal_code',
+            'preferred_contact_method',
+            'delivery_note',
+            'status',
+            'submitted_at',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = fields
+
+
+class WinnerDetailsUnlockStatusSerializer(serializers.Serializer):
+    """Read-only status response for seller winner-details readiness and unlock status.
+
+    Strictly excludes any Buyer contact or address PII.
+    """
+
+    auction_id = serializers.IntegerField()
+    winner_exists = serializers.BooleanField()
+    details_status = serializers.CharField()
+    can_unlock = serializers.BooleanField()
+    is_unlocked = serializers.BooleanField()
+    unlock_fee = serializers.DecimalField(max_digits=10, decimal_places=2)
+    currency = serializers.CharField()
+
+
+class WinnerDetailsUnlockResponseSerializer(serializers.Serializer):
+    """Confirmation payload returned upon successful mock payment and unlock."""
+
+    auction_id = serializers.IntegerField()
+    status = serializers.CharField()
+    is_unlocked = serializers.BooleanField()
+    already_unlocked = serializers.BooleanField(default=False)
+    fee_amount = serializers.DecimalField(max_digits=10, decimal_places=2)
+    currency = serializers.CharField()
+    payment_reference = serializers.CharField()
+    unlocked_at = serializers.DateTimeField()
+
