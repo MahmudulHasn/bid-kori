@@ -19,6 +19,9 @@ export const KNOWN_NOTIFICATION_TYPES: readonly NotificationType[] = [
   'AUCTION_WON',
   'AUCTION_LOST',
   'SELLER_NEW_BID',
+  'SELLER_WINNER_DETAILS_READY',
+  'WINNER_DETAILS_UNLOCKED',
+  'SELLER_WINNER_DETAILS_UPDATED',
 ] as const;
 
 export type NotificationCreatedEvent = {
@@ -201,10 +204,13 @@ export function getNotificationToastTone(
     case 'OUTBID':
       return 'warning';
     case 'AUCTION_WON':
+    case 'WINNER_DETAILS_UNLOCKED':
       return 'success';
     case 'AUCTION_LOST':
       return 'neutral';
     case 'SELLER_NEW_BID':
+    case 'SELLER_WINNER_DETAILS_READY':
+    case 'SELLER_WINNER_DETAILS_UPDATED':
       return 'info';
     default:
       return 'neutral';

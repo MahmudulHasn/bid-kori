@@ -222,5 +222,8 @@ class NotificationAPITests(APITestCase):
                 'AUCTION_WON',
                 'AUCTION_LOST',
                 'SELLER_NEW_BID',
+                'SELLER_WINNER_DETAILS_READY',
+                'WINNER_DETAILS_UNLOCKED',
+                'SELLER_WINNER_DETAILS_UPDATED',
             },
         )

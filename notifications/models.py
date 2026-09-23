@@ -14,6 +14,9 @@ class Notification(models.Model):
         AUCTION_WON = 'AUCTION_WON', 'Auction Won'
         AUCTION_LOST = 'AUCTION_LOST', 'Auction Lost'
         SELLER_NEW_BID = 'SELLER_NEW_BID', 'Seller New Bid'
+        SELLER_WINNER_DETAILS_READY = 'SELLER_WINNER_DETAILS_READY', 'Seller Winner Details Ready'
+        WINNER_DETAILS_UNLOCKED = 'WINNER_DETAILS_UNLOCKED', 'Winner Details Unlocked'
+        SELLER_WINNER_DETAILS_UPDATED = 'SELLER_WINNER_DETAILS_UPDATED', 'Seller Winner Details Updated'
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,

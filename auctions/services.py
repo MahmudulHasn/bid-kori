@@ -752,6 +752,12 @@ class WinnerFulfillmentService:
                 'preferred_contact_method',
                 'delivery_note',
             ]
+            old_values = (
+                {f: getattr(details, f) for f in allowed_fields}
+                if details.status == WinnerFulfillmentDetails.Status.COMPLETED
+                else None
+            )
+
             update_fields = ['updated_at']
             for field in allowed_fields:
                 if field in data:
@@ -779,6 +785,16 @@ class WinnerFulfillmentService:
                     raise WinnerDetailsValidationError(
                         f'Cannot invalidate completed details ({field_name}: {first_error})'
                     )
+
+                changed = any(getattr(details, f) != old_values[f] for f in allowed_fields)
+                if changed and WinnerDetailsUnlockService.seller_has_access(auction.pk, auction.product.seller):
+                    from notifications.services import schedule_seller_winner_details_updated_notification
+
+                    schedule_seller_winner_details_updated_notification(
+                        seller_id=auction.product.seller_id,
+                        auction_id=auction.pk,
+                        product_title=auction.product.title,
+                    )
             elif completed_step is not None:
                 step_val = min(3, max(0, int(completed_step)))
                 details.completed_step = max(details.completed_step, step_val)
@@ -805,20 +821,27 @@ class WinnerFulfillmentService:
                 },
             )
 
+            allowed_fields = [
+                'full_name',
+                'phone',
+                'email',
+                'address_line',
+                'area',
+                'district',
+                'division',
+                'postal_code',
+                'preferred_contact_method',
+                'delivery_note',
+            ]
+
+            was_completed = (
+                details.status == WinnerFulfillmentDetails.Status.COMPLETED
+                and details.submitted_at is not None
+            )
+            old_values = {f: getattr(details, f) for f in allowed_fields} if was_completed else None
+
             # Apply any incoming data first
             if data:
-                allowed_fields = [
-                    'full_name',
-                    'phone',
-                    'email',
-                    'address_line',
-                    'area',
-                    'district',
-                    'division',
-                    'postal_code',
-                    'preferred_contact_method',
-                    'delivery_note',
-                ]
                 for field in allowed_fields:
                     if field in data:
                         setattr(details, field, data[field])
@@ -853,6 +876,26 @@ class WinnerFulfillmentService:
                 details.submitted_at = timezone.now()
 
             details.save()
+
+            if not was_completed:
+                from notifications.services import schedule_seller_winner_details_ready_notification
+
+                schedule_seller_winner_details_ready_notification(
+                    seller_id=auction.product.seller_id,
+                    auction_id=auction.pk,
+                    product_title=auction.product.title,
+                )
+            elif old_values is not None:
+                changed = any(getattr(details, f) != old_values[f] for f in allowed_fields)
+                if changed and WinnerDetailsUnlockService.seller_has_access(auction.pk, auction.product.seller):
+                    from notifications.services import schedule_seller_winner_details_updated_notification
+
+                    schedule_seller_winner_details_updated_notification(
+                        seller_id=auction.product.seller_id,
+                        auction_id=auction.pk,
+                        product_title=auction.product.title,
+                    )
+
             return details
 
 
@@ -1002,39 +1045,46 @@ class WinnerDetailsUnlockService:
             now = timezone.now()
 
             try:
-                with transaction.atomic():
-                    if existing_unlock is not None:
-                        existing_unlock.fee_amount = fee_amount
-                        existing_unlock.status = WinnerDetailsUnlock.Status.PAID
-                        existing_unlock.payment_reference = payment_ref
-                        existing_unlock.paid_at = now
-                        existing_unlock.unlocked_at = now
-                        existing_unlock.winner_details = details
-                        existing_unlock.save(
-                            update_fields=[
-                                'fee_amount',
-                                'status',
-                                'payment_reference',
-                                'paid_at',
-                                'unlocked_at',
-                                'winner_details',
-                                'updated_at',
-                            ]
-                        )
-                        return existing_unlock, True
-                    else:
-                        unlock = WinnerDetailsUnlock.objects.create(
-                            auction=auction,
-                            seller=user,
-                            winner_details=details,
-                            fee_amount=fee_amount,
-                            currency='BDT',
-                            status=WinnerDetailsUnlock.Status.PAID,
-                            payment_reference=payment_ref,
-                            paid_at=now,
-                            unlocked_at=now,
-                        )
-                        return unlock, True
+                from notifications.services import schedule_winner_details_unlocked_notification
+
+                schedule_winner_details_unlocked_notification(
+                    buyer_id=auction.winning_bidder_id,
+                    auction_id=auction.pk,
+                    product_title=auction.product.title,
+                )
+
+                if existing_unlock is not None:
+                    existing_unlock.fee_amount = fee_amount
+                    existing_unlock.status = WinnerDetailsUnlock.Status.PAID
+                    existing_unlock.payment_reference = payment_ref
+                    existing_unlock.paid_at = now
+                    existing_unlock.unlocked_at = now
+                    existing_unlock.winner_details = details
+                    existing_unlock.save(
+                        update_fields=[
+                            'fee_amount',
+                            'status',
+                            'payment_reference',
+                            'paid_at',
+                            'unlocked_at',
+                            'winner_details',
+                            'updated_at',
+                        ]
+                    )
+                    return existing_unlock, True
+                else:
+                    unlock = WinnerDetailsUnlock.objects.create(
+                        auction=auction,
+                        seller=user,
+                        winner_details=details,
+                        fee_amount=fee_amount,
+                        currency='BDT',
+                        status=WinnerDetailsUnlock.Status.PAID,
+                        payment_reference=payment_ref,
+                        paid_at=now,
+                        unlocked_at=now,
+                    )
+                    return unlock, True
             except IntegrityError:
                 raced = WinnerDetailsUnlock.objects.filter(auction_id=auction.pk).first()
                 if raced is not None and raced.status == WinnerDetailsUnlock.Status.PAID:

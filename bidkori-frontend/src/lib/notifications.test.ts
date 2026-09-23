@@ -11,6 +11,7 @@ import {
   buildNotificationsReadAllApiPath,
   canGoToNextPage,
   canGoToPreviousPage,
+  getNotificationActionLabel,
   getNotificationAuctionHref,
   getNotificationTypeLabel,
   getNotificationsPagePath,
@@ -56,7 +57,30 @@ describe('notification type labels', () => {
     assert.equal(getNotificationTypeLabel('AUCTION_WON'), 'Auction won');
     assert.equal(getNotificationTypeLabel('AUCTION_LOST'), 'Auction ended');
     assert.equal(getNotificationTypeLabel('SELLER_NEW_BID'), 'New bid');
+    assert.equal(
+      getNotificationTypeLabel('SELLER_WINNER_DETAILS_READY'),
+      'Winner details ready',
+    );
+    assert.equal(
+      getNotificationTypeLabel('WINNER_DETAILS_UNLOCKED'),
+      'Details unlocked',
+    );
+    assert.equal(
+      getNotificationTypeLabel('SELLER_WINNER_DETAILS_UPDATED'),
+      'Winner details updated',
+    );
     assert.equal(getNotificationTypeLabel('ENDING_SOON'), 'Notification');
+  });
+});
+
+describe('notification action labels', () => {
+  it('maps contextual action button labels', () => {
+    assert.equal(getNotificationActionLabel('AUCTION_WON'), 'Complete details');
+    assert.equal(getNotificationActionLabel('WINNER_DETAILS_UNLOCKED'), 'View details');
+    assert.equal(getNotificationActionLabel('SELLER_WINNER_DETAILS_READY'), 'Review unlock');
+    assert.equal(getNotificationActionLabel('SELLER_WINNER_DETAILS_UPDATED'), 'Review updates');
+    assert.equal(getNotificationActionLabel('OUTBID'), 'View auction');
+    assert.equal(getNotificationActionLabel('SELLER_NEW_BID'), 'View auction');
   });
 });
 
@@ -107,6 +131,25 @@ describe('auction deep links', () => {
     assert.equal(getNotificationAuctionHref('BUYER', null), null);
     assert.equal(getNotificationAuctionHref('SELLER', null), null);
     assert.equal(getNotificationAuctionHref('ADMIN', 42), null);
+  });
+
+  it('routes fulfillment notifications to dedicated fulfillment workflows', () => {
+    assert.equal(
+      getNotificationAuctionHref('BUYER', 42, 'AUCTION_WON'),
+      '/buyer/won/42/details',
+    );
+    assert.equal(
+      getNotificationAuctionHref('BUYER', 42, 'WINNER_DETAILS_UNLOCKED'),
+      '/buyer/won/42/details',
+    );
+    assert.equal(
+      getNotificationAuctionHref('SELLER', 7, 'SELLER_WINNER_DETAILS_READY'),
+      '/seller/sales',
+    );
+    assert.equal(
+      getNotificationAuctionHref('SELLER', 7, 'SELLER_WINNER_DETAILS_UPDATED'),
+      '/seller/sales',
+    );
   });
 });
 

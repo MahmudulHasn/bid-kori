@@ -7,12 +7,22 @@ import { format } from 'date-fns';
 import useSWR, { useSWRConfig } from 'swr';
 import toast from 'react-hot-toast';
 
+import {
+  AlertCircle,
+  ClipboardCheck,
+  Gavel,
+  RefreshCw,
+  ShieldCheck,
+  Trophy,
+} from 'lucide-react';
+
 import { getApiErrorMessage } from '@/lib/apiErrors';
 import {
   buildNotificationsListApiPath,
   buildNotificationsPageHref,
   canGoToNextPage,
   canGoToPreviousPage,
+  getNotificationActionLabel,
   getNotificationAuctionHref,
   getNotificationTypeLabel,
   getNotificationsPagePath,
@@ -39,6 +49,41 @@ function formatCreatedAt(value: string): { iso: string; label: string } | null {
   return { iso: date.toISOString(), label: format(date, 'MMM d, yyyy h:mm a') };
 }
 
+function getNotificationIcon(type: string) {
+  switch (type) {
+    case 'AUCTION_WON':
+      return <Trophy className="h-4 w-4 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />;
+    case 'WINNER_DETAILS_UNLOCKED':
+      return <ShieldCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />;
+    case 'SELLER_WINNER_DETAILS_READY':
+      return <ClipboardCheck className="h-4 w-4 text-blue-600 dark:text-blue-400" aria-hidden="true" />;
+    case 'SELLER_WINNER_DETAILS_UPDATED':
+      return <RefreshCw className="h-4 w-4 text-indigo-600 dark:text-indigo-400" aria-hidden="true" />;
+    case 'OUTBID':
+      return <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" aria-hidden="true" />;
+    case 'SELLER_NEW_BID':
+      return <Gavel className="h-4 w-4 text-sky-600 dark:text-sky-400" aria-hidden="true" />;
+    default:
+      return null;
+  }
+}
+
+function getNotificationBadgeClass(type: string): string {
+  switch (type) {
+    case 'AUCTION_WON':
+    case 'WINNER_DETAILS_UNLOCKED':
+      return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300';
+    case 'SELLER_WINNER_DETAILS_READY':
+      return 'bg-blue-100 text-blue-800 dark:bg-blue-950/50 dark:text-blue-300';
+    case 'SELLER_WINNER_DETAILS_UPDATED':
+      return 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950/50 dark:text-indigo-300';
+    case 'OUTBID':
+      return 'bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300';
+    default:
+      return 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300';
+  }
+}
+
 function NotificationRow({
   item,
   role,
@@ -50,9 +95,12 @@ function NotificationRow({
   busyId: number | null;
   onOpen: (item: NotificationItem) => void;
 }) {
-  const auctionHref = getNotificationAuctionHref(role, item.auction_id);
+  const auctionHref = getNotificationAuctionHref(role, item.auction_id, item.type);
+  const actionLabel = getNotificationActionLabel(item.type);
   const when = formatCreatedAt(item.created_at);
   const typeLabel = getNotificationTypeLabel(item.type);
+  const badgeClass = getNotificationBadgeClass(item.type);
+  const icon = getNotificationIcon(item.type);
   const pending = busyId === item.id;
 
   return (
@@ -67,7 +115,13 @@ function NotificationRow({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1 space-y-1">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-md bg-zinc-100 px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+            <span
+              className={[
+                'inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide',
+                badgeClass,
+              ].join(' ')}
+            >
+              {icon}
               {typeLabel}
             </span>
             {!item.is_read ? (
@@ -78,13 +132,13 @@ function NotificationRow({
           </div>
           <h2
             className={[
-              'text-sm text-zinc-900 dark:text-white',
+              'break-words text-sm text-zinc-900 dark:text-white',
               item.is_read ? 'font-medium' : 'font-semibold',
             ].join(' ')}
           >
             {item.title}
           </h2>
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">{item.message}</p>
+          <p className="break-words text-sm text-zinc-600 dark:text-zinc-400">{item.message}</p>
           {when ? (
             <time
               dateTime={when.iso}
@@ -101,16 +155,16 @@ function NotificationRow({
               type="button"
               disabled={pending}
               onClick={() => onOpen(item)}
-              className="inline-flex rounded-lg bg-zinc-900 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-zinc-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-400 disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+              className="inline-flex items-center justify-center rounded-lg bg-zinc-900 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-zinc-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-400 disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
             >
-              {pending ? 'Opening…' : 'View auction'}
+              {pending ? 'Opening…' : actionLabel}
             </button>
           ) : (
             <button
               type="button"
               disabled={pending || item.is_read}
               onClick={() => onOpen(item)}
-              className="inline-flex rounded-lg border border-zinc-300 px-3 py-1.5 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-400 disabled:cursor-default disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+              className="inline-flex items-center justify-center rounded-lg border border-zinc-300 px-3 py-1.5 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-400 disabled:cursor-default disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
             >
               {item.is_read ? 'Read' : pending ? 'Updating…' : 'Mark read'}
             </button>
@@ -160,7 +214,7 @@ export default function NotificationListPage({ role }: NotificationListPageProps
   };
 
   const handleOpen = async (item: NotificationItem) => {
-    const href = getNotificationAuctionHref(role, item.auction_id);
+    const href = getNotificationAuctionHref(role, item.auction_id, item.type);
     setBusyId(item.id);
     try {
       if (!item.is_read) {

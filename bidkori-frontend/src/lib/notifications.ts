@@ -11,7 +11,10 @@ export type NotificationType =
   | 'OUTBID'
   | 'AUCTION_WON'
   | 'AUCTION_LOST'
-  | 'SELLER_NEW_BID';
+  | 'SELLER_NEW_BID'
+  | 'SELLER_WINNER_DETAILS_READY'
+  | 'WINNER_DETAILS_UNLOCKED'
+  | 'SELLER_WINNER_DETAILS_UPDATED';
 
 export type NotificationItem = {
   id: number;
@@ -75,22 +78,59 @@ export function getNotificationTypeLabel(type: string): string {
       return 'Auction ended';
     case 'SELLER_NEW_BID':
       return 'New bid';
+    case 'SELLER_WINNER_DETAILS_READY':
+      return 'Winner details ready';
+    case 'WINNER_DETAILS_UNLOCKED':
+      return 'Details unlocked';
+    case 'SELLER_WINNER_DETAILS_UPDATED':
+      return 'Winner details updated';
     default:
       return 'Notification';
   }
 }
 
 /**
+ * Contextual button/action label for a notification row.
+ */
+export function getNotificationActionLabel(type?: string | null): string {
+  switch (type) {
+    case 'AUCTION_WON':
+      return 'Complete details';
+    case 'WINNER_DETAILS_UNLOCKED':
+      return 'View details';
+    case 'SELLER_WINNER_DETAILS_READY':
+      return 'Review unlock';
+    case 'SELLER_WINNER_DETAILS_UPDATED':
+      return 'Review updates';
+    default:
+      return 'View auction';
+  }
+}
+
+/**
  * Auction deep-link for a notification.
- * Buyer → public auction detail; Seller → seller management detail.
+ * Specific fulfillment notifications map to dedicated workflow routes:
+ * AUCTION_WON / WINNER_DETAILS_UNLOCKED → /buyer/won/<auction_id>/details
+ * SELLER_WINNER_DETAILS_READY / SELLER_WINNER_DETAILS_UPDATED → /seller/sales
+ * General Buyer → public auction detail; General Seller → seller management detail.
  */
 export function getNotificationAuctionHref(
   role: UserRole,
   auctionId: number | null | undefined,
+  type?: string | null,
 ): string | null {
+  if (type === 'SELLER_WINNER_DETAILS_READY' || type === 'SELLER_WINNER_DETAILS_UPDATED') {
+    return '/seller/sales';
+  }
+
   if (auctionId == null || !Number.isFinite(auctionId) || auctionId <= 0) {
     return null;
   }
+
+  if (type === 'AUCTION_WON' || type === 'WINNER_DETAILS_UNLOCKED') {
+    return `/buyer/won/${auctionId}/details`;
+  }
+
   if (role === 'BUYER') {
     return MARKETPLACE_ROUTES.auctionDetail(auctionId);
   }

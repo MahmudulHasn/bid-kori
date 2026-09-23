@@ -124,11 +124,90 @@ class NotificationService:
         title = 'You won the auction'
         message = (
             f'You won {product_title} with a final bid of '
-            f'{_format_money(final_amount)}.'
+            f'{_format_money(final_amount)}. Complete your winner details for fulfillment.'
         )
         return _safe_create_and_push(
             user_id=user_id,
             type=Notification.Type.AUCTION_WON,
+            title=title,
+            message=message,
+            auction_id=auction_id,
+            is_read=False,
+        )
+
+    @classmethod
+    def create_seller_winner_details_ready_notification(
+        cls,
+        *,
+        seller_id: int,
+        auction_id: int,
+        product_title: str,
+    ) -> Notification | None:
+        """Idempotent for (seller, SELLER_WINNER_DETAILS_READY, auction). Push only on first create."""
+        existing = Notification.objects.filter(
+            user_id=seller_id,
+            type=Notification.Type.SELLER_WINNER_DETAILS_READY,
+            auction_id=auction_id,
+        ).first()
+        if existing is not None:
+            return existing
+
+        title = 'Winner details ready'
+        message = (
+            f'Winner details are ready for {product_title}. '
+            'You can review the unlock option from Seller Sales.'
+        )
+        return _safe_create_and_push(
+            user_id=seller_id,
+            type=Notification.Type.SELLER_WINNER_DETAILS_READY,
+            title=title,
+            message=message,
+            auction_id=auction_id,
+            is_read=False,
+        )
+
+    @classmethod
+    def create_winner_details_unlocked_notification(
+        cls,
+        *,
+        buyer_id: int,
+        auction_id: int,
+        product_title: str,
+    ) -> Notification | None:
+        """Idempotent for (buyer, WINNER_DETAILS_UNLOCKED, auction). Push only on first create."""
+        existing = Notification.objects.filter(
+            user_id=buyer_id,
+            type=Notification.Type.WINNER_DETAILS_UNLOCKED,
+            auction_id=auction_id,
+        ).first()
+        if existing is not None:
+            return existing
+
+        title = 'Fulfillment details unlocked'
+        message = f'The Seller has unlocked your fulfillment details for {product_title}.'
+        return _safe_create_and_push(
+            user_id=buyer_id,
+            type=Notification.Type.WINNER_DETAILS_UNLOCKED,
+            title=title,
+            message=message,
+            auction_id=auction_id,
+            is_read=False,
+        )
+
+    @classmethod
+    def create_seller_winner_details_updated_notification(
+        cls,
+        *,
+        seller_id: int,
+        auction_id: int,
+        product_title: str,
+    ) -> Notification | None:
+        """Notify seller that unlocked fulfillment details were updated."""
+        title = 'Winner details updated'
+        message = f'The winner updated their fulfillment details for {product_title}.'
+        return _safe_create_and_push(
+            user_id=seller_id,
+            type=Notification.Type.SELLER_WINNER_DETAILS_UPDATED,
             title=title,
             message=message,
             auction_id=auction_id,
@@ -312,3 +391,79 @@ def schedule_auction_closed_notifications(
             )
 
     transaction.on_commit(_run)
+
+
+def schedule_seller_winner_details_ready_notification(
+    *,
+    seller_id: int,
+    auction_id: int,
+    product_title: str,
+) -> None:
+    """Register post-commit ready notification for the seller (call inside atomic)."""
+
+    def _run():
+        try:
+            NotificationService.create_seller_winner_details_ready_notification(
+                seller_id=seller_id,
+                auction_id=auction_id,
+                product_title=product_title,
+            )
+        except Exception:
+            logger.exception(
+                'Winner details ready notification side-effect failed auction_id=%s seller_id=%s',
+                auction_id,
+                seller_id,
+            )
+
+    transaction.on_commit(_run)
+
+
+def schedule_winner_details_unlocked_notification(
+    *,
+    buyer_id: int,
+    auction_id: int,
+    product_title: str,
+) -> None:
+    """Register post-commit unlocked notification for the buyer (call inside atomic)."""
+
+    def _run():
+        try:
+            NotificationService.create_winner_details_unlocked_notification(
+                buyer_id=buyer_id,
+                auction_id=auction_id,
+                product_title=product_title,
+            )
+        except Exception:
+            logger.exception(
+                'Winner details unlocked notification side-effect failed auction_id=%s buyer_id=%s',
+                auction_id,
+                buyer_id,
+            )
+
+    transaction.on_commit(_run)
+
+
+def schedule_seller_winner_details_updated_notification(
+    *,
+    seller_id: int,
+    auction_id: int,
+    product_title: str,
+) -> None:
+    """Register post-commit updated notification for the seller (call inside atomic)."""
+
+    def _run():
+        try:
+            NotificationService.create_seller_winner_details_updated_notification(
+                seller_id=seller_id,
+                auction_id=auction_id,
+                product_title=product_title,
+            )
+        except Exception:
+            logger.exception(
+                'Winner details updated notification side-effect failed auction_id=%s seller_id=%s',
+                auction_id,
+                seller_id,
+            )
+
+    transaction.on_commit(_run)
+

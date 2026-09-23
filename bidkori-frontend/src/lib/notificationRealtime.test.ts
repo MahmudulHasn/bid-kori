@@ -207,6 +207,9 @@ describe('toast tone mapping', () => {
     assert.equal(getNotificationToastTone('AUCTION_WON'), 'success');
     assert.equal(getNotificationToastTone('AUCTION_LOST'), 'neutral');
     assert.equal(getNotificationToastTone('SELLER_NEW_BID'), 'info');
+    assert.equal(getNotificationToastTone('SELLER_WINNER_DETAILS_READY'), 'info');
+    assert.equal(getNotificationToastTone('WINNER_DETAILS_UNLOCKED'), 'success');
+    assert.equal(getNotificationToastTone('SELLER_WINNER_DETAILS_UPDATED'), 'info');
     assert.equal(getNotificationToastTone('ENDING_SOON'), 'neutral');
   });
 });

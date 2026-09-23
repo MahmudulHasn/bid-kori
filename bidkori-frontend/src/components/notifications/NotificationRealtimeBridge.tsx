@@ -12,6 +12,7 @@ import {
 } from '@/lib/notificationRealtime';
 import {
   buildNotificationsListApiPath,
+  getNotificationActionLabel,
   getNotificationAuctionHref,
   type NotificationItem,
   type NotificationListResponse,
@@ -31,8 +32,13 @@ function showLiveNotificationToast(
 ): void {
   const tone = getNotificationToastTone(notification.type);
   const text = notification.title || notification.message;
-  const href = getNotificationAuctionHref(role, notification.auction_id);
-  const content = href ? `${text} — View auction` : text;
+  const href = getNotificationAuctionHref(
+    role,
+    notification.auction_id,
+    notification.type,
+  );
+  const actionLabel = getNotificationActionLabel(notification.type);
+  const content = href ? `${text} — ${actionLabel}` : text;
   const options = {
     id: `notification-${notification.id}`,
     duration: 5000,
