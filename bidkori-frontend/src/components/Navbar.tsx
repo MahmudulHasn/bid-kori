@@ -8,7 +8,6 @@ import {
   LogIn,
   LogOut,
   Menu,
-  Search,
   Store,
   User,
   UserPlus,
@@ -31,7 +30,6 @@ const navLinkClass = (active: boolean) =>
 
 const navIcons = {
   Marketplace: Store,
-  Search: Search,
 } as const;
 
 export default function Navbar() {

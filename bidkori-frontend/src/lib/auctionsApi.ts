@@ -17,7 +17,12 @@ import {
   buildAuctionDetailApiPath,
   buildCheckoutApiPath,
 } from '@/lib/checkoutApi';
-import { ACTIVE_AUCTIONS_API_PATH, buildAuctionSearchApiPath } from '@/lib/marketplace';
+import {
+  ACTIVE_AUCTIONS_API_PATH,
+  MARKETPLACE_STATS_API_PATH,
+  type MarketplaceStats,
+  buildAuctionSearchApiPath,
+} from '@/lib/marketplace';
 import type { Auction, AuctionImage, PaymentSummary, UserBid } from '@/lib/types';
 
 export {
@@ -74,6 +79,12 @@ export async function auctionDetailFetcher(url: string): Promise<Auction> {
 export async function auctionListFetcher(url: string): Promise<Auction[]> {
   const { data } = await api.get<unknown>(url);
   return unwrapAuctionList(data);
+}
+
+/** SWR-compatible fetcher for `/auctions/stats/`. */
+export async function marketplaceStatsFetcher(url: string): Promise<MarketplaceStats> {
+  const { data } = await api.get<MarketplaceStats>(url);
+  return data;
 }
 
 export function unwrapBidList(data: unknown): UserBid[] {

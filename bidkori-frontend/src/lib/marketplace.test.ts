@@ -26,7 +26,7 @@ test('marketplace route constants match public IA', () => {
 
 test('public navbar marketplace links exclude legacy dashboard/create', () => {
   const hrefs = PUBLIC_NAV_LINKS.map((link) => link.href);
-  assert.deepEqual(hrefs, ['/auctions', '/search']);
+  assert.deepEqual(hrefs, ['/auctions']);
   assert.equal(
     PUBLIC_NAV_LINKS.some((link) => link.label === 'Marketplace'),
     true,

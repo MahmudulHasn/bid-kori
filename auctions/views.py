@@ -822,3 +822,57 @@ class AnalyticsDashboardView(UserPassesTestMixin, TemplateView):
 
     def test_func(self):
         return self.request.user.is_authenticated and self.request.user.is_staff
+
+
+class MarketplaceStatsView(APIView):
+    """Return aggregate marketplace stats for the landing page hero section.
+
+    Public, unauthenticated endpoint. Returns:
+    - ``active_bids``: total number of bids placed on currently active auctions.
+    - ``verified_sellers``: number of users with role=SELLER.
+    - ``total_traded``: sum of amounts from COMPLETED payments (items traded value).
+    """
+
+    permission_classes = [AllowAny]
+    authentication_classes: list = []
+
+    @extend_schema(
+        summary='Marketplace aggregate stats',
+        description='Returns aggregate stats for the landing page.',
+        responses={200: dict},
+    )
+    def get(self, request):
+        from users.models import UserProfile
+
+        now = timezone.now()
+
+        # Count bids on currently-active auctions
+        active_bids = Bid.objects.filter(
+            auction__status=Auction.Status.ACTIVE,
+            auction__start_time__lte=now,
+            auction__end_time__gt=now,
+        ).count()
+
+        # Total bids placed across all auctions
+        total_bids = Bid.objects.count()
+
+        # Count users with SELLER role
+        verified_sellers = UserProfile.objects.filter(
+            role=UserProfile.Role.SELLER,
+        ).count()
+
+        # Sum of completed payment amounts (total ৳ traded)
+        traded_agg = Payment.objects.filter(
+            status=Payment.Status.COMPLETED,
+        ).aggregate(total=Sum('amount'))
+        total_traded = traded_agg['total'] or 0
+
+        return Response(
+            {
+                'active_bids': active_bids,
+                'total_bids': total_bids,
+                'verified_sellers': verified_sellers,
+                'total_traded': float(total_traded),
+            },
+            status=status.HTTP_200_OK,
+        )

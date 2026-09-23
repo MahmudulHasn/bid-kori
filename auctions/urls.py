@@ -9,6 +9,7 @@ from .views import (
     AuctionImageUploadView,
     AuctionListCreateView,
     CheckoutView,
+    MarketplaceStatsView,
     PlaceBidView,
     TransitionAuctionStateView,
     UserBidsView,
@@ -23,6 +24,7 @@ app_name = 'auctions'
 urlpatterns = [
     path('my-bids/', UserBidsView.as_view(), name='my-bids'),
     path('active/', ActiveAuctionListView.as_view(), name='active-auctions'),
+    path('stats/', MarketplaceStatsView.as_view(), name='marketplace-stats'),
     path('analytics/', AnalyticsSummaryView.as_view(), name='analytics-summary'),
     path(
         'analytics/dashboard/',

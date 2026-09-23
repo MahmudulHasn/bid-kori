@@ -25,7 +25,6 @@ import {
   Sparkles,
   Tag,
   Trophy,
-  UserCheck,
   UserPlus,
   Watch,
   Zap,
@@ -39,12 +38,16 @@ import {
   MarketplaceErrorState,
 } from '@/components/marketplace/MarketplaceStates';
 import { useAuth } from '@/context/AuthContext';
-import { auctionListFetcher } from '@/lib/auctionsApi';
+import { auctionListFetcher, marketplaceStatsFetcher } from '@/lib/auctionsApi';
 import { CATEGORIES_API_PATH, categoriesFetcher } from '@/lib/categoriesApi';
 import {
   ACTIVE_AUCTIONS_API_PATH,
   MARKETPLACE_ROUTES,
+  MARKETPLACE_STATS_API_PATH,
+  type MarketplaceStats,
   buildSearchPageHref,
+  formatStatNumber,
+  formatTradedAmount,
   sortAuctionsEndingSoon,
 } from '@/lib/marketplace';
 import type { Category } from '@/lib/types';
@@ -163,10 +166,31 @@ export default function HomePage() {
     data: categoriesData,
   } = useSWR<Category[]>(CATEGORIES_API_PATH, categoriesFetcher);
 
+  const {
+    data: statsData,
+  } = useSWR<MarketplaceStats>(MARKETPLACE_STATS_API_PATH, marketplaceStatsFetcher, {
+    refreshInterval: 15000,
+  });
+
   const auctions = useMemo(() => auctionsData ?? [], [auctionsData]);
   const categories = useMemo(() => categoriesData ?? [], [categoriesData]);
   const activePreview = useMemo(() => auctions.slice(0, PREVIEW_LIMIT), [auctions]);
   const endingSoon = useMemo(() => sortAuctionsEndingSoon(auctions).slice(0, PREVIEW_LIMIT), [auctions]);
+
+  // Derived real-time stats for hero floating chips with graceful fallbacks
+  const activeBidsDisplay = useMemo(() => {
+    if (!statsData) return '1,200+';
+    const count = statsData.active_bids > 0 ? statsData.active_bids : (statsData.total_bids ?? 0);
+    return formatStatNumber(count, '1,200+');
+  }, [statsData]);
+
+  const verifiedSellersDisplay = useMemo(() => {
+    return formatStatNumber(statsData?.verified_sellers, '500+');
+  }, [statsData]);
+
+  const itemsTradedDisplay = useMemo(() => {
+    return formatTradedAmount(statsData?.total_traded, '৳50L+');
+  }, [statsData]);
 
   // Display top 9 categories for the grid
   const displayCategories = useMemo(() => {
@@ -289,34 +313,6 @@ export default function HomePage() {
                 <span>Sell on BidKori</span>
               </Link>
             </div>
-
-            {/* Trust Badges */}
-            <div className="mt-10 flex flex-wrap items-center gap-4 text-xs text-zinc-400 pt-4 border-t border-zinc-850">
-              <span className="inline-flex items-center gap-1.5 font-medium">
-                <ShieldCheck className="h-4 w-4 text-amber-500" />
-                Secure Payments
-              </span>
-              <span className="text-zinc-700">|</span>
-              <span className="inline-flex items-center gap-1.5 font-medium">
-                <UserCheck className="h-4 w-4 text-amber-500" />
-                Verified Sellers
-              </span>
-              <span className="text-zinc-700">|</span>
-              <span className="inline-flex items-center gap-1.5 font-medium">
-                <Gavel className="h-4 w-4 text-amber-500" />
-                Fair Bidding
-              </span>
-              <span className="text-zinc-700">|</span>
-              <span className="inline-flex items-center gap-1.5 font-medium">
-                <Zap className="h-4 w-4 text-amber-500" />
-                Real-Time Bidding
-              </span>
-              <span className="text-zinc-700">|</span>
-              <span className="inline-flex items-center gap-1.5 font-medium">
-                <Headphones className="h-4 w-4 text-amber-500" />
-                24/7 Support
-              </span>
-            </div>
           </div>
 
           {/* Right Column: Cinematic Video Showcase */}
@@ -335,7 +331,7 @@ export default function HomePage() {
                 </div>
                 <div>
                   <p className="text-[10px] font-medium text-zinc-400">Active Bids</p>
-                  <p className="text-xs font-bold text-white">1,200+</p>
+                  <p className="text-xs font-bold text-white transition-colors duration-300">{activeBidsDisplay}</p>
                 </div>
               </div>
 
@@ -346,7 +342,7 @@ export default function HomePage() {
                 </div>
                 <div>
                   <p className="text-[10px] font-medium text-zinc-400">Verified Sellers</p>
-                  <p className="text-xs font-bold text-white">500+</p>
+                  <p className="text-xs font-bold text-white transition-colors duration-300">{verifiedSellersDisplay}</p>
                 </div>
               </div>
 
@@ -357,7 +353,7 @@ export default function HomePage() {
                 </div>
                 <div>
                   <p className="text-[10px] font-medium text-zinc-400">Items Traded</p>
-                  <p className="text-xs font-bold text-white">৳50L+</p>
+                  <p className="text-xs font-bold text-white transition-colors duration-300">{itemsTradedDisplay}</p>
                 </div>
               </div>
 

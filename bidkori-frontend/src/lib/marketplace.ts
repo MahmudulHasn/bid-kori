@@ -14,7 +14,6 @@ export const MARKETPLACE_ROUTES = {
 /** Primary public navbar marketplace links (legacy dashboard/create excluded). */
 export const PUBLIC_NAV_LINKS = [
   { href: MARKETPLACE_ROUTES.auctions, label: 'Marketplace' },
-  { href: MARKETPLACE_ROUTES.search, label: 'Search' },
 ] as const;
 
 export const LEGACY_PRIMARY_NAV_HREFS = [
@@ -59,6 +58,39 @@ export function buildAuctionSearchApiPath(
 }
 
 export const ACTIVE_AUCTIONS_API_PATH = '/auctions/active/';
+export const MARKETPLACE_STATS_API_PATH = '/auctions/stats/';
+
+export interface MarketplaceStats {
+  active_bids: number;
+  total_bids?: number;
+  verified_sellers: number;
+  total_traded: number;
+}
+
+/** Format numeric stat counts with k/M suffixes and fallback. */
+export function formatStatNumber(val: number | undefined | null, fallback: string): string {
+  if (val === undefined || val === null) return fallback;
+  if (val >= 1000000) return `${(val / 1000000).toFixed(1)}M+`;
+  if (val >= 1000) return `${(val / 1000).toFixed(1)}k+`;
+  return `${val}+`;
+}
+
+/** Format currency volume (BDT) into Lakh (L) or Crore (Cr) notation. */
+export function formatTradedAmount(val: number | undefined | null, fallback: string): string {
+  if (val === undefined || val === null) return fallback;
+  if (val >= 10000000) {
+    const cr = val / 10000000;
+    return `৳${cr >= 10 ? Math.round(cr) : cr.toFixed(1)}Cr+`;
+  }
+  if (val >= 100000) {
+    const lakh = val / 100000;
+    return `৳${lakh >= 10 ? Math.round(lakh) : lakh.toFixed(2)}L+`;
+  }
+  if (val >= 1000) {
+    return `৳${(val / 1000).toFixed(1)}k+`;
+  }
+  return `৳${Math.round(val).toLocaleString()}`;
+}
 
 /** Sort a copy of auctions by soonest end_time first (missing dates last). */
 export function sortAuctionsEndingSoon<T extends { end_time?: string }>(
@@ -73,3 +105,4 @@ export function sortAuctionsEndingSoon<T extends { end_time?: string }>(
     return aMs - bMs;
   });
 }
+
