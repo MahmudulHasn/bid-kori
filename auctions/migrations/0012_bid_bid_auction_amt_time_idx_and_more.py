@@ -18,10 +18,6 @@ class Migration(migrations.Migration):
         ),
         migrations.AddConstraint(
             model_name='bid',
-            constraint=models.UniqueConstraint(fields=('auction', 'amount'), name='unique_auction_bid_amount'),
-        ),
-        migrations.AddConstraint(
-            model_name='bid',
             constraint=models.CheckConstraint(condition=models.Q(('amount__gt', 0)), name='bid_amount_positive'),
         ),
     ]

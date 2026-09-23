@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Gavel, ShieldCheck, Zap, Lock } from 'lucide-react';
+import { ShieldCheck, Zap, Lock } from 'lucide-react';
+import BidKoriLogo from '@/components/brand/BidKoriLogo';
 import { MARKETPLACE_ROUTES } from '@/lib/marketplace';
 import { isRoleWorkspacePath } from '@/lib/authRouting';
 
@@ -23,14 +24,10 @@ export default function Footer() {
           <div className="space-y-3">
             <Link
               href={MARKETPLACE_ROUTES.home}
-              className="inline-flex items-center gap-2 text-lg font-bold text-zinc-900 dark:text-white"
+              className="inline-flex items-center transition-opacity hover:opacity-90"
+              aria-label="BidKori Home"
             >
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-600 text-white">
-                <Gavel className="h-4 w-4" aria-hidden />
-              </div>
-              <span>
-                Bid<span className="text-amber-600 dark:text-amber-400">Kori</span>
-              </span>
+              <BidKoriLogo size="md" />
             </Link>
             <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
               Real-time online auction marketplace with sub-second WebSocket sync and verified seller listings.

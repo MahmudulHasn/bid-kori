@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState } from 'react';
 import {
-  Gavel,
   LayoutDashboard,
   LogIn,
   LogOut,
@@ -16,6 +15,7 @@ import {
   X,
 } from 'lucide-react';
 
+import BidKoriLogo from '@/components/brand/BidKoriLogo';
 import { useAuth } from '@/context/AuthContext';
 import { getRoleHome, isRoleWorkspacePath } from '@/lib/authRouting';
 import { MARKETPLACE_ROUTES, PUBLIC_NAV_LINKS } from '@/lib/marketplace';
@@ -60,14 +60,10 @@ export default function Navbar() {
         {/* Brand Logo */}
         <Link
           href={MARKETPLACE_ROUTES.home}
-          className="group inline-flex items-center gap-2.5 text-lg font-bold tracking-tight text-zinc-900 dark:text-white"
+          className="group inline-flex items-center transition-transform duration-200 hover:opacity-90 active:scale-95"
+          aria-label="BidKori Home"
         >
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-tr from-amber-600 to-amber-500 text-white shadow-sm shadow-amber-600/20 transition-transform duration-200 group-hover:scale-105">
-            <Gavel className="h-5 w-5" aria-hidden />
-          </div>
-          <span>
-            Bid<span className="text-amber-600 dark:text-amber-400">Kori</span>
-          </span>
+          <BidKoriLogo size="md" priority />
         </Link>
 
         {/* Desktop Navigation Links */}

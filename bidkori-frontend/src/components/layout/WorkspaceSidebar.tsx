@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { Store } from 'lucide-react';
 
+import BidKoriLogo from '@/components/brand/BidKoriLogo';
 import {
   getWorkspaceAccent,
   isNavItemActive,
@@ -114,14 +115,7 @@ export default function WorkspaceSidebar({
     >
       <div className="border-b border-zinc-200/80 px-5 py-5 dark:border-zinc-800/80">
         <div className="flex items-center gap-3">
-          <span
-            className={[
-              'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl shadow-xs',
-              accentBrand[accent],
-            ].join(' ')}
-          >
-            <Store className="h-5 w-5" aria-hidden />
-          </span>
+          <BidKoriLogo variant="icon" size="md" className="h-9 w-9 shrink-0" />
           <div className="min-w-0">
             <p className="truncate text-sm font-bold text-zinc-900 dark:text-white">
               {config.brandTitle}

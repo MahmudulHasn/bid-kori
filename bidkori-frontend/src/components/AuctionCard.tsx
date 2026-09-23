@@ -78,10 +78,10 @@ export default function AuctionCard({ auction }: AuctionCardProps) {
     <Link
       href={MARKETPLACE_ROUTES.auctionDetail(auction.id)}
       aria-label={`View auction: ${title}. ${price.label} ${formatAuctionMoney(price.amount)}`}
-      className="group relative flex h-full min-h-[300px] flex-col overflow-hidden rounded-2xl border border-zinc-200/90 bg-white shadow-xs transition-all duration-300 hover:-translate-y-1 hover:border-amber-500/40 hover:shadow-lg dark:border-zinc-800 dark:bg-zinc-900/70 dark:hover:border-amber-500/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500"
+      className="group relative flex h-full min-h-[320px] flex-col overflow-hidden rounded-2xl border border-zinc-200/90 bg-white shadow-xs transition-all duration-300 hover:-translate-y-1 hover:border-amber-500/50 hover:shadow-xl dark:border-zinc-800 dark:bg-[#0B0F1A] dark:hover:border-amber-500/60 dark:hover:shadow-2xl dark:hover:shadow-amber-500/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500"
     >
       {/* Thumbnail area */}
-      <div className="relative aspect-[4/3] w-full overflow-hidden bg-zinc-100 dark:bg-zinc-800/80">
+      <div className="relative aspect-[4/3] w-full overflow-hidden bg-zinc-100 dark:bg-zinc-950">
         {imageUrl && !imgError ? (
           <Image
             src={imageUrl}
@@ -100,7 +100,7 @@ export default function AuctionCard({ auction }: AuctionCardProps) {
         {/* Gradient overlay for badges readability */}
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-black/40 via-black/10 to-transparent"
+          className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-black/50 via-black/15 to-transparent"
         />
 
         {/* Top Badges */}
@@ -108,7 +108,7 @@ export default function AuctionCard({ auction }: AuctionCardProps) {
           <AuctionStatusBadge state={displayState} size="sm" />
 
           {isEndingSoon && (
-            <span className="inline-flex items-center rounded-full border border-rose-500/40 bg-rose-950/85 px-2.5 py-0.5 text-[10px] font-semibold tracking-wide text-rose-300 backdrop-blur-md shadow-xs">
+            <span className="inline-flex items-center rounded-full border border-rose-500/40 bg-rose-950/85 px-2.5 py-0.5 text-[10px] font-bold tracking-wide text-rose-300 backdrop-blur-md shadow-xs">
               Ending Soon
             </span>
           )}
@@ -124,17 +124,17 @@ export default function AuctionCard({ auction }: AuctionCardProps) {
           </div>
         )}
 
-        <h2 className="line-clamp-2 text-sm font-semibold text-zinc-900 transition-colors group-hover:text-amber-700 dark:text-zinc-100 dark:group-hover:text-amber-300 sm:text-base leading-snug">
+        <h2 className="line-clamp-2 text-sm font-bold text-zinc-900 transition-colors group-hover:text-amber-700 dark:text-zinc-100 dark:group-hover:text-amber-400 sm:text-base leading-snug">
           {title}
         </h2>
 
         {/* Price display */}
-        <div className="mt-auto pt-3.5">
+        <div className="mt-auto pt-4">
           <div className="flex flex-col border-t border-zinc-100 pt-3 dark:border-zinc-800/80">
             <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
               {price.label}
             </span>
-            <span className="text-lg font-bold tabular-nums text-zinc-900 dark:text-white sm:text-xl">
+            <span className="text-lg font-extrabold tabular-nums text-zinc-900 dark:text-white sm:text-xl">
               {formatAuctionMoney(price.amount)}
             </span>
           </div>
@@ -146,7 +146,7 @@ export default function AuctionCard({ auction }: AuctionCardProps) {
                 closed
                   ? 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'
                   : isEndingSoon
-                  ? 'bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300'
+                  ? 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300'
                   : 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800/90 dark:text-zinc-300'
               }`}
             >
@@ -160,7 +160,7 @@ export default function AuctionCard({ auction }: AuctionCardProps) {
               </span>
             </span>
 
-            <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 dark:text-amber-400 transition-all duration-200 group-hover:translate-x-0.5 group-hover:text-amber-600">
+            <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-600 dark:text-amber-400 transition-all duration-200 group-hover:translate-x-0.5 group-hover:text-amber-500">
               Bid <ArrowRight className="h-3.5 w-3.5" aria-hidden />
             </span>
           </div>
