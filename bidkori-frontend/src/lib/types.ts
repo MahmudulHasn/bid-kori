@@ -187,3 +187,44 @@ export type WinnerFulfillmentDetails = {
   updated_at?: string | null;
 };
 
+export type SellerWinnerDetailsStatus = {
+  auction_id: number;
+  winner_exists: boolean;
+  details_status: WinnerFulfillmentStatus;
+  can_unlock: boolean;
+  is_unlocked: boolean;
+  unlock_fee: string;
+  currency: string;
+};
+
+export type WinnerDetailsUnlockResponse = {
+  auction_id: number;
+  status: string;
+  is_unlocked: boolean;
+  already_unlocked: boolean;
+  fee_amount: string;
+  currency: string;
+  payment_reference: string;
+  unlocked_at: string;
+};
+
+export type SellerUnlockedWinnerDetails = {
+  auction_id: number;
+  buyer_username: string;
+  full_name: string;
+  phone: string;
+  email?: string;
+  address_line: string;
+  area: string;
+  district: string;
+  division: string;
+  postal_code?: string;
+  preferred_contact_method: ContactMethod;
+  delivery_note?: string;
+  status: WinnerFulfillmentStatus;
+  submitted_at?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+

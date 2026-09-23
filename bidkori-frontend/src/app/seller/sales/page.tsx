@@ -1,12 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { Suspense, useMemo, type ReactNode } from 'react';
+import { Fragment, Suspense, useMemo, useState, type ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { format } from 'date-fns';
-import { Banknote, Percent, Receipt, Wallet } from 'lucide-react';
+import { Banknote, ChevronDown, ChevronUp, Percent, Receipt, Wallet } from 'lucide-react';
 import useSWR from 'swr';
 
+import SellerWinnerDetailsCard from '@/components/seller/SellerWinnerDetailsCard';
 import { getApiErrorMessage } from '@/lib/apiErrors';
 import { formatAdminMoney } from '@/lib/adminDashboard';
 import {
@@ -109,6 +110,20 @@ function SellerSalesContent() {
   const rows = sales?.results ?? [];
   const empty = !salesBusy && !salesErrorMessage && (sales?.count ?? 0) === 0;
   const showLegacy = hasLegacySellerSales(earnings ?? null);
+
+  const [collapsedAuctions, setCollapsedAuctions] = useState<Set<number>>(() => new Set());
+
+  function toggleAuction(auctionId: number) {
+    setCollapsedAuctions((prev) => {
+      const next = new Set(prev);
+      if (next.has(auctionId)) {
+        next.delete(auctionId);
+      } else {
+        next.add(auctionId);
+      }
+      return next;
+    });
+  }
 
   const pageLabel = useMemo(() => {
     if (!sales) return null;
@@ -274,53 +289,83 @@ function SellerSalesContent() {
                   <th className="px-2 py-2 font-medium">Platform fee</th>
                   <th className="px-2 py-2 font-medium">Net</th>
                   <th className="px-2 py-2 font-medium">Date</th>
+                  <th className="px-2 py-2 font-medium text-right">Fulfillment</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
                 {rows.map((row) => {
                   const legacy = isLegacySaleRow(row);
+                  const isExpanded = !collapsedAuctions.has(row.auction_id);
                   return (
-                    <tr key={row.payment_id}>
-                      <td className="px-2 py-3">
-                        <Link
-                          href={sellerAuctionDetailPath(row.auction_id)}
-                          className="font-medium text-sky-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:text-sky-300"
+                    <Fragment key={row.payment_id}>
+                      <tr className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30">
+                        <td className="px-2 py-3">
+                          <Link
+                            href={sellerAuctionDetailPath(row.auction_id)}
+                            className="font-medium text-sky-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:text-sky-300"
+                          >
+                            {row.auction_title}
+                          </Link>
+                        </td>
+                        <td className="px-2 py-3 text-zinc-700 dark:text-zinc-300">
+                          {row.buyer_username}
+                        </td>
+                        <td className="px-2 py-3 tabular-nums text-zinc-900 dark:text-white">
+                          {formatAdminMoney(row.amount)}
+                        </td>
+                        <td
+                          className="px-2 py-3 tabular-nums text-zinc-700 dark:text-zinc-300"
+                          title={legacy ? LEGACY_SALE_FEE_UNAVAILABLE : undefined}
                         >
-                          {row.auction_title}
-                        </Link>
-                      </td>
-                      <td className="px-2 py-3 text-zinc-700 dark:text-zinc-300">
-                        {row.buyer_username}
-                      </td>
-                      <td className="px-2 py-3 tabular-nums text-zinc-900 dark:text-white">
-                        {formatAdminMoney(row.amount)}
-                      </td>
-                      <td
-                        className="px-2 py-3 tabular-nums text-zinc-700 dark:text-zinc-300"
-                        title={legacy ? LEGACY_SALE_FEE_UNAVAILABLE : undefined}
-                      >
-                        {legacy ? '—' : formatFeeRateDisplay(row.fee_rate)}
-                      </td>
-                      <td
-                        className="px-2 py-3 tabular-nums text-zinc-700 dark:text-zinc-300"
-                        title={legacy ? LEGACY_SALE_FEE_UNAVAILABLE : undefined}
-                      >
-                        {legacy
-                          ? '—'
-                          : formatAdminMoney(row.platform_fee)}
-                      </td>
-                      <td
-                        className="px-2 py-3 tabular-nums text-zinc-900 dark:text-white"
-                        title={legacy ? LEGACY_SALE_FEE_UNAVAILABLE : undefined}
-                      >
-                        {legacy
-                          ? '—'
-                          : formatAdminMoney(row.seller_net_amount)}
-                      </td>
-                      <td className="px-2 py-3 text-zinc-500 dark:text-zinc-400">
-                        {formatSaleDate(row.created_at)}
-                      </td>
-                    </tr>
+                          {legacy ? '—' : formatFeeRateDisplay(row.fee_rate)}
+                        </td>
+                        <td
+                          className="px-2 py-3 tabular-nums text-zinc-700 dark:text-zinc-300"
+                          title={legacy ? LEGACY_SALE_FEE_UNAVAILABLE : undefined}
+                        >
+                          {legacy
+                            ? '—'
+                            : formatAdminMoney(row.platform_fee)}
+                        </td>
+                        <td
+                          className="px-2 py-3 tabular-nums text-zinc-900 dark:text-white"
+                          title={legacy ? LEGACY_SALE_FEE_UNAVAILABLE : undefined}
+                        >
+                          {legacy
+                            ? '—'
+                            : formatAdminMoney(row.seller_net_amount)}
+                        </td>
+                        <td className="px-2 py-3 text-zinc-500 dark:text-zinc-400">
+                          {formatSaleDate(row.created_at)}
+                        </td>
+                        <td className="px-2 py-3 text-right">
+                          <button
+                            type="button"
+                            onClick={() => toggleAuction(row.auction_id)}
+                            aria-expanded={isExpanded}
+                            aria-label={`${isExpanded ? 'Hide' : 'View'} winner fulfillment details for ${row.auction_title}`}
+                            className="inline-flex items-center gap-1 rounded-lg border border-zinc-200 px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                          >
+                            <span>{isExpanded ? 'Hide' : 'Winner Details'}</span>
+                            {isExpanded ? (
+                              <ChevronUp className="h-3.5 w-3.5" aria-hidden="true" />
+                            ) : (
+                              <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
+                            )}
+                          </button>
+                        </td>
+                      </tr>
+                      {isExpanded ? (
+                        <tr key={`${row.payment_id}-fulfillment`}>
+                          <td colSpan={8} className="p-3 bg-zinc-50/50 dark:bg-zinc-900/40">
+                            <SellerWinnerDetailsCard
+                              auctionId={row.auction_id}
+                              auctionTitle={row.auction_title}
+                            />
+                          </td>
+                        </tr>
+                      ) : null}
+                    </Fragment>
                   );
                 })}
               </tbody>

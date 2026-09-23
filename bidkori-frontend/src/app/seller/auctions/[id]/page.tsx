@@ -19,6 +19,7 @@ import {
 } from '@/lib/auctionDisplay';
 import AuctionImageUploadSection from '@/components/seller/AuctionImageUploadSection';
 import SellerModerationNotice from '@/components/seller/SellerModerationNotice';
+import SellerWinnerDetailsCard from '@/components/seller/SellerWinnerDetailsCard';
 import {
   AUCTIONS_LIST_API_PATH,
   auctionDetailFetcher,
@@ -454,6 +455,19 @@ function OwnedAuctionDetail({
           ) : null}
         </dl>
       </section>
+
+      {auction.status?.toUpperCase() === 'CLOSED' &&
+      (auction.winning_bidder != null || auction.winning_bidder_username != null) ? (
+        <section className="mt-8" aria-labelledby="winner-fulfillment-heading">
+          <h2 id="winner-fulfillment-heading" className="sr-only">
+            Winner Fulfillment
+          </h2>
+          <SellerWinnerDetailsCard
+            auctionId={auction.id}
+            auctionTitle={title}
+          />
+        </section>
+      ) : null}
     </>
   );
 }
