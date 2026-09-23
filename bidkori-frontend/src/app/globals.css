@@ -102,6 +102,16 @@ body {
   outline-offset: 2px;
 }
 
+/* Inputs, textareas, and selects manage their own focus borders/rings */
+input:focus,
+input:focus-visible,
+textarea:focus,
+textarea:focus-visible,
+select:focus,
+select:focus-visible {
+  outline: none;
+}
+
 /* Reduced motion preference */
 @media (prefers-reduced-motion: reduce) {
   *,

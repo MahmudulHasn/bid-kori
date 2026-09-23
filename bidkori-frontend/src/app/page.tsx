@@ -270,7 +270,8 @@ export default function HomePage() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search for products, laptops, phones, furniture..."
-                className="w-full bg-transparent px-3 py-2 text-sm text-white placeholder-zinc-500 outline-none"
+                className="w-full bg-transparent px-3 py-2 text-sm text-white placeholder-zinc-500 outline-none focus:outline-none focus-visible:outline-none focus:ring-0 focus-visible:ring-0 border-none"
+                style={{ outline: 'none', boxShadow: 'none' }}
               />
               <button
                 type="submit"

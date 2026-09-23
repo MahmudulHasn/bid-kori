@@ -13,6 +13,7 @@ export const MARKETPLACE_ROUTES = {
 
 /** Primary public navbar marketplace links (legacy dashboard/create excluded). */
 export const PUBLIC_NAV_LINKS = [
+  { href: MARKETPLACE_ROUTES.home, label: 'Home' },
   { href: MARKETPLACE_ROUTES.auctions, label: 'Marketplace' },
 ] as const;
 

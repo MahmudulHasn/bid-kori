@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState } from 'react';
 import {
+  Home,
   LayoutDashboard,
   LogIn,
   LogOut,
@@ -29,6 +30,7 @@ const navLinkClass = (active: boolean) =>
   ].join(' ');
 
 const navIcons = {
+  Home: Home,
   Marketplace: Store,
 } as const;
 
@@ -69,7 +71,9 @@ export default function Navbar() {
           {PUBLIC_NAV_LINKS.map((link) => {
             const Icon = navIcons[link.label];
             const active =
-              pathname === link.href || pathname.startsWith(`${link.href}/`);
+              link.href === '/'
+                ? pathname === '/'
+                : pathname === link.href || pathname.startsWith(`${link.href}/`);
             return (
               <Link
                 key={link.href}
@@ -164,7 +168,9 @@ export default function Navbar() {
             {PUBLIC_NAV_LINKS.map((link) => {
               const Icon = navIcons[link.label];
               const active =
-                pathname === link.href || pathname.startsWith(`${link.href}/`);
+                link.href === '/'
+                  ? pathname === '/'
+                  : pathname === link.href || pathname.startsWith(`${link.href}/`);
               return (
                 <Link
                   key={link.href}
