@@ -6,6 +6,7 @@ export const MARKETPLACE_ROUTES = {
   home: '/',
   auctions: '/auctions',
   search: '/search',
+  contact: '/contact',
   auctionDetail: (id: string | number) => `/auctions/${id}`,
   buyerWon: '/buyer/won',
   buyerWonDetails: (id: string | number) => `/buyer/won/${id}/details`,
@@ -15,6 +16,7 @@ export const MARKETPLACE_ROUTES = {
 export const PUBLIC_NAV_LINKS = [
   { href: MARKETPLACE_ROUTES.home, label: 'Home' },
   { href: MARKETPLACE_ROUTES.auctions, label: 'Marketplace' },
+  { href: MARKETPLACE_ROUTES.contact, label: 'Contact Us' },
 ] as const;
 
 export const LEGACY_PRIMARY_NAV_HREFS = [

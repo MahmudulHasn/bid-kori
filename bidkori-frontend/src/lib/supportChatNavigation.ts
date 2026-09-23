@@ -56,6 +56,14 @@ export const SAFE_ROUTE_REGISTRY: readonly SafeRouteEntry[] = [
     keywords: ['register', 'sign up', 'create account', 'join bidkori', 'become a seller'],
     defaultLabel: 'Create Account',
   },
+  {
+    href: '/contact',
+    title: 'Contact Us',
+    description: 'Contact BidKori 24/7 customer support, dispute resolution, and office desk.',
+    roles: ['ANONYMOUS', 'BUYER', 'SELLER', 'ADMIN'],
+    keywords: ['contact', 'contact us', 'support', 'help desk', 'customer support', 'email support', 'hotline'],
+    defaultLabel: 'Contact Support',
+  },
 
   // BUYER
   {

@@ -20,19 +20,24 @@ test('marketplace route constants match public IA', () => {
   assert.equal(MARKETPLACE_ROUTES.home, '/');
   assert.equal(MARKETPLACE_ROUTES.auctions, '/auctions');
   assert.equal(MARKETPLACE_ROUTES.search, '/search');
+  assert.equal(MARKETPLACE_ROUTES.contact, '/contact');
   assert.equal(MARKETPLACE_ROUTES.auctionDetail(42), '/auctions/42');
   assert.equal(ACTIVE_AUCTIONS_API_PATH, '/auctions/active/');
 });
 
 test('public navbar marketplace links exclude legacy dashboard/create', () => {
   const hrefs = PUBLIC_NAV_LINKS.map((link) => link.href);
-  assert.deepEqual(hrefs, ['/', '/auctions']);
+  assert.deepEqual(hrefs, ['/', '/auctions', '/contact']);
   assert.equal(
     PUBLIC_NAV_LINKS.some((link) => link.label === 'Home'),
     true,
   );
   assert.equal(
     PUBLIC_NAV_LINKS.some((link) => link.label === 'Marketplace'),
+    true,
+  );
+  assert.equal(
+    PUBLIC_NAV_LINKS.some((link) => link.label === 'Contact Us'),
     true,
   );
   for (const legacy of LEGACY_PRIMARY_NAV_HREFS) {

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState } from 'react';
 import {
+  Headphones,
   Home,
   LayoutDashboard,
   LogIn,
@@ -32,6 +33,7 @@ const navLinkClass = (active: boolean) =>
 const navIcons = {
   Home: Home,
   Marketplace: Store,
+  'Contact Us': Headphones,
 } as const;
 
 export default function Navbar() {

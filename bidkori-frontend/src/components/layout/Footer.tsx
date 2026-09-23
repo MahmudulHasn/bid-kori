@@ -78,6 +78,14 @@ export default function Footer() {
                   Become a Seller
                 </Link>
               </li>
+              <li>
+                <Link
+                  href={MARKETPLACE_ROUTES.contact}
+                  className="text-zinc-600 hover:text-amber-700 dark:text-zinc-400 dark:hover:text-amber-300"
+                >
+                  Contact Support
+                </Link>
+              </li>
             </ul>
           </div>
 
