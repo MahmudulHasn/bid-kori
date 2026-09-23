@@ -290,6 +290,11 @@ export type AdminDashboardSummary = {
   products: AdminDashboardProductStats;
   bids: AdminDashboardBidStats;
   finance: AdminDashboardFinanceStats;
+  fulfillment?: {
+    completed_locked: number;
+    unlocked: number;
+    recent_unlocks_7d: number;
+  };
   moderation: AdminDashboardModerationStats;
   recent_activity: AdminDashboardRecentActivity;
   system_health: AdminDashboardSystemHealth;

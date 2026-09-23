@@ -121,3 +121,28 @@ def admin_financial_summary() -> dict:
             'bidding volume, unpaid closed auctions, or real bank settlement.'
         ),
     }
+
+
+def unlock_revenue_summary() -> dict:
+    """Winner Details unlock revenue — separate monetization stream.
+
+    SUM of fee_amount on PAID WinnerDetailsUnlock records only.
+    Not combined with seller successful-sale platform fees.
+    """
+    from .models import WinnerDetailsUnlock
+
+    qs = WinnerDetailsUnlock.objects.filter(
+        status=WinnerDetailsUnlock.Status.PAID,
+    )
+    agg = qs.aggregate(
+        total=Coalesce(Sum('fee_amount'), ZERO),
+        count=Count('id'),
+    )
+    return {
+        'unlock_revenue': money_str(agg['total']),
+        'unlock_count': agg['count'] or 0,
+        'disclosure': (
+            'Winner Details unlock fee revenue from mock/internal payments. '
+            'Separate from seller successful-sale platform fees.'
+        ),
+    }

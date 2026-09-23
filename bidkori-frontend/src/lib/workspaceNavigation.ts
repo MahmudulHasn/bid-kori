@@ -15,6 +15,7 @@ import { ADMIN_BIDS_PATH } from './adminBids.ts';
 import { ADMIN_ANALYTICS_PATH } from './adminAnalytics.ts';
 import { ADMIN_USERS_PATH } from './adminUsers.ts';
 import { ADMIN_CATEGORIES_PATH } from './adminCategories.ts';
+import { ADMIN_FULFILLMENT_PATH } from './adminFulfillment.ts';
 
 export type WorkspaceNavItem = {
   id: string;
@@ -53,6 +54,7 @@ export {
   ADMIN_CATEGORIES_PATH,
 };
 export const ADMIN_MODERATION_PATH = '/admin/moderation';
+export { ADMIN_FULFILLMENT_PATH };
 export const SELLER_PRODUCTS_PATH = '/seller/products';
 export const SELLER_PRODUCT_CREATE_PATH = '/seller/products/create';
 export const SELLER_AUCTIONS_PATH = '/seller/auctions';
@@ -129,6 +131,7 @@ const ADMIN_NAV: readonly WorkspaceNavItem[] = [
   { id: 'categories', label: 'Categories', enabled: false },
   { id: 'reports', label: 'Reports', enabled: false },
   { id: 'analytics', label: 'Analytics', href: ADMIN_ANALYTICS_PATH, enabled: true },
+  { id: 'fulfillment', label: 'Fulfillment', href: ADMIN_FULFILLMENT_PATH, enabled: true },
   { id: 'profile', label: 'Profile', href: ADMIN_PROFILE_PATH, enabled: true },
   { id: 'settings', label: 'Settings', href: ADMIN_SETTINGS_PATH, enabled: true },
 ];

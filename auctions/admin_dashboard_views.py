@@ -6,6 +6,8 @@ Admin Command Center in a single staff-only request.
 
 from __future__ import annotations
 
+from datetime import timedelta
+
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import connection
@@ -17,7 +19,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from auctions.financial import admin_financial_summary
-from auctions.models import Auction, Bid, Payment
+from auctions.models import Auction, Bid, Payment, WinnerDetailsUnlock, WinnerFulfillmentDetails
 from products.models import Product
 from users.models import UserProfile
 
@@ -181,6 +183,23 @@ class AdminDashboardSummaryView(APIView):
             'api': 'healthy',
         }
 
+        # 9. Fulfillment snapshot (ADMIN-W01)
+        closed_with_winner = Auction.objects.filter(
+            status=Auction.Status.CLOSED,
+            winning_bidder__isnull=False,
+        )
+        completed_wfd = closed_with_winner.filter(
+            winner_fulfillment_details__status=WinnerFulfillmentDetails.Status.COMPLETED,
+        )
+        unlocked_auctions = completed_wfd.filter(
+            winner_details_unlock__status=WinnerDetailsUnlock.Status.PAID,
+        ).count()
+        completed_locked_auctions = completed_wfd.count() - unlocked_auctions
+        recent_unlocks_7d = WinnerDetailsUnlock.objects.filter(
+            status=WinnerDetailsUnlock.Status.PAID,
+            paid_at__gte=now - timedelta(days=7),
+        ).count()
+
         payload = {
             'users': {
                 'total': total_users,
@@ -206,6 +225,11 @@ class AdminDashboardSummaryView(APIView):
                 'total': total_bids,
             },
             'finance': finance_summary,
+            'fulfillment': {
+                'completed_locked': completed_locked_auctions,
+                'unlocked': unlocked_auctions,
+                'recent_unlocks_7d': recent_unlocks_7d,
+            },
             'moderation': moderation_stats,
             'recent_activity': {
                 'users': recent_users,

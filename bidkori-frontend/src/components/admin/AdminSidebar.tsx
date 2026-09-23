@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   BarChart3,
+  ClipboardCheck,
   Gavel,
   History,
   Layers,
@@ -25,6 +26,7 @@ import {
   ADMIN_AUCTIONS_PATH,
   ADMIN_BIDS_PATH,
   ADMIN_CATEGORIES_PATH,
+  ADMIN_FULFILLMENT_PATH,
   ADMIN_MODERATION_PATH,
   ADMIN_PRODUCTS_PATH,
   ADMIN_PROFILE_PATH,
@@ -100,6 +102,13 @@ export default function AdminSidebar({
           label: 'Products',
           href: ADMIN_PRODUCTS_PATH,
           icon: Package,
+        },
+        {
+          label: 'Fulfillment',
+          href: ADMIN_FULFILLMENT_PATH,
+          icon: ClipboardCheck,
+          badge: summary?.fulfillment?.completed_locked,
+          badgeColor: 'bg-blue-500/15 text-blue-700 dark:text-blue-300',
         },
       ],
     },
