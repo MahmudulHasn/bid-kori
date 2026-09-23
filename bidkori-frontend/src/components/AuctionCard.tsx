@@ -7,6 +7,7 @@ import { ArrowRight, Clock3, Tag } from 'lucide-react';
 
 import AuctionStatusBadge from '@/components/auctions/AuctionStatusBadge';
 import { useAuctionTimer } from '@/hooks/useAuctionTimer';
+import { getAuctionDisplayState } from '@/lib/auctionDetailUx';
 import {
   formatAuctionMoney,
   getAuctionPriceLabel,
@@ -44,13 +45,29 @@ export default function AuctionCard({ auction }: AuctionCardProps) {
   const timer = useAuctionTimer(auction.end_time, auction.server_time, {
     forceExpired:
       auction.status === 'CLOSED' || auction.status === 'CANCELLED',
+    startTime: auction.start_time,
   });
-  const closed =
-    timer.isClosed ||
-    auction.status === 'CLOSED' ||
-    auction.status === 'CANCELLED';
 
-  const isEndingSoon = !closed && timer.days === 0 && timer.hours < 2;
+  const parsedServerMs = auction.server_time
+    ? Date.parse(auction.server_time)
+    : Number.NaN;
+  const nowMs =
+    timer.estimatedNowMs ??
+    (Number.isFinite(parsedServerMs) ? parsedServerMs : Date.now());
+
+  const displayState = getAuctionDisplayState({
+    status: auction.status,
+    startTime: auction.start_time,
+    endTime: auction.end_time,
+    nowMs,
+  });
+
+  const closed =
+    displayState === 'CLOSED' ||
+    displayState === 'CANCELLED' ||
+    timer.isClosed;
+
+  const isEndingSoon = displayState === 'LIVE' && timer.days === 0 && timer.hours < 2;
   const categoryName = typeof (product as Record<string, unknown>)?.category_name === 'string'
     ? (product as Record<string, unknown>).category_name as string
     : typeof (auction as Record<string, unknown>)?.category_name === 'string'
@@ -88,7 +105,7 @@ export default function AuctionCard({ auction }: AuctionCardProps) {
 
         {/* Top Badges */}
         <div className="absolute left-3 right-3 top-3 flex items-center justify-between pointer-events-none">
-          <AuctionStatusBadge state={auction.status || 'CLOSED'} size="sm" />
+          <AuctionStatusBadge state={displayState} size="sm" />
 
           {isEndingSoon && (
             <span className="inline-flex items-center rounded-full border border-rose-500/40 bg-rose-950/85 px-2.5 py-0.5 text-[10px] font-semibold tracking-wide text-rose-300 backdrop-blur-md shadow-xs">

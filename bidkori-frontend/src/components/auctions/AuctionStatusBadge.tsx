@@ -2,7 +2,7 @@
 
 import { Ban, CheckCircle2, Clock, Flame, Loader2 } from 'lucide-react';
 
-export type AuctionState = 'LIVE' | 'UPCOMING' | 'FINALIZING' | 'CLOSED' | 'CANCELLED' | string;
+export type AuctionState = 'LIVE' | 'ACTIVE' | 'UPCOMING' | 'FINALIZING' | 'CLOSED' | 'CANCELLED' | string;
 
 export default function AuctionStatusBadge({
   state,
@@ -23,6 +23,7 @@ export default function AuctionStatusBadge({
 
   switch (normState) {
     case 'LIVE':
+    case 'ACTIVE':
       return (
         <span
           className={`inline-flex items-center rounded-full border border-emerald-500/30 bg-emerald-950/80 font-semibold tracking-wide text-emerald-300 shadow-xs backdrop-blur-md ${sizeClasses} ${className}`}
