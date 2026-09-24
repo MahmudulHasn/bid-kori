@@ -120,7 +120,7 @@ class AuctionViewSet(viewsets.ModelViewSet):
 
         status_param = self.request.query_params.get('status')
         category = self.request.query_params.get('category')
-        search = self.request.query_params.get('search')
+        search = (self.request.query_params.get('search') or self.request.query_params.get('q') or '').strip()
 
         if status_param:
             queryset = queryset.filter(status__iexact=status_param)
@@ -634,7 +634,7 @@ class ActiveAuctionListView(APIView):
         ).prefetch_related('bids__bidder', 'images')
 
         category = request.query_params.get('category')
-        search = request.query_params.get('search')
+        search = (request.query_params.get('search') or request.query_params.get('q') or '').strip()
         if category:
             auctions = auctions.filter(
                 Q(product__category__slug__iexact=category)
@@ -644,6 +644,8 @@ class ActiveAuctionListView(APIView):
             auctions = auctions.filter(
                 Q(product__title__icontains=search)
                 | Q(product__description__icontains=search)
+                | Q(product__category__name__icontains=search)
+                | Q(product__category__slug__icontains=search)
             )
 
         serializer = AuctionDetailSerializer(

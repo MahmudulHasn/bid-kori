@@ -61,6 +61,46 @@ export function buildAuctionSearchApiPath(
 }
 
 export const ACTIVE_AUCTIONS_API_PATH = '/auctions/active/';
+
+/**
+ * Build the active auctions API path with optional category and search query filters.
+ */
+export function buildActiveAuctionsApiPath(options?: {
+  category?: string | null;
+  search?: string | null;
+}): string {
+  const params = new URLSearchParams();
+  const cat = options?.category?.trim();
+  const search = normalizeSearchQuery(options?.search);
+  if (cat) {
+    params.set('category', cat);
+  }
+  if (search) {
+    params.set('search', search);
+  }
+  const qs = params.toString();
+  return qs ? `${ACTIVE_AUCTIONS_API_PATH}?${qs}` : ACTIVE_AUCTIONS_API_PATH;
+}
+
+/**
+ * Build the URL href for the marketplace active auctions page with optional category & search query.
+ */
+export function buildMarketplaceAuctionsHref(options?: {
+  category?: string | null;
+  query?: string | null;
+}): string {
+  const params = new URLSearchParams();
+  const cat = options?.category?.trim();
+  const q = normalizeSearchQuery(options?.query);
+  if (cat) {
+    params.set('category', cat);
+  }
+  if (q) {
+    params.set('q', q);
+  }
+  const qs = params.toString();
+  return qs ? `${MARKETPLACE_ROUTES.auctions}?${qs}` : MARKETPLACE_ROUTES.auctions;
+}
 export const MARKETPLACE_STATS_API_PATH = '/auctions/stats/';
 
 export interface MarketplaceStats {

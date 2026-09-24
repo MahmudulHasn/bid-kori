@@ -1,8 +1,8 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search } from 'lucide-react';
+import { Search, X } from 'lucide-react';
 
 import { buildSearchPageHref } from '@/lib/marketplace';
 
@@ -11,18 +11,44 @@ type AuctionToolbarProps = {
   initialQuery?: string;
   /** Shown beside the form (e.g. result count). */
   resultSummary?: string | null;
+  /** Custom submit handler. If provided, overrides default routing to /search. */
+  onSearch?: (query: string) => void;
+  /** Optional callback when user clears the search input. */
+  onClear?: () => void;
+  /** Optional custom input placeholder. */
+  placeholder?: string;
 };
 
 export default function AuctionToolbar({
   initialQuery = '',
   resultSummary = null,
+  onSearch,
+  onClear,
+  placeholder = 'Search by title, brand, category…',
 }: AuctionToolbarProps) {
   const router = useRouter();
   const [query, setQuery] = useState(initialQuery);
 
+  useEffect(() => {
+    setQuery(initialQuery);
+  }, [initialQuery]);
+
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    router.push(buildSearchPageHref(query));
+    if (onSearch) {
+      onSearch(query);
+    } else {
+      router.push(buildSearchPageHref(query));
+    }
+  };
+
+  const handleClear = () => {
+    setQuery('');
+    if (onClear) {
+      onClear();
+    } else if (onSearch) {
+      onSearch('');
+    }
   };
 
   return (
@@ -46,9 +72,20 @@ export default function AuctionToolbar({
             name="q"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search by title, brand, category…"
-            className="min-h-[44px] w-full rounded-xl border border-zinc-200/90 bg-white py-2.5 pl-10 pr-3.5 text-sm text-zinc-900 shadow-2xs outline-none transition focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 dark:border-zinc-800 dark:bg-zinc-900/90 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500"
+            placeholder={placeholder}
+            className="min-h-[44px] w-full rounded-xl border border-zinc-200/90 bg-white py-2.5 pl-10 pr-9 text-sm text-zinc-900 shadow-2xs outline-none transition focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 dark:border-zinc-800 dark:bg-zinc-900/90 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500"
           />
+          {query ? (
+            <button
+              type="button"
+              onClick={handleClear}
+              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-0.5 text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+              title="Clear search"
+              aria-label="Clear search"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          ) : null}
         </div>
         <button
           type="submit"

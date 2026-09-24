@@ -7,7 +7,9 @@ import {
   LEGACY_PRIMARY_NAV_HREFS,
   MARKETPLACE_ROUTES,
   PUBLIC_NAV_LINKS,
+  buildActiveAuctionsApiPath,
   buildAuctionSearchApiPath,
+  buildMarketplaceAuctionsHref,
   buildSearchPageHref,
   isLegacyPrimaryNavHref,
   normalizeSearchQuery,
@@ -81,6 +83,46 @@ test('buildAuctionSearchApiPath uses backend search param safely', () => {
   assert.equal(
     buildAuctionSearchApiPath('c++ & rust'),
     '/auctions/?search=c%2B%2B%20%26%20rust',
+  );
+});
+
+test('buildActiveAuctionsApiPath builds correct active endpoint with filters', () => {
+  assert.equal(buildActiveAuctionsApiPath(), '/auctions/active/');
+  assert.equal(
+    buildActiveAuctionsApiPath({ category: 'electronics' }),
+    '/auctions/active/?category=electronics',
+  );
+  assert.equal(
+    buildActiveAuctionsApiPath({ search: 'camera' }),
+    '/auctions/active/?search=camera',
+  );
+  assert.equal(
+    buildActiveAuctionsApiPath({ category: 'cameras', search: 'retro lens' }),
+    '/auctions/active/?category=cameras&search=retro+lens',
+  );
+  assert.equal(
+    buildActiveAuctionsApiPath({ category: '', search: '   ' }),
+    '/auctions/active/',
+  );
+});
+
+test('buildMarketplaceAuctionsHref preserves or clears search and category', () => {
+  assert.equal(buildMarketplaceAuctionsHref(), '/auctions');
+  assert.equal(
+    buildMarketplaceAuctionsHref({ category: 'fashion' }),
+    '/auctions?category=fashion',
+  );
+  assert.equal(
+    buildMarketplaceAuctionsHref({ query: 'shoes' }),
+    '/auctions?q=shoes',
+  );
+  assert.equal(
+    buildMarketplaceAuctionsHref({ category: 'fashion', query: 'sneakers' }),
+    '/auctions?category=fashion&q=sneakers',
+  );
+  assert.equal(
+    buildMarketplaceAuctionsHref({ category: '', query: '   ' }),
+    '/auctions',
   );
 });
 
