@@ -199,7 +199,7 @@ export default function AdminCategoriesPage() {
             type="button"
             onClick={() => void mutate()}
             disabled={isValidating}
-            className="flex h-9 items-center gap-1.5 rounded-xl border border-zinc-200 bg-white px-3 text-xs font-semibold text-zinc-700 shadow-2xs transition hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
+            className="flex h-9 items-center gap-1.5 rounded-xl border border-zinc-200 bg-white px-3 text-xs font-semibold text-zinc-700 shadow-2xs transition hover:border-zinc-300 hover:bg-zinc-100 hover:text-zinc-900 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
           >
             <RefreshCw
               className={`h-3.5 w-3.5 ${isValidating ? 'animate-spin text-violet-600' : ''}`}
@@ -386,7 +386,7 @@ export default function AdminCategoriesPage() {
                     <button
                       type="button"
                       onClick={() => openEditModal(cat)}
-                      className="font-medium text-violet-600 dark:text-violet-400"
+                      className="font-medium text-violet-600 transition hover:text-violet-700 hover:underline dark:text-violet-400 dark:hover:text-violet-300"
                     >
                       Edit
                     </button>
@@ -394,7 +394,7 @@ export default function AdminCategoriesPage() {
                     <button
                       type="button"
                       onClick={() => openDeleteModal(cat)}
-                      className="font-medium text-red-600 dark:text-red-400"
+                      className="font-medium text-red-600 transition hover:text-red-700 hover:underline dark:text-red-400 dark:hover:text-red-300"
                     >
                       Delete
                     </button>
@@ -422,7 +422,7 @@ export default function AdminCategoriesPage() {
                 type="button"
                 onClick={closeModal}
                 disabled={isSubmitting}
-                className="rounded-lg p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+                className="rounded-lg p-1 text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -530,7 +530,7 @@ export default function AdminCategoriesPage() {
                   type="button"
                   onClick={closeModal}
                   disabled={isSubmitting}
-                  className="rounded-xl border border-zinc-200 px-4 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                  className="rounded-xl border border-zinc-200 px-4 py-2 text-xs font-semibold text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-100 hover:text-zinc-900 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-800"
                 >
                   Cancel
                 </button>
@@ -590,7 +590,7 @@ export default function AdminCategoriesPage() {
                 type="button"
                 onClick={closeModal}
                 disabled={isSubmitting}
-                className="rounded-xl border border-zinc-200 px-4 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                className="rounded-xl border border-zinc-200 px-4 py-2 text-xs font-semibold text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-100 hover:text-zinc-900 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-800"
               >
                 Cancel
               </button>

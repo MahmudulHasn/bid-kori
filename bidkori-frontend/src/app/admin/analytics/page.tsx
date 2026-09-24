@@ -185,7 +185,7 @@ export default function AdminAnalyticsPage() {
                 className={`rounded-lg px-2.5 py-1 text-xs font-medium transition ${
                   selectedRange === r.id
                     ? 'bg-violet-600 text-white shadow-sm'
-                    : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white'
+                    : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white'
                 }`}
               >
                 {r.label}
@@ -197,7 +197,7 @@ export default function AdminAnalyticsPage() {
             type="button"
             onClick={() => void mutate()}
             disabled={isValidating}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-xs font-medium text-zinc-700 shadow-sm transition hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-xs font-medium text-zinc-700 shadow-sm transition hover:border-zinc-300 hover:bg-zinc-100 hover:text-zinc-900 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
             title="Refresh metrics"
           >
             <RefreshCw

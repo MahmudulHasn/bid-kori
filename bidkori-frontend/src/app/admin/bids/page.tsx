@@ -294,7 +294,11 @@ function AdminBidsPageInner() {
                           type="button"
                           aria-pressed={isSelected}
                           onClick={() => selectAuction(auction.id)}
-                          className="rounded-lg border border-zinc-300 px-2.5 py-1 text-xs font-medium text-zinc-800 hover:bg-zinc-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500 dark:border-zinc-600 dark:text-zinc-100 dark:hover:bg-zinc-800"
+                          className={`rounded-lg border px-2.5 py-1 text-xs font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500 ${
+                            isSelected
+                              ? 'border-violet-600 bg-violet-600 text-white shadow-xs'
+                              : 'border-zinc-300 text-zinc-800 hover:border-zinc-400 hover:bg-zinc-100 dark:border-zinc-600 dark:text-zinc-100 dark:hover:bg-zinc-800'
+                          }`}
                         >
                           {isSelected ? 'Selected' : 'View bids'}
                         </button>

@@ -122,7 +122,7 @@ export default function AdminHeader({
           onClick={handleRefreshClick}
           disabled={isRefreshing}
           title="Refresh dashboard data"
-          className="flex h-9 items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2.5 text-xs font-medium text-zinc-700 shadow-2xs transition hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
+          className="flex h-9 items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2.5 text-xs font-medium text-zinc-700 shadow-2xs transition hover:border-zinc-300 hover:bg-zinc-100 hover:text-zinc-900 disabled:opacity-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-white"
         >
           <RefreshCw
             className={`h-3.5 w-3.5 ${
@@ -142,7 +142,7 @@ export default function AdminHeader({
               ? `${attentionCount} items require moderation attention`
               : 'Moderation queue clean'
           }
-          className="relative flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-200 bg-white text-zinc-600 shadow-2xs transition hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
+          className="relative flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-200 bg-white text-zinc-600 shadow-2xs transition hover:border-zinc-300 hover:bg-zinc-100 hover:text-zinc-900 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-white"
         >
           <ShieldAlert
             className={`h-4 w-4 ${
@@ -159,7 +159,7 @@ export default function AdminHeader({
         {/* Profile Avatar Pill */}
         <Link
           href={ADMIN_PROFILE_PATH}
-          className="flex items-center gap-2 rounded-lg border border-zinc-200/80 bg-white p-1 pl-2 shadow-2xs transition hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700"
+          className="flex items-center gap-2 rounded-lg border border-zinc-200/80 bg-white p-1 pl-2 shadow-2xs transition hover:border-zinc-300 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700 dark:hover:bg-zinc-800/80"
         >
           <span className="hidden text-xs font-semibold text-zinc-800 sm:inline dark:text-zinc-200">
             {user?.username || 'admin'}

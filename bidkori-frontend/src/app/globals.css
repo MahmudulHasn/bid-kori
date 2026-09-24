@@ -32,6 +32,35 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Interactive Controls & Cursor Defaults */
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]),
+select:not(:disabled),
+summary,
+a[href],
+input[type="submit"]:not(:disabled),
+input[type="button"]:not(:disabled),
+input[type="reset"]:not(:disabled),
+label[for],
+label:has(input[type="file"]),
+label:has(input[type="checkbox"]),
+label:has(input[type="radio"]) {
+  cursor: pointer;
+}
+
+button:disabled,
+[role="button"][aria-disabled="true"],
+input:disabled,
+select:disabled {
+  cursor: not-allowed !important;
+}
+
+/* Tactile micro-interaction feedback on clicks */
+button:not(:disabled):active,
+[role="button"]:not([aria-disabled="true"]):active {
+  transform: scale(0.985);
+}
+
 body {
   background: var(--background);
   color: var(--foreground);

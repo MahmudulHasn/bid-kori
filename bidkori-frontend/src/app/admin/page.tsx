@@ -217,7 +217,7 @@ export default function AdminHomePage() {
             type="button"
             onClick={() => void mutate()}
             disabled={isValidating}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-xs font-medium text-zinc-700 shadow-sm transition hover:bg-zinc-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-xs font-medium text-zinc-700 shadow-sm transition hover:border-zinc-400 hover:bg-zinc-100 hover:text-zinc-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
             title="Refresh dashboard metrics"
           >
             <RefreshCw
@@ -609,7 +609,7 @@ export default function AdminHomePage() {
             className={`border-b-2 px-4 py-2.5 transition ${
               activityTab === 'bids'
                 ? 'border-violet-600 text-violet-700 dark:border-violet-400 dark:text-violet-300'
-                : 'border-transparent text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200'
+                : 'border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-800 dark:text-zinc-400 dark:hover:border-zinc-700 dark:hover:text-zinc-200'
             }`}
           >
             Recent Bids ({recent?.bids?.length ?? 0})
@@ -620,7 +620,7 @@ export default function AdminHomePage() {
             className={`border-b-2 px-4 py-2.5 transition ${
               activityTab === 'payments'
                 ? 'border-violet-600 text-violet-700 dark:border-violet-400 dark:text-violet-300'
-                : 'border-transparent text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200'
+                : 'border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-800 dark:text-zinc-400 dark:hover:border-zinc-700 dark:hover:text-zinc-200'
             }`}
           >
             Completed Payments ({recent?.payments?.length ?? 0})
@@ -631,7 +631,7 @@ export default function AdminHomePage() {
             className={`border-b-2 px-4 py-2.5 transition ${
               activityTab === 'auctions'
                 ? 'border-violet-600 text-violet-700 dark:border-violet-400 dark:text-violet-300'
-                : 'border-transparent text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200'
+                : 'border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-800 dark:text-zinc-400 dark:hover:border-zinc-700 dark:hover:text-zinc-200'
             }`}
           >
             New Auctions ({recent?.auctions?.length ?? 0})
@@ -642,7 +642,7 @@ export default function AdminHomePage() {
             className={`border-b-2 px-4 py-2.5 transition ${
               activityTab === 'products'
                 ? 'border-violet-600 text-violet-700 dark:border-violet-400 dark:text-violet-300'
-                : 'border-transparent text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200'
+                : 'border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-800 dark:text-zinc-400 dark:hover:border-zinc-700 dark:hover:text-zinc-200'
             }`}
           >
             Products ({recent?.products?.length ?? 0})
@@ -653,7 +653,7 @@ export default function AdminHomePage() {
             className={`border-b-2 px-4 py-2.5 transition ${
               activityTab === 'users'
                 ? 'border-violet-600 text-violet-700 dark:border-violet-400 dark:text-violet-300'
-                : 'border-transparent text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200'
+                : 'border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-800 dark:text-zinc-400 dark:hover:border-zinc-700 dark:hover:text-zinc-200'
             }`}
           >
             Users ({recent?.users?.length ?? 0})

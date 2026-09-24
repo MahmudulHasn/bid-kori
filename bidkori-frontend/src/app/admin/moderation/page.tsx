@@ -215,7 +215,7 @@ export default function AdminModerationPage() {
         <button
           type="button"
           onClick={refreshAll}
-          className="inline-flex items-center gap-1.5 self-start rounded-xl border border-zinc-200 bg-white px-3 py-2 text-xs font-medium text-zinc-700 shadow-sm transition hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800 sm:self-auto"
+          className="inline-flex items-center gap-1.5 self-start rounded-xl border border-zinc-200 bg-white px-3 py-2 text-xs font-medium text-zinc-700 shadow-sm transition hover:border-zinc-300 hover:bg-zinc-100 hover:text-zinc-900 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800 sm:self-auto"
         >
           <RefreshCw className="h-3.5 w-3.5" aria-hidden />
           Refresh Queue
@@ -269,7 +269,7 @@ export default function AdminModerationPage() {
           className={`flex flex-col rounded-2xl border p-4 text-left transition-all ${
             activeTab === 'suspended_users'
               ? 'border-violet-500 bg-violet-50/60 ring-2 ring-violet-500/20 dark:border-violet-500/60 dark:bg-violet-950/20'
-              : 'border-zinc-200/80 bg-white hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-900/80'
+              : 'border-zinc-200/80 bg-white hover:border-zinc-300 hover:bg-zinc-50/80 hover:shadow-xs dark:border-zinc-800 dark:bg-zinc-900/80'
           }`}
         >
           <div className="flex items-center justify-between">
@@ -290,7 +290,7 @@ export default function AdminModerationPage() {
           className={`flex flex-col rounded-2xl border p-4 text-left transition-all ${
             activeTab === 'hidden_auctions'
               ? 'border-violet-500 bg-violet-50/60 ring-2 ring-violet-500/20 dark:border-violet-500/60 dark:bg-violet-950/20'
-              : 'border-zinc-200/80 bg-white hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-900/80'
+              : 'border-zinc-200/80 bg-white hover:border-zinc-300 hover:bg-zinc-50/80 hover:shadow-xs dark:border-zinc-800 dark:bg-zinc-900/80'
           }`}
         >
           <div className="flex items-center justify-between">
@@ -311,7 +311,7 @@ export default function AdminModerationPage() {
           className={`flex flex-col rounded-2xl border p-4 text-left transition-all ${
             activeTab === 'hidden_products'
               ? 'border-violet-500 bg-violet-50/60 ring-2 ring-violet-500/20 dark:border-violet-500/60 dark:bg-violet-950/20'
-              : 'border-zinc-200/80 bg-white hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-900/80'
+              : 'border-zinc-200/80 bg-white hover:border-zinc-300 hover:bg-zinc-50/80 hover:shadow-xs dark:border-zinc-800 dark:bg-zinc-900/80'
           }`}
         >
           <div className="flex items-center justify-between">
@@ -332,7 +332,7 @@ export default function AdminModerationPage() {
           className={`flex flex-col rounded-2xl border p-4 text-left transition-all ${
             activeTab === 'cancelled_auctions'
               ? 'border-violet-500 bg-violet-50/60 ring-2 ring-violet-500/20 dark:border-violet-500/60 dark:bg-violet-950/20'
-              : 'border-zinc-200/80 bg-white hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-900/80'
+              : 'border-zinc-200/80 bg-white hover:border-zinc-300 hover:bg-zinc-50/80 hover:shadow-xs dark:border-zinc-800 dark:bg-zinc-900/80'
           }`}
         >
           <div className="flex items-center justify-between">
@@ -370,7 +370,7 @@ export default function AdminModerationPage() {
               className={`rounded-lg px-3 py-1.5 transition ${
                 activeTab === 'suspended_users'
                   ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-900 dark:text-white'
-                  : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white'
+                  : 'text-zinc-600 hover:bg-zinc-200/70 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-700/60 dark:hover:text-white'
               }`}
             >
               Users ({suspendedUsers.length})
@@ -381,7 +381,7 @@ export default function AdminModerationPage() {
               className={`rounded-lg px-3 py-1.5 transition ${
                 activeTab === 'hidden_auctions'
                   ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-900 dark:text-white'
-                  : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white'
+                  : 'text-zinc-600 hover:bg-zinc-200/70 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-700/60 dark:hover:text-white'
               }`}
             >
               Auctions ({hiddenAuctions.length})
@@ -392,7 +392,7 @@ export default function AdminModerationPage() {
               className={`rounded-lg px-3 py-1.5 transition ${
                 activeTab === 'hidden_products'
                   ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-900 dark:text-white'
-                  : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white'
+                  : 'text-zinc-600 hover:bg-zinc-200/70 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-700/60 dark:hover:text-white'
               }`}
             >
               Products ({hiddenProducts.length})
@@ -403,7 +403,7 @@ export default function AdminModerationPage() {
               className={`rounded-lg px-3 py-1.5 transition ${
                 activeTab === 'cancelled_auctions'
                   ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-900 dark:text-white'
-                  : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white'
+                  : 'text-zinc-600 hover:bg-zinc-200/70 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-700/60 dark:hover:text-white'
               }`}
             >
               Cancelled ({cancelledAuctions.length})
