@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import {
   AlertTriangle,
   FolderPlus,
+  ImageIcon,
   Layers,
   MoreVertical,
   Pencil,
@@ -13,6 +14,7 @@ import {
   RefreshCw,
   Search,
   Trash2,
+  UploadCloud,
   X,
 } from 'lucide-react';
 
@@ -30,6 +32,7 @@ import {
   updateAdminCategory,
 } from '@/lib/adminCategoriesApi';
 import { getApiErrorMessage } from '@/lib/apiErrors';
+import { resolveMediaUrl } from '@/lib/media';
 
 export default function AdminCategoriesPage() {
   const [search, setSearch] = useState('');
@@ -37,6 +40,9 @@ export default function AdminCategoriesPage() {
   const [targetCategory, setTargetCategory] = useState<AdminCategory | null>(null);
   const [nameInput, setNameInput] = useState('');
   const [slugInput, setSlugInput] = useState('');
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [removeExistingImage, setRemoveExistingImage] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
 
@@ -58,6 +64,9 @@ export default function AdminCategoriesPage() {
     setTargetCategory(null);
     setNameInput('');
     setSlugInput('');
+    setImageFile(null);
+    setImagePreview(null);
+    setRemoveExistingImage(false);
     setValidationError(null);
   };
 
@@ -66,6 +75,9 @@ export default function AdminCategoriesPage() {
     setTargetCategory(cat);
     setNameInput(cat.name);
     setSlugInput(cat.slug);
+    setImageFile(null);
+    setImagePreview(null);
+    setRemoveExistingImage(false);
     setValidationError(null);
   };
 
@@ -78,7 +90,39 @@ export default function AdminCategoriesPage() {
     if (isSubmitting) return;
     setModalMode(null);
     setTargetCategory(null);
+    setImageFile(null);
+    setImagePreview(null);
+    setRemoveExistingImage(false);
     setValidationError(null);
+  };
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setValidationError('Category image must not exceed 5MB.');
+      return;
+    }
+    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!allowed.includes(file.type)) {
+      setValidationError('Supported image formats: JPEG, PNG, WEBP, or GIF.');
+      return;
+    }
+    setValidationError(null);
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+    setRemoveExistingImage(false);
+  };
+
+  const handleClearImage = () => {
+    setImageFile(null);
+    if (imagePreview) {
+      URL.revokeObjectURL(imagePreview);
+      setImagePreview(null);
+    }
+    if (modalMode === 'edit' && targetCategory?.image) {
+      setRemoveExistingImage(true);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -86,6 +130,7 @@ export default function AdminCategoriesPage() {
     const payload: AdminCategoryInput = {
       name: nameInput,
       slug: slugInput.trim() ? slugInput.trim() : undefined,
+      image: imageFile ? imageFile : (removeExistingImage ? null : undefined),
     };
 
     const check = validateCategoryInput(payload);
@@ -261,11 +306,19 @@ export default function AdminCategoriesPage() {
                     className="transition hover:bg-zinc-50/60 dark:hover:bg-zinc-800/40"
                   >
                     <td className="px-5 py-4 font-semibold text-zinc-900 dark:text-white">
-                      <div className="flex items-center gap-2.5">
-                        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-50 text-violet-700 dark:bg-violet-950/50 dark:text-violet-300">
-                          <Layers className="h-4 w-4" />
-                        </span>
-                        <span>{cat.name}</span>
+                      <div className="flex items-center gap-3">
+                        {cat.image ? (
+                          <img
+                            src={resolveMediaUrl(cat.image) ?? ''}
+                            alt={cat.name}
+                            className="h-10 w-10 rounded-xl object-cover border border-zinc-200 dark:border-zinc-700 shadow-2xs shrink-0"
+                          />
+                        ) : (
+                          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-violet-700 dark:bg-violet-950/50 dark:text-violet-300">
+                            <Layers className="h-5 w-5" />
+                          </span>
+                        )}
+                        <span className="truncate">{cat.name}</span>
                       </div>
                     </td>
                     <td className="px-5 py-4 font-mono text-xs text-zinc-500 dark:text-zinc-400">
@@ -307,10 +360,18 @@ export default function AdminCategoriesPage() {
             {filteredCategories.map((cat) => (
               <div key={cat.id} className="p-4 space-y-2">
                 <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-50 text-violet-700 dark:bg-violet-950/50 dark:text-violet-300">
-                      <Layers className="h-3.5 w-3.5" />
-                    </span>
+                  <div className="flex items-center gap-2.5">
+                    {cat.image ? (
+                      <img
+                        src={resolveMediaUrl(cat.image) ?? ''}
+                        alt={cat.name}
+                        className="h-8 w-8 rounded-lg object-cover border border-zinc-200 dark:border-zinc-700 shadow-2xs shrink-0"
+                      />
+                    ) : (
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-50 text-violet-700 dark:bg-violet-950/50 dark:text-violet-300">
+                        <Layers className="h-4 w-4" />
+                      </span>
+                    )}
                     <span className="font-semibold text-zinc-900 dark:text-white">
                       {cat.name}
                     </span>
@@ -396,6 +457,66 @@ export default function AdminCategoriesPage() {
                 <p className="mt-1 text-[11px] text-zinc-400">
                   Lower-case letters, numbers, and hyphens only (e.g. vintage-antiques).
                 </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                  Category Image (Optional)
+                </label>
+                {imagePreview || (modalMode === 'edit' && targetCategory?.image && !removeExistingImage) ? (
+                  <div className="mt-1.5 flex items-center gap-3 rounded-xl border border-zinc-200 bg-zinc-50/60 p-2.5 dark:border-zinc-800 dark:bg-zinc-950/60">
+                    <img
+                      src={imagePreview || (resolveMediaUrl(targetCategory?.image) ?? '')}
+                      alt="Category preview"
+                      className="h-16 w-16 rounded-lg object-cover border border-zinc-200 dark:border-zinc-700 shadow-2xs shrink-0"
+                    />
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <p className="truncate text-xs font-medium text-zinc-900 dark:text-white">
+                        {imageFile ? imageFile.name : 'Current Image'}
+                      </p>
+                      <p className="text-[11px] text-zinc-400">
+                        {imageFile
+                          ? `${(imageFile.size / 1024).toFixed(1)} KB`
+                          : 'Saved in database'}
+                      </p>
+                      <div className="flex items-center gap-2 pt-0.5">
+                        <label className="cursor-pointer text-xs font-semibold text-violet-600 hover:text-violet-700 dark:text-violet-400">
+                          <span>Replace</span>
+                          <input
+                            type="file"
+                            accept="image/png,image/jpeg,image/webp,image/gif"
+                            className="sr-only"
+                            onChange={handleImageChange}
+                          />
+                        </label>
+                        <span className="text-zinc-300 dark:text-zinc-700">·</span>
+                        <button
+                          type="button"
+                          onClick={handleClearImage}
+                          className="text-xs font-semibold text-red-600 hover:text-red-700 dark:text-red-400"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <label className="mt-1.5 flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-zinc-200 bg-zinc-50/40 p-4 transition hover:border-violet-500 hover:bg-violet-50/20 dark:border-zinc-800 dark:bg-zinc-950/40 dark:hover:border-violet-500/60 dark:hover:bg-violet-950/10">
+                    <UploadCloud className="h-6 w-6 text-zinc-400" />
+                    <span className="mt-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                      Click to upload category image
+                    </span>
+                    <span className="mt-0.5 text-[11px] text-zinc-400">
+                      PNG, JPG, WEBP or GIF up to 5MB
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp,image/gif"
+                      className="sr-only"
+                      onChange={handleImageChange}
+                    />
+                  </label>
+                )}
               </div>
 
               {validationError && (

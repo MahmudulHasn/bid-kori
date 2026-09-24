@@ -9,6 +9,7 @@ from django.db.models import Count
 from django.utils.text import slugify
 from drf_spectacular.utils import extend_schema
 from rest_framework import generics, serializers, status
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import IsAdminUser
 from rest_framework.response import Response
 
@@ -18,10 +19,11 @@ from .models import Category
 class AdminCategorySerializer(serializers.ModelSerializer):
     slug = serializers.CharField(required=False, allow_blank=True)
     product_count = serializers.IntegerField(read_only=True, default=0)
+    image = serializers.ImageField(required=False, allow_null=True)
 
     class Meta:
         model = Category
-        fields = ['id', 'name', 'slug', 'product_count']
+        fields = ['id', 'name', 'slug', 'image', 'product_count']
         read_only_fields = ['id', 'product_count']
 
     def validate_name(self, value: str) -> str:
@@ -43,11 +45,26 @@ class AdminCategorySerializer(serializers.ModelSerializer):
             validated_data['slug'] = slug
         return super().create(validated_data)
 
+    def update(self, instance, validated_data):
+        if 'image' in validated_data:
+            old_image = instance.image
+            new_image = validated_data['image']
+            if old_image and old_image != new_image:
+                storage = getattr(old_image, 'storage', None)
+                name = getattr(old_image, 'name', '')
+                if storage and name:
+                    try:
+                        storage.delete(name)
+                    except Exception:
+                        pass
+        return super().update(instance, validated_data)
+
 
 class AdminCategoryListCreateView(generics.ListCreateAPIView):
     """List all categories with product counts, or create a new category (staff only)."""
 
     permission_classes = [IsAdminUser]
+    parser_classes = (MultiPartParser, FormParser, JSONParser)
     serializer_class = AdminCategorySerializer
 
     def get_queryset(self):
@@ -75,6 +92,7 @@ class AdminCategoryDetailView(generics.RetrieveUpdateDestroyAPIView):
     """Retrieve, update, or delete a single category (staff only)."""
 
     permission_classes = [IsAdminUser]
+    parser_classes = (MultiPartParser, FormParser, JSONParser)
     serializer_class = AdminCategorySerializer
     lookup_url_kwarg = 'category_id'
 

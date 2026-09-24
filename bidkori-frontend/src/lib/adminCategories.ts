@@ -9,12 +9,14 @@ export type AdminCategory = {
   id: number;
   name: string;
   slug: string;
+  image?: string | null;
   product_count: number;
 };
 
 export type AdminCategoryInput = {
   name: string;
   slug?: string;
+  image?: File | null;
 };
 
 export function buildAdminCategoryDetailApiPath(id: number): string {
@@ -38,6 +40,22 @@ export function validateCategoryInput(input: AdminCategoryInput): {
       return {
         valid: false,
         error: 'Slug may only contain lowercase letters, numbers, and hyphens.',
+      };
+    }
+  }
+  if (input.image instanceof File) {
+    const maxBytes = 5 * 1024 * 1024;
+    if (input.image.size > maxBytes) {
+      return {
+        valid: false,
+        error: 'Category image must not exceed 5MB.',
+      };
+    }
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (input.image.type && !allowedTypes.includes(input.image.type)) {
+      return {
+        valid: false,
+        error: 'Category image must be JPEG, PNG, WEBP, or GIF.',
       };
     }
   }

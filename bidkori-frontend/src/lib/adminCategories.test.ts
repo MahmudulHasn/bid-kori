@@ -19,6 +19,21 @@ test('validateCategoryInput validates presence and formatting', () => {
     validateCategoryInput({ name: 'Valid', slug: 'Invalid Slug!' }).valid,
     false,
   );
+  // Image validation
+  const validFile = new File(['fake-png-content'], 'test.png', {
+    type: 'image/png',
+  });
+  assert.equal(
+    validateCategoryInput({ name: 'Valid', image: validFile }).valid,
+    true,
+  );
+  const invalidTypeFile = new File(['fake-pdf'], 'doc.pdf', {
+    type: 'application/pdf',
+  });
+  assert.equal(
+    validateCategoryInput({ name: 'Valid', image: invalidTypeFile }).valid,
+    false,
+  );
 });
 
 test('filterAdminCategories filters by name and slug case-insensitively', () => {

@@ -9,6 +9,14 @@ class Category(models.Model):
 
     name = models.CharField(max_length=100, unique=True)
     slug = models.SlugField(unique=True)
+    image = models.ImageField(
+        upload_to='category_images/',
+        null=True,
+        blank=True,
+        validators=[validate_product_image],
+    )
+    created_at = models.DateTimeField(auto_now_add=True, null=True)
+    updated_at = models.DateTimeField(auto_now=True, null=True)
 
     class Meta:
         verbose_name_plural = 'Categories'
@@ -16,6 +24,17 @@ class Category(models.Model):
 
     def __str__(self):
         return self.name
+
+    def delete(self, using=None, keep_parents=False):
+        """Remove the DB row and the underlying storage object."""
+        name = self.image.name if self.image else ''
+        storage = self.image.storage if self.image else None
+        super().delete(using=using, keep_parents=keep_parents)
+        if name and storage is not None:
+            try:
+                storage.delete(name)
+            except Exception:
+                pass
 
 
 class Product(models.Model):

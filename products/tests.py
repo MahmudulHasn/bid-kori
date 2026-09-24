@@ -613,7 +613,7 @@ class CategoryCatalogTests(APITestCase):
         response = self.client.get('/api/categories/')
         self.assertEqual(response.status_code, 200)
         for row in response.data:
-            self.assertEqual(set(row.keys()), {'id', 'name', 'slug'})
+            self.assertEqual(set(row.keys()), {'id', 'name', 'slug', 'image'})
 
     def test_category_detail_is_public(self):
         response = self.client.get(f'/api/categories/{self.alpha.pk}/')
