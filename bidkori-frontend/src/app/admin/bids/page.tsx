@@ -8,7 +8,6 @@ import useSWR from 'swr';
 
 import { getApiErrorMessage } from '@/lib/apiErrors';
 import {
-  ADMIN_AUCTION_SEARCH_HINT,
   ADMIN_AUCTION_STATUS_OPTIONS,
 } from '@/lib/adminAuctions';
 import {
@@ -155,8 +154,7 @@ function AdminBidsPageInner() {
           Select an auction
         </h2>
         <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-          {ADMIN_AUCTION_SEARCH_HINT} History loads only after you select one
-          auction.
+          History loads only after you select an auction.
         </p>
 
         <form

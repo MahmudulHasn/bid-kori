@@ -9,7 +9,6 @@ import { getApiErrorMessage } from '@/lib/apiErrors';
 import ModerationVisibilityBadge from '@/components/admin/ModerationVisibilityBadge';
 import {
   ADMIN_PRODUCT_READONLY_COPY,
-  ADMIN_PRODUCT_SEARCH_HINT,
   ADMIN_PRODUCT_SORT_OPTIONS,
   adminProductDetailPath,
   filterAdminProducts,
@@ -170,9 +169,6 @@ export default function AdminProductsPage() {
                 placeholder="Title, description, condition, or seller ID"
                 className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm outline-none ring-violet-500/40 focus:ring-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500 dark:border-zinc-700 dark:bg-zinc-900"
               />
-              <span className="block text-xs text-zinc-500 dark:text-zinc-400">
-                {ADMIN_PRODUCT_SEARCH_HINT}
-              </span>
             </label>
             <label className="block space-y-1.5 sm:w-44">
               <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
