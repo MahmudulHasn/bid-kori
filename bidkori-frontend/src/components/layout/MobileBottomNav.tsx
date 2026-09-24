@@ -100,7 +100,7 @@ export default function MobileBottomNav() {
               {isActive ? (
                 <span
                   aria-hidden
-                  className="absolute -top-1 h-0.5 w-6 rounded-full bg-amber-600 dark:bg-amber-400"
+                  className="absolute -top-1 h-0.5 w-6 rounded-full bg-amber-600 dark:bg-amber-400 animate-dropdown-in"
                 />
               ) : null}
               <div

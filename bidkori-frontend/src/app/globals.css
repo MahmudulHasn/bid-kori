@@ -242,3 +242,81 @@ nextjs-portal {
 .animate-orb-pulse-slow {
   animation: orb-pulse 7s ease-in-out infinite;
 }
+
+/* Smooth Drawer, Dropdown & Modal Animations across all roles */
+@keyframes backdropFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-backdrop-in {
+  animation: backdropFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes drawerSlideInLeft {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.animate-drawer-in-left {
+  animation: drawerSlideInLeft 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform;
+}
+
+@keyframes dropdownMenuIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.92) translateY(-6px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-dropdown-in {
+  animation: dropdownMenuIn 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transform-origin: top right;
+  will-change: transform, opacity;
+}
+
+@keyframes navMenuSlideDown {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-menu-slide-down {
+  animation: navMenuSlideDown 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transform-origin: top;
+  will-change: transform, opacity;
+}
+
+@keyframes sheetSlideUp {
+  0% {
+    opacity: 0;
+    transform: translateY(20px) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-sheet-up {
+  animation: sheetSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
+}

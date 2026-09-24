@@ -152,12 +152,12 @@ export default function Navbar() {
             type="button"
             onClick={() => setMobileOpen(!mobileOpen)}
             aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
-            className="inline-flex items-center justify-center rounded-xl p-2 text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+            className="inline-flex items-center justify-center rounded-xl p-2 text-zinc-700 transition-all duration-200 hover:bg-zinc-100 active:scale-90 dark:text-zinc-300 dark:hover:bg-zinc-800"
           >
             {mobileOpen ? (
-              <X className="h-5 w-5" aria-hidden />
+              <X className="h-5 w-5 transition-transform duration-200 rotate-90" aria-hidden />
             ) : (
-              <Menu className="h-5 w-5" aria-hidden />
+              <Menu className="h-5 w-5 transition-transform duration-200" aria-hidden />
             )}
           </button>
         </div>
@@ -165,7 +165,7 @@ export default function Navbar() {
 
       {/* Mobile Drawer Menu */}
       {mobileOpen ? (
-        <div className="border-b border-zinc-200 bg-white/95 px-4 py-4 backdrop-blur-md md:hidden dark:border-zinc-800 dark:bg-zinc-950/95 space-y-3">
+        <div className="border-b border-zinc-200 bg-white/95 px-4 py-4 backdrop-blur-md md:hidden dark:border-zinc-800 dark:bg-zinc-950/95 space-y-3 animate-menu-slide-down shadow-xl shadow-zinc-950/5">
           <div className="flex flex-col gap-1">
             {PUBLIC_NAV_LINKS.map((link) => {
               const Icon = navIcons[link.label];

@@ -153,8 +153,8 @@ export default function SupportChat() {
           onClick={() => setOpen(true)}
           className={[
             'fixed bottom-20 right-4 sm:bottom-6 sm:right-6 z-40 inline-flex items-center gap-2 rounded-full',
-            'bg-amber-600 px-4 py-3 text-sm font-bold text-white shadow-lg',
-            'transition hover:bg-amber-500 focus-visible:outline focus-visible:outline-2',
+            'bg-amber-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-amber-600/25',
+            'transition-all duration-200 hover:bg-amber-500 hover:scale-105 active:scale-95 focus-visible:outline focus-visible:outline-2',
             'focus-visible:outline-offset-2 focus-visible:outline-amber-500',
           ].join(' ')}
           aria-haspopup="dialog"
@@ -170,7 +170,7 @@ export default function SupportChat() {
         <div className="fixed inset-0 z-50 flex items-end justify-end sm:items-end sm:p-5">
           <button
             type="button"
-            className="absolute inset-0 bg-zinc-950/40"
+            className="absolute inset-0 bg-zinc-950/60 backdrop-blur-xs transition-opacity animate-backdrop-in"
             aria-label="Close BidKori Help"
             onClick={closePanel}
           />
@@ -182,7 +182,7 @@ export default function SupportChat() {
             aria-labelledby={titleId}
             aria-describedby={disclosureId}
             className={[
-              'relative flex h-[min(100dvh,100%)] w-full flex-col bg-white shadow-2xl',
+              'relative flex h-[min(100dvh,100%)] w-full flex-col bg-white shadow-2xl animate-sheet-up',
               'dark:bg-zinc-950 sm:h-[min(640px,calc(100dvh-2.5rem))] sm:max-w-md sm:rounded-2xl',
               'border border-zinc-200 dark:border-zinc-800 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))]',
             ].join(' ')}

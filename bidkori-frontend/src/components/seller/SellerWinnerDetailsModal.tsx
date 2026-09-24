@@ -62,7 +62,7 @@ export default function SellerWinnerDetailsModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-4 sm:items-center sm:p-6"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-4 sm:items-center sm:p-6 backdrop-blur-xs transition-opacity animate-backdrop-in"
       role="dialog"
       aria-modal="true"
       aria-labelledby="unlock-dialog-title"
@@ -75,7 +75,7 @@ export default function SellerWinnerDetailsModal({
     >
       <div
         ref={dialogRef}
-        className="w-full max-w-lg rounded-2xl border border-zinc-200 bg-white p-6 shadow-2xl dark:border-zinc-800 dark:bg-zinc-900"
+        className="w-full max-w-lg rounded-2xl border border-zinc-200 bg-white p-6 shadow-2xl dark:border-zinc-800 dark:bg-zinc-900 animate-sheet-up"
       >
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-3">

@@ -409,11 +409,11 @@ export default function AdminCategoriesPage() {
       {/* CREATE / EDIT MODAL */}
       {(modalMode === 'create' || modalMode === 'edit') && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/60 p-4 backdrop-blur-xs"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/60 p-4 backdrop-blur-xs transition-opacity animate-backdrop-in"
           role="dialog"
           aria-modal="true"
         >
-          <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-2xl dark:border-zinc-800 dark:bg-zinc-900">
+          <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-2xl dark:border-zinc-800 dark:bg-zinc-900 animate-sheet-up">
             <div className="flex items-center justify-between border-b border-zinc-100 pb-3 dark:border-zinc-800">
               <h3 className="text-base font-bold text-zinc-900 dark:text-white">
                 {modalMode === 'create' ? 'Create New Category' : `Edit "${targetCategory?.name}"`}
@@ -551,11 +551,11 @@ export default function AdminCategoriesPage() {
       {/* DELETE CONFIRMATION MODAL */}
       {modalMode === 'delete' && targetCategory && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/60 p-4 backdrop-blur-xs"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/60 p-4 backdrop-blur-xs transition-opacity animate-backdrop-in"
           role="dialog"
           aria-modal="true"
         >
-          <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-2xl dark:border-zinc-800 dark:bg-zinc-900">
+          <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-2xl dark:border-zinc-800 dark:bg-zinc-900 animate-sheet-up">
             <div className="flex items-center gap-3 text-red-600 dark:text-red-400">
               <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-100 dark:bg-red-950/60">
                 <Trash2 className="h-5 w-5" />

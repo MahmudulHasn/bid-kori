@@ -77,15 +77,15 @@ export default function WorkspaceHeader({
         <div className="flex min-w-0 items-center gap-2">
           <button
             type="button"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-zinc-600 transition hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-400 lg:hidden dark:text-zinc-300 dark:hover:bg-zinc-800"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-zinc-600 transition-all duration-200 hover:bg-zinc-100 active:scale-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-400 lg:hidden dark:text-zinc-300 dark:hover:bg-zinc-800"
             aria-label={menuOpen ? 'Close navigation menu' : 'Open navigation menu'}
             aria-expanded={menuOpen}
             onClick={onMenuToggle}
           >
             {menuOpen ? (
-              <X className="h-5 w-5" aria-hidden />
+              <X className="h-5 w-5 transition-transform duration-200 rotate-90" aria-hidden />
             ) : (
-              <Menu className="h-5 w-5" aria-hidden />
+              <Menu className="h-5 w-5 transition-transform duration-200" aria-hidden />
             )}
           </button>
 
@@ -147,7 +147,7 @@ export default function WorkspaceHeader({
               <div
                 id={menuId}
                 role="menu"
-                className="absolute right-0 mt-2 w-48 overflow-hidden rounded-xl border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
+                className="absolute right-0 mt-2 w-48 overflow-hidden rounded-xl border border-zinc-200 bg-white py-1 shadow-xl dark:border-zinc-700 dark:bg-zinc-900 animate-dropdown-in origin-top-right"
               >
                 <div className="border-b border-zinc-100 px-3 py-2 dark:border-zinc-800">
                   <p className="truncate text-sm font-medium text-zinc-900 dark:text-white">

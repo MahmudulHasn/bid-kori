@@ -67,9 +67,13 @@ export default function AdminHeader({
           type="button"
           onClick={onMenuToggle}
           aria-label={menuOpen ? 'Close navigation drawer' : 'Open navigation drawer'}
-          className="flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-200 text-zinc-600 transition hover:bg-zinc-100 lg:hidden dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-900"
+          className="flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-200 text-zinc-600 transition-all duration-200 hover:bg-zinc-100 active:scale-90 lg:hidden dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-900"
         >
-          {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          {menuOpen ? (
+            <X className="h-5 w-5 transition-transform duration-200 rotate-90" />
+          ) : (
+            <Menu className="h-5 w-5 transition-transform duration-200" />
+          )}
         </button>
 
         <div className="flex items-center gap-2">
