@@ -232,9 +232,6 @@ export default function AdminUsersPage() {
               placeholder="Search users…"
               className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm outline-none ring-violet-500/40 focus:ring-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500 dark:border-zinc-700 dark:bg-zinc-900"
             />
-            <span className="block text-xs text-zinc-500 dark:text-zinc-400">
-              Searches username and email on the server.
-            </span>
           </label>
           <button
             type="submit"
