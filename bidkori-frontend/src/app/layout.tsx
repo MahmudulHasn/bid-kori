@@ -6,6 +6,7 @@ import type { ReactNode } from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/layout/Footer';
 import MobileBottomNav from '@/components/layout/MobileBottomNav';
+import RouteLoadingBar from '@/components/layout/RouteLoadingBar';
 import SkipLink from '@/components/layout/SkipLink';
 import SupportChatHost from '@/components/support/SupportChatHost';
 import { AuthProvider } from '@/context/AuthContext';
@@ -34,6 +35,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     >
       <body className="min-h-full flex flex-col">
         <AuthProvider>
+          <RouteLoadingBar />
           <SkipLink />
           <Navbar />
           <div id="main-content" tabIndex={-1} className="flex-1 flex flex-col outline-none">
