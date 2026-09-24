@@ -46,14 +46,14 @@ export default function RoleWorkspaceLayout({
 
       {/* Mobile drawer */}
       {mobileNavOpen ? (
-        <div className="fixed inset-0 z-40 lg:hidden" role="dialog" aria-modal="true">
+        <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true">
           <button
             type="button"
-            className="absolute inset-0 bg-zinc-950/40"
+            className="absolute inset-0 bg-zinc-950/60 backdrop-blur-xs transition-opacity"
             aria-label="Close navigation menu"
             onClick={closeMobileNav}
           />
-          <div className="absolute inset-y-0 left-0 flex max-w-[85vw] shadow-xl">
+          <div className="absolute inset-y-0 left-0 flex max-w-[85vw] shadow-2xl">
             <WorkspaceSidebar
               config={config}
               pathname={pathname}

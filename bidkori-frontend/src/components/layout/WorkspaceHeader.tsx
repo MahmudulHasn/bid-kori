@@ -99,13 +99,15 @@ export default function WorkspaceHeader({
           </div>
         </div>
 
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-1.5 sm:gap-3">
           <Link
             href={config.marketplaceHref}
-            className="hidden items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-400 sm:inline-flex dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-white"
+            aria-label={config.marketplaceLabel}
+            title={config.marketplaceLabel}
+            className="inline-flex items-center gap-1.5 rounded-lg p-2 sm:px-2.5 sm:py-1.5 text-sm font-medium text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-400 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-white"
           >
             <Store className="h-4 w-4" aria-hidden />
-            {config.marketplaceLabel}
+            <span className="hidden sm:inline">{config.marketplaceLabel}</span>
           </Link>
 
           <NotificationBell role={config.role} />

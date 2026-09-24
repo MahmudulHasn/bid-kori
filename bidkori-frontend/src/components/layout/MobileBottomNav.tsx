@@ -32,10 +32,11 @@ export default function MobileBottomNav() {
     label: string;
     href: string;
     icon: typeof Home;
+    exact?: boolean;
   };
 
   let items: NavItem[] = [
-    { label: 'Home', href: '/', icon: Home },
+    { label: 'Home', href: '/', icon: Home, exact: true },
     { label: 'Auctions', href: '/auctions', icon: Gavel },
     { label: 'Search', href: '/search', icon: Search },
     { label: 'Login', href: '/auth/login', icon: LogIn },
@@ -47,11 +48,11 @@ export default function MobileBottomNav() {
         { label: 'Market', href: '/auctions', icon: Gavel },
         { label: 'My Bids', href: '/buyer/my-bids', icon: ShoppingBag },
         { label: 'Won', href: '/buyer/won', icon: Trophy },
-        { label: 'Account', href: '/buyer', icon: User },
+        { label: 'Account', href: '/buyer', icon: User, exact: true },
       ];
     } else if (role === 'SELLER') {
       items = [
-        { label: 'Dashboard', href: '/seller', icon: Home },
+        { label: 'Dashboard', href: '/seller', icon: Home, exact: true },
         { label: 'Products', href: '/seller/products', icon: Package },
         { label: 'Auctions', href: '/seller/auctions', icon: Gavel },
         { label: 'Sales', href: '/seller/sales', icon: Store },
@@ -59,7 +60,7 @@ export default function MobileBottomNav() {
       ];
     } else if (role === 'ADMIN') {
       items = [
-        { label: 'Overview', href: '/admin', icon: Home },
+        { label: 'Overview', href: '/admin', icon: Home, exact: true },
         { label: 'Users', href: '/admin/users', icon: Users },
         { label: 'Auctions', href: '/admin/auctions', icon: Gavel },
         { label: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
@@ -79,10 +80,11 @@ export default function MobileBottomNav() {
       <div className="flex h-16 items-center justify-around px-2">
         {items.map((item) => {
           const Icon = item.icon;
-          const isActive =
-            item.href === '/'
-              ? pathname === '/'
-              : pathname === item.href || pathname.startsWith(`${item.href}/`);
+          const pathOnly = pathname.split('#')[0]?.split('?')[0] ?? pathname;
+          const isExact = item.exact || item.href === '/';
+          const isActive = isExact
+            ? pathOnly === item.href || pathOnly === `${item.href}/`
+            : pathOnly === item.href || pathOnly.startsWith(`${item.href}/`);
 
           return (
             <Link

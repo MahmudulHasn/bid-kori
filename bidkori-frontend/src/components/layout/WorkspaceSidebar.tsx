@@ -97,6 +97,15 @@ function NavList({
   );
 }
 
+const accentIcon: Record<
+  ReturnType<typeof getWorkspaceAccent>,
+  string
+> = {
+  amber: 'text-amber-600 dark:text-amber-400',
+  sky: 'text-sky-600 dark:text-sky-400',
+  violet: 'text-violet-600 dark:text-violet-400',
+};
+
 export default function WorkspaceSidebar({
   config,
   pathname,
@@ -127,7 +136,7 @@ export default function WorkspaceSidebar({
         </div>
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-3.5 py-4" aria-label="Workspace sections">
+      <nav className="flex-1 overflow-y-auto px-3.5 py-4 pb-20 lg:pb-4" aria-label="Workspace sections">
         <NavList
           items={config.navItems}
           pathname={pathname}
@@ -135,15 +144,28 @@ export default function WorkspaceSidebar({
           accent={accent}
           onNavigate={onNavigate}
         />
+
+        {/* Prominent Browse Marketplace link positioned directly under Settings for mobile drawer */}
+        <div className="mt-3 pt-3 border-t border-zinc-200/80 dark:border-zinc-800/80 lg:hidden">
+          <Link
+            href={config.marketplaceHref}
+            onClick={onNavigate}
+            className="flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-sm font-medium text-zinc-700 transition-all hover:bg-zinc-100 hover:text-zinc-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-400 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+          >
+            <Store className={`h-4 w-4 shrink-0 ${accentIcon[accent]}`} aria-hidden />
+            <span>{config.marketplaceLabel}</span>
+          </Link>
+        </div>
       </nav>
 
-      <div className="border-t border-zinc-200/80 px-3.5 py-4 dark:border-zinc-800/80">
+      <div className="hidden lg:block border-t border-zinc-200/80 px-3.5 py-4 dark:border-zinc-800/80">
         <Link
           href={config.marketplaceHref}
           onClick={onNavigate}
-          className="flex items-center rounded-xl px-3.5 py-2.5 text-sm font-medium text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-400 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+          className="flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-sm font-medium text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-400 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
         >
-          {config.marketplaceLabel}
+          <Store className="h-4 w-4 shrink-0 text-zinc-400" aria-hidden />
+          <span>{config.marketplaceLabel}</span>
         </Link>
       </div>
     </aside>
