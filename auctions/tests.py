@@ -1080,6 +1080,7 @@ class BidServiceHardeningTests(APITestCase):
         end_offset=timedelta(hours=1),
         starting_bid=100,
         min_increment=10,
+        reserve_price=None,
         status=Auction.Status.ACTIVE,
     ):
         now = timezone.now()
@@ -1093,6 +1094,7 @@ class BidServiceHardeningTests(APITestCase):
             starting_bid=starting_bid,
             current_highest_bid=starting_bid,
             min_increment=min_increment,
+            reserve_price=reserve_price,
             start_time=now + start_offset,
             end_time=now + end_offset,
             status=status,
@@ -1216,6 +1218,67 @@ class BidServiceHardeningTests(APITestCase):
         closed, _ = AuctionLifecycleService.close_auction(auction.pk)
         self.assertEqual(closed.winning_bidder, self.buyer_b)
         self.assertEqual(float(closed.current_highest_bid), 130.0)
+
+    def test_bid_below_reserve_keeps_auction_active_no_winner(self):
+        from .services import BidService
+
+        auction = self._create_auction(reserve_price=200, starting_bid=100)
+        bid = BidService.place_bid(auction.pk, self.buyer_a, 150)
+        self.assertEqual(float(bid.amount), 150.0)
+
+        auction.refresh_from_db()
+        self.assertEqual(auction.status, Auction.Status.ACTIVE)
+        self.assertIsNone(auction.winning_bidder)
+        self.assertEqual(float(auction.current_highest_bid), 150.0)
+
+    def test_bid_fulfilling_reserve_price_closes_auction_and_sets_winner(self):
+        from .services import BidPlacementError, BidService
+
+        auction = self._create_auction(reserve_price=200, starting_bid=100)
+        # Bid 1: 150 (below reserve)
+        BidService.place_bid(auction.pk, self.buyer_a, 150)
+        auction.refresh_from_db()
+        self.assertEqual(auction.status, Auction.Status.ACTIVE)
+        self.assertIsNone(auction.winning_bidder)
+
+        # Bid 2: 200 (meets reserve price exactly)
+        BidService.place_bid(auction.pk, self.buyer_b, 200)
+        auction.refresh_from_db()
+        self.assertEqual(auction.status, Auction.Status.CLOSED)
+        self.assertEqual(auction.winning_bidder, self.buyer_b)
+        self.assertEqual(float(auction.current_highest_bid), 200.0)
+
+        # Subsequent bids must be rejected because the auction closed
+        with self.assertRaises(BidPlacementError) as ctx:
+            BidService.place_bid(auction.pk, self.buyer_a, 220)
+        self.assertIn('not active', str(ctx.exception).lower())
+
+    def test_bid_exceeding_reserve_price_closes_auction_and_sets_winner(self):
+        from .services import BidService
+
+        auction = self._create_auction(reserve_price=200, starting_bid=100)
+        BidService.place_bid(auction.pk, self.buyer_a, 250)
+        auction.refresh_from_db()
+        self.assertEqual(auction.status, Auction.Status.CLOSED)
+        self.assertEqual(auction.winning_bidder, self.buyer_a)
+        self.assertEqual(float(auction.current_highest_bid), 250.0)
+
+    def test_api_bid_fulfilling_reserve_closes_auction(self):
+        auction = self._create_auction(reserve_price=200, starting_bid=100)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.buyer_a_token.key}')
+        response = self.client.post(
+            f'/api/auctions/{auction.pk}/place-bid/',
+            {'amount': '200.00'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data['status'], 'ACCEPTED')
+        self.assertEqual(response.data['auction_status'], 'CLOSED')
+        self.assertTrue(response.data['is_winner'])
+
+        auction.refresh_from_db()
+        self.assertEqual(auction.status, Auction.Status.CLOSED)
+        self.assertEqual(auction.winning_bidder, self.buyer_a)
 
     def test_unauthenticated_bidder_rejected(self):
         from django.contrib.auth.models import AnonymousUser

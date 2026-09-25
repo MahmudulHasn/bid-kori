@@ -390,6 +390,8 @@ class AuctionViewSet(viewsets.ModelViewSet):
             'accepted_amount': f'{Decimal(str(bid.amount)):.2f}',
             'current_bid': f'{Decimal(str(current_highest)):.2f}',
             'is_highest_bidder': True,
+            'auction_status': getattr(auction, 'status', 'ACTIVE'),
+            'is_winner': getattr(auction, 'winning_bidder_id', None) == request.user.pk,
             # Backward-compatible fields
             'id': bid.pk,
             'auction': auction.pk,

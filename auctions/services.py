@@ -513,8 +513,6 @@ class BidService:
                     )
 
                 auction.current_highest_bid = amount
-                # Do not set winning_bidder here — final winner is assigned at close.
-                auction.save(update_fields=['current_highest_bid'])
                 # Attach bidder and auction for payload.
                 bid.bidder = bidder
                 bid.auction = auction
@@ -536,6 +534,17 @@ class BidService:
                     amount=amount,
                     product_title=product_title,
                 )
+
+                # If reserve price is configured and fulfilled, close auction immediately and declare winner
+                reserve_fulfilled = (
+                    auction.reserve_price is not None
+                    and amount >= auction.reserve_price
+                )
+
+                if reserve_fulfilled:
+                    AuctionLifecycleService._finalize_close(auction)
+                else:
+                    auction.save(update_fields=['current_highest_bid'])
 
         if reject_error is not None:
             raise reject_error
