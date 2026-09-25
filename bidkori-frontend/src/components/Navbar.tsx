@@ -130,9 +130,9 @@ export default function Navbar() {
             <div className="flex items-center gap-2 pl-2">
               <Link
                 href="/auth/login"
-                className="inline-flex items-center gap-1.5 rounded-xl border border-zinc-200 bg-white px-3.5 py-2 text-xs font-semibold text-zinc-800 shadow-2xs transition-all hover:bg-zinc-50 hover:text-zinc-950 active:scale-98 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                className="group inline-flex items-center gap-1.5 rounded-xl border border-zinc-200 bg-white px-3.5 py-2 text-xs font-semibold text-zinc-800 shadow-2xs transition-all duration-200 hover:border-amber-500/50 hover:bg-amber-500/10 hover:text-amber-600 hover:shadow-xs hover:shadow-amber-500/10 active:scale-98 dark:border-zinc-800 dark:bg-zinc-900/80 dark:text-zinc-200 dark:hover:border-amber-500/50 dark:hover:bg-amber-500/10 dark:hover:text-amber-400 dark:hover:shadow-amber-500/10"
               >
-                <LogIn className="h-3.5 w-3.5" aria-hidden />
+                <LogIn className="h-3.5 w-3.5 transition-colors group-hover:text-amber-600 dark:group-hover:text-amber-400" aria-hidden />
                 Login
               </Link>
               <Link
@@ -218,9 +218,9 @@ export default function Navbar() {
                 <Link
                   href="/auth/login"
                   onClick={() => setMobileOpen(false)}
-                  className="flex items-center justify-center gap-1.5 rounded-xl border border-zinc-300 px-3 py-2 text-xs font-semibold text-zinc-800 dark:border-zinc-700 dark:text-zinc-200"
+                  className="group flex items-center justify-center gap-1.5 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-xs font-semibold text-zinc-800 transition-all duration-200 hover:border-amber-500/50 hover:bg-amber-500/10 hover:text-amber-600 dark:border-zinc-800 dark:bg-zinc-900/80 dark:text-zinc-200 dark:hover:border-amber-500/50 dark:hover:bg-amber-500/10 dark:hover:text-amber-400"
                 >
-                  <LogIn className="h-4 w-4" aria-hidden />
+                  <LogIn className="h-4 w-4 transition-colors group-hover:text-amber-600 dark:group-hover:text-amber-400" aria-hidden />
                   Login
                 </Link>
                 <Link

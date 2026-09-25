@@ -31,7 +31,6 @@ import {
 } from '@/lib/auctionDisplay';
 import {
   formatAuctionDetailMoney,
-  formatBidHistoryEmptyLabel,
   getAuctionCurrentBidAmount,
   getAuctionDisplayState,
   getAuctionReservePresentation,
@@ -489,7 +488,7 @@ export default function AuctionDetailPage() {
 
       {/* Main Two-Column Marketplace Grid */}
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-12 lg:items-start">
-        {/* LEFT COLUMN: Media Gallery + Details + Bid History */}
+        {/* LEFT COLUMN: Media Gallery + Details */}
         <section className="space-y-6 lg:col-span-7">
           {/* Media Gallery */}
           <div className="space-y-3">
@@ -583,63 +582,6 @@ export default function AuctionDetailPage() {
               </p>
             )}
           </article>
-
-          {/* Live Bid History */}
-          <section
-            aria-labelledby="auction-bid-history-heading"
-            className="rounded-2xl border border-zinc-200/90 bg-white p-6 shadow-xs dark:border-zinc-800 dark:bg-zinc-900/60"
-          >
-            <div className="flex items-center justify-between">
-              <h2
-                id="auction-bid-history-heading"
-                className="text-base font-bold text-zinc-900 dark:text-white"
-              >
-                Bid History
-              </h2>
-              <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">
-                {sortedHistory.length} {sortedHistory.length === 1 ? 'bid' : 'bids'} placed
-              </span>
-            </div>
-
-            {sortedHistory.length === 0 ? (
-              <p className="mt-4 text-sm text-zinc-500 dark:text-zinc-400">
-                {formatBidHistoryEmptyLabel()}
-              </p>
-            ) : (
-              <ol className="mt-4 divide-y divide-zinc-100 dark:divide-zinc-800">
-                {sortedHistory.map((bid, index) => (
-                  <li
-                    key={bid.id}
-                    className={`flex flex-wrap items-baseline justify-between gap-2 py-3 text-sm ${
-                      index === 0 ? 'font-semibold' : ''
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      {index === 0 && (
-                        <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-bold uppercase text-emerald-700 dark:text-emerald-300">
-                          Leading
-                        </span>
-                      )}
-                      <span className="text-zinc-900 dark:text-white font-bold tabular-nums">
-                        {formatAuctionMoney(Number(bid.amount))}
-                      </span>
-                    </div>
-                    <span className="text-zinc-600 dark:text-zinc-400 text-xs">
-                      {bid.bidder_username?.trim() || 'Bidder'}
-                    </span>
-                    <time
-                      className="w-full text-xs text-zinc-400 sm:w-auto"
-                      dateTime={bid.timestamp}
-                    >
-                      {bid.timestamp
-                        ? new Date(bid.timestamp).toLocaleString()
-                        : '—'}
-                    </time>
-                  </li>
-                ))}
-              </ol>
-            )}
-          </section>
         </section>
 
         {/* RIGHT COLUMN: Sticky Bidding Panel + Countdown + Seller Info */}
