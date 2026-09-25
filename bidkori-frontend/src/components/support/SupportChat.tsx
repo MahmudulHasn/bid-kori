@@ -11,10 +11,9 @@ import {
   useState,
 } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
+import Image from 'next/image';
 import {
   ArrowRight,
-  HelpCircle,
-  MessageCircle,
   SendHorizontal,
   Trash2,
   X,
@@ -330,17 +329,34 @@ export default function SupportChat() {
           type="button"
           onClick={() => setOpen(true)}
           className={[
-            'fixed bottom-20 right-4 sm:bottom-6 sm:right-6 z-40 inline-flex items-center gap-2 rounded-full',
-            'bg-amber-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-amber-600/25',
-            'transition-all duration-200 hover:bg-amber-500 hover:scale-105 active:scale-95 focus-visible:outline focus-visible:outline-2',
+            'group fixed bottom-20 right-4 sm:bottom-6 sm:right-6 z-40 inline-flex items-center gap-3 rounded-full',
+            'bg-zinc-950/90 text-white p-2 pr-4 shadow-xl shadow-amber-950/40 backdrop-blur-md',
+            'border border-amber-500/40 hover:border-amber-400 hover:shadow-amber-500/30',
+            'transition-all duration-300 hover:scale-105 active:scale-95 focus-visible:outline focus-visible:outline-2',
             'focus-visible:outline-offset-2 focus-visible:outline-amber-500',
           ].join(' ')}
           aria-haspopup="dialog"
           aria-expanded={false}
           aria-label="Open BidKori Help"
         >
-          <MessageCircle className="h-4 w-4" aria-hidden />
-          Ask BidKori
+          <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-linear-to-tr from-amber-500 via-amber-400 to-sky-500 p-0.5 shadow-xs transition-transform duration-300 group-hover:rotate-6">
+            <div className="flex h-full w-full items-center justify-center rounded-full bg-zinc-950 overflow-hidden">
+              <Image
+                src="/bidkori-chatbot-mascot.png"
+                alt="BidKori AI Mascot"
+                width={36}
+                height={36}
+                className="h-8 w-8 object-contain transition-transform duration-300 group-hover:scale-110"
+              />
+            </div>
+            <span className="absolute -bottom-0.5 -right-0.5 flex h-3 w-3">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex h-3 w-3 rounded-full border-2 border-zinc-950 bg-emerald-500" />
+            </span>
+          </div>
+          <span className="text-sm font-bold tracking-wide text-[#ffb600] group-hover:text-[#ffc425] transition-colors pr-1">
+            Ask BidKori
+          </span>
         </button>
       ) : null}
 
@@ -365,17 +381,33 @@ export default function SupportChat() {
               'border border-zinc-200 dark:border-zinc-800 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))]',
             ].join(' ')}
           >
-            <header className="flex items-start gap-3 border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
-              <div className="mt-0.5 rounded-full bg-amber-500/15 p-2 text-amber-700 dark:text-amber-300">
-                <HelpCircle className="h-4 w-4" aria-hidden />
+            <header className="flex items-center gap-3 border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
+              <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-amber-500/20 via-sky-500/15 to-blue-500/20 p-1 border border-amber-500/30">
+                <Image
+                  src="/bidkori-chatbot-mascot.png"
+                  alt="BidKori Assistant"
+                  width={36}
+                  height={36}
+                  className="h-8 w-8 object-contain"
+                />
+                <span className="absolute -bottom-0.5 -right-0.5 flex h-2.5 w-2.5">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full border-2 border-white dark:border-zinc-950 bg-emerald-500" />
+                </span>
               </div>
               <div className="min-w-0 flex-1">
-                <h2
-                  id={titleId}
-                  className="text-base font-semibold text-zinc-900 dark:text-white"
-                >
-                  BidKori Help
-                </h2>
+                <div className="flex items-center gap-2">
+                  <h2
+                    id={titleId}
+                    className="text-base font-bold text-zinc-900 dark:text-white"
+                  >
+                    BidKori Assistant
+                  </h2>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    Online
+                  </span>
+                </div>
                 <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
                   Ask how bidding, auctions, products, and notifications work.
                 </p>
@@ -434,37 +466,59 @@ export default function SupportChat() {
                 return (
                   <div
                     key={message.id}
-                    className="mr-auto max-w-[92%] rounded-2xl border border-zinc-200/60 bg-zinc-100 px-3.5 py-2.5 text-sm leading-relaxed break-words text-zinc-900 shadow-xs dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100"
+                    className="mr-auto flex items-start gap-2.5 max-w-[94%]"
                   >
-                    <AnimatedAssistantBubble
-                      message={message}
-                      shouldAnimate={
-                        message.id === latestAnimatedId &&
-                        message.id !== 'welcome'
-                      }
-                      onLineRevealed={scrollToBottom}
-                      onActionClick={(href) => {
-                        closePanel();
-                        router.push(href);
-                      }}
-                    />
+                    <div className="mt-0.5 shrink-0 h-7 w-7 rounded-full bg-amber-500/10 border border-amber-500/25 flex items-center justify-center overflow-hidden">
+                      <Image
+                        src="/bidkori-chatbot-mascot.png"
+                        alt="BidKori Assistant"
+                        width={24}
+                        height={24}
+                        className="h-6 w-6 object-contain"
+                      />
+                    </div>
+                    <div className="flex-1 rounded-2xl border border-zinc-200/60 bg-zinc-100 px-3.5 py-2.5 text-sm leading-relaxed break-words text-zinc-900 shadow-xs dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100">
+                      <AnimatedAssistantBubble
+                        message={message}
+                        shouldAnimate={
+                          message.id === latestAnimatedId &&
+                          message.id !== 'welcome'
+                        }
+                        onLineRevealed={scrollToBottom}
+                        onActionClick={(href) => {
+                          closePanel();
+                          router.push(href);
+                        }}
+                      />
+                    </div>
                   </div>
                 );
               })}
 
               {pending ? (
                 <div
-                  className="mr-auto inline-flex items-center gap-2.5 rounded-2xl border border-zinc-200/60 bg-zinc-100 px-3.5 py-2 text-sm text-zinc-600 shadow-xs dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300"
+                  className="mr-auto flex items-center gap-2.5"
                   aria-live="polite"
                 >
-                  <span className="inline-flex items-center gap-1">
-                    <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-bounce [animation-delay:-0.3s]" />
-                    <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-bounce [animation-delay:-0.15s]" />
-                    <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-bounce" />
-                  </span>
-                  <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
-                    BidKori Help is thinking…
-                  </span>
+                  <div className="shrink-0 h-7 w-7 rounded-full bg-amber-500/10 border border-amber-500/25 flex items-center justify-center overflow-hidden animate-pulse">
+                    <Image
+                      src="/bidkori-chatbot-mascot.png"
+                      alt="BidKori Assistant"
+                      width={24}
+                      height={24}
+                      className="h-6 w-6 object-contain"
+                    />
+                  </div>
+                  <div className="inline-flex items-center gap-2.5 rounded-2xl border border-zinc-200/60 bg-zinc-100 px-3.5 py-2 text-sm text-zinc-600 shadow-xs dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300">
+                    <span className="inline-flex items-center gap-1">
+                      <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-bounce [animation-delay:-0.3s]" />
+                      <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-bounce [animation-delay:-0.15s]" />
+                      <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-bounce" />
+                    </span>
+                    <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
+                      BidKori Assistant is thinking…
+                    </span>
+                  </div>
                 </div>
               ) : null}
 

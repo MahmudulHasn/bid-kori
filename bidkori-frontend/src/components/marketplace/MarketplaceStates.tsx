@@ -13,16 +13,21 @@ export function AuctionGridSkeleton({ count = 8 }: { count?: number }) {
       {Array.from({ length: count }).map((_, index) => (
         <div
           key={index}
-          className="overflow-hidden rounded-2xl border border-zinc-200/80 bg-white p-0 shadow-xs dark:border-zinc-800/80 dark:bg-zinc-900/50"
+          className="overflow-hidden rounded-2xl border border-zinc-800/80 bg-[#0c1017] p-3.5 sm:p-4 shadow-xl"
         >
-          <div className="aspect-[4/3] w-full animate-pulse bg-zinc-200/70 dark:bg-zinc-800" />
-          <div className="space-y-3 p-5">
-            <div className="h-4 w-3/4 animate-pulse rounded-lg bg-zinc-200/70 dark:bg-zinc-800" />
-            <div className="h-3 w-1/3 animate-pulse rounded-lg bg-zinc-200/70 dark:bg-zinc-800" />
-            <div className="mt-4 pt-3 border-t border-zinc-100 dark:border-zinc-800">
-              <div className="h-6 w-1/2 animate-pulse rounded-lg bg-zinc-200/70 dark:bg-zinc-800" />
+          <div className="aspect-[16/11] sm:aspect-[4/3] w-full animate-pulse rounded-xl sm:rounded-2xl bg-zinc-900/80 border border-zinc-800/60" />
+          <div className="mt-3.5 space-y-3">
+            <div className="h-3 w-1/4 animate-pulse rounded bg-zinc-800/80" />
+            <div className="h-5 w-3/4 animate-pulse rounded-lg bg-zinc-800/80" />
+            <div className="my-3.5 border-t border-zinc-800/80" />
+            <div className="space-y-1.5">
+              <div className="h-2.5 w-1/5 animate-pulse rounded bg-zinc-800/60" />
+              <div className="h-6 w-2/5 animate-pulse rounded-lg bg-zinc-800/80" />
             </div>
-            <div className="h-4 w-2/5 animate-pulse rounded-lg bg-zinc-200/70 dark:bg-zinc-800" />
+            <div className="mt-4 flex items-center justify-between">
+              <div className="h-7 w-24 animate-pulse rounded-full bg-zinc-800/60" />
+              <div className="h-7 w-16 animate-pulse rounded-xl bg-zinc-800/60" />
+            </div>
           </div>
         </div>
       ))}
