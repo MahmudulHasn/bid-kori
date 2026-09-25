@@ -37,7 +37,7 @@ export const AUCTION_IMAGE_UPLOAD_METHOD = 'POST';
 export const AUCTION_IMAGE_UPLOAD_FIELD = 'images';
 
 /** Defaults mirrored from auctions/image_validation.py / settings. */
-export const AUCTION_IMAGE_MAX_PER_AUCTION = 10;
+export const AUCTION_IMAGE_MAX_PER_AUCTION = 5;
 export const AUCTION_IMAGE_MAX_PER_REQUEST = 5;
 export const AUCTION_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 export const AUCTION_IMAGE_ACCEPT =

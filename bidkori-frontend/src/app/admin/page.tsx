@@ -413,7 +413,7 @@ export default function AdminHomePage() {
           <MetricCard
             label="Platform Fee Revenue"
             value={formatAdminMoney(finance?.platform_revenue)}
-            hint="5.00% standard commission"
+            hint="2.00% standard commission"
             icon={<Trophy className="h-5 w-5" />}
             loading={isLoading}
             badge={

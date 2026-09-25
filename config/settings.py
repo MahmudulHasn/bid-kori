@@ -274,7 +274,7 @@ AUCTION_IMAGE_MAX_WIDTH = int(os.getenv('AUCTION_IMAGE_MAX_WIDTH', '4096'))
 AUCTION_IMAGE_MAX_HEIGHT = int(os.getenv('AUCTION_IMAGE_MAX_HEIGHT', '4096'))
 AUCTION_IMAGE_MIN_WIDTH = int(os.getenv('AUCTION_IMAGE_MIN_WIDTH', '1'))
 AUCTION_IMAGE_MIN_HEIGHT = int(os.getenv('AUCTION_IMAGE_MIN_HEIGHT', '1'))
-AUCTION_IMAGE_MAX_PER_AUCTION = int(os.getenv('AUCTION_IMAGE_MAX_PER_AUCTION', '10'))
+AUCTION_IMAGE_MAX_PER_AUCTION = int(os.getenv('AUCTION_IMAGE_MAX_PER_AUCTION', '5'))
 AUCTION_IMAGE_MAX_PER_REQUEST = int(os.getenv('AUCTION_IMAGE_MAX_PER_REQUEST', '5'))
 AUCTION_IMAGE_ALLOWED_FORMATS = ('JPEG', 'PNG', 'WEBP', 'GIF')
 
@@ -311,7 +311,7 @@ PRODUCT_IMAGE_MAX_PER_REQUEST = int(
 def _parse_platform_success_fee_percent():
     from decimal import Decimal, InvalidOperation
 
-    raw = os.getenv('PLATFORM_SUCCESS_FEE_PERCENT', '5.00')
+    raw = os.getenv('PLATFORM_SUCCESS_FEE_PERCENT', '2.00')
     try:
         value = Decimal(str(raw).strip())
     except (InvalidOperation, AttributeError) as exc:

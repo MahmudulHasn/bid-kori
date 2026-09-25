@@ -59,7 +59,7 @@ def get_platform_success_fee_percent() -> Decimal:
     """Return the configured platform success-fee percent (Decimal)."""
     configured = getattr(settings, 'PLATFORM_SUCCESS_FEE_PERCENT', None)
     if configured is None:
-        return Decimal('5.00')
+        return Decimal('2.00')
     if isinstance(configured, Decimal):
         return parse_platform_success_fee_percent(configured)
     return parse_platform_success_fee_percent(configured)

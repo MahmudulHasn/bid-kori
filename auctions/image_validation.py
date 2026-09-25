@@ -55,7 +55,7 @@ def min_image_height() -> int:
 
 
 def max_images_per_auction() -> int:
-    return int(_setting('AUCTION_IMAGE_MAX_PER_AUCTION', 10))
+    return int(_setting('AUCTION_IMAGE_MAX_PER_AUCTION', 5))
 
 
 def max_images_per_request() -> int:

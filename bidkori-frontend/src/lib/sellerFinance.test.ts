@@ -99,6 +99,7 @@ test('normalize sales list', () => {
   assert.equal(list.count, 1);
   assert.equal(list.results[0]?.platform_fee, '100.00');
   assert.equal(formatFeeRateDisplay('5.00'), '5.00%');
+  assert.equal(formatFeeRateDisplay('2.00'), '2.00%');
   assert.equal(isLegacySaleRow(list.results[0]!), false);
 });
 

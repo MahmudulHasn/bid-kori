@@ -82,7 +82,7 @@ test('upload contract path remains POST /auctions/<id>/images/', () => {
   assert.equal(AUCTION_IMAGE_UPLOAD_METHOD, 'POST');
   assert.equal(AUCTION_IMAGE_UPLOAD_FIELD, 'images');
   assert.equal(buildAuctionImagesUploadApiPath(42), '/auctions/42/images/');
-  assert.equal(AUCTION_IMAGE_MAX_PER_AUCTION, 10);
+  assert.equal(AUCTION_IMAGE_MAX_PER_AUCTION, 5);
   assert.equal(AUCTION_IMAGE_MAX_PER_REQUEST, 5);
   assert.equal(AUCTION_IMAGE_MAX_BYTES, 5 * 1024 * 1024);
   assert.ok(AUCTION_IMAGE_ACCEPT.includes('image/jpeg'));
@@ -137,7 +137,7 @@ test('client image validation enforces request and capacity limits', () => {
       { id: 3, image: '/c.jpg' },
     ],
   });
-  assert.equal(auctionImageRemainingCapacity(base), 7);
+  assert.equal(auctionImageRemainingCapacity(base), 2);
   assert.equal(validateAuctionImageSelection([], base).ok, false);
 
   const tooMany = Array.from({ length: 6 }, (_, i) =>
@@ -147,7 +147,7 @@ test('client image validation enforces request and capacity limits', () => {
 
   const nearFull = auction({
     ...base,
-    images: Array.from({ length: 9 }, (_, i) => ({
+    images: Array.from({ length: 4 }, (_, i) => ({
       id: i,
       image: `/${i}.jpg`,
     })),
