@@ -8,7 +8,6 @@ import useSWR from 'swr';
 import { getApiErrorMessage } from '@/lib/apiErrors';
 import ModerationVisibilityBadge from '@/components/admin/ModerationVisibilityBadge';
 import {
-  ADMIN_PRODUCT_READONLY_COPY,
   ADMIN_PRODUCT_SORT_OPTIONS,
   adminProductDetailPath,
   filterAdminProducts,
@@ -107,9 +106,6 @@ export default function AdminProductsPage() {
         </h1>
         <p className="mt-2 max-w-2xl text-sm text-zinc-600 dark:text-zinc-400">
           Platform product catalog for operational visibility.
-        </p>
-        <p className="mt-2 max-w-2xl text-xs text-zinc-500 dark:text-zinc-500">
-          {ADMIN_PRODUCT_READONLY_COPY}
         </p>
       </header>
 

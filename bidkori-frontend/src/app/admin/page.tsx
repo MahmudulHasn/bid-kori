@@ -205,9 +205,6 @@ export default function AdminHomePage() {
           <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
             Welcome back, <span className="font-semibold text-zinc-900 dark:text-zinc-200">{user?.username ?? 'admin'}</span>. Platform status & live operational telemetry.
           </p>
-          <p className="mt-0.5 text-xs text-zinc-400 dark:text-zinc-500">
-            Authoritative data derived from PostgreSQL and Daphne ASGI stack.
-          </p>
         </div>
 
         {/* Refresh control */}

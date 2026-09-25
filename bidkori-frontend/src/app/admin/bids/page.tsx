@@ -12,8 +12,6 @@ import {
 } from '@/lib/adminAuctions';
 import {
   ADMIN_BIDS_PAGE_HINT,
-  ADMIN_BIDS_READONLY_COPY,
-  ADMIN_BIDS_VS_ANALYTICS_HINT,
   ADMIN_BID_HISTORY_ORDER_HINT,
   adminBidsPath,
   buildAdminAuctionsApiPath,
@@ -118,12 +116,6 @@ function AdminBidsPageInner() {
         </h1>
         <p className="max-w-2xl text-sm text-zinc-600 dark:text-zinc-400">
           {ADMIN_BIDS_PAGE_HINT}
-        </p>
-        <p className="max-w-2xl text-xs text-zinc-500 dark:text-zinc-500">
-          {ADMIN_BIDS_READONLY_COPY}
-        </p>
-        <p className="max-w-2xl text-xs text-zinc-500 dark:text-zinc-500">
-          {ADMIN_BIDS_VS_ANALYTICS_HINT}
         </p>
       </header>
 

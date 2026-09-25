@@ -10,7 +10,6 @@ import AdminUserStatusAction from '@/components/admin/AdminUserStatusAction';
 import { getApiErrorMessage, getApiStatus } from '@/lib/apiErrors';
 import {
   ADMIN_USERS_PATH,
-  ADMIN_USERS_READONLY_IDENTITY_COPY,
   buildAdminUserDetailApiPath,
   formatAdminUserRole,
   formatAdminUserStatus,
@@ -176,10 +175,6 @@ export default function AdminUserDetailPage() {
           Marketplace account record.
         </p>
       </header>
-
-      <p className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900/60 dark:text-zinc-400">
-        {ADMIN_USERS_READONLY_IDENTITY_COPY}
-      </p>
 
       <section
         aria-labelledby="user-details-heading"

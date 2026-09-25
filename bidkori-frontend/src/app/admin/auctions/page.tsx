@@ -9,7 +9,6 @@ import ModerationVisibilityBadge from '@/components/admin/ModerationVisibilityBa
 import { getApiErrorMessage } from '@/lib/apiErrors';
 import {
   ADMIN_AUCTIONS_PATH,
-  ADMIN_AUCTION_READONLY_COPY,
   ADMIN_AUCTION_SORT_OPTIONS,
   ADMIN_AUCTION_STATUS_OPTIONS,
   adminAuctionDetailPath,
@@ -146,9 +145,6 @@ export default function AdminAuctionsPage() {
         </h1>
         <p className="mt-2 max-w-2xl text-sm text-zinc-600 dark:text-zinc-400">
           Platform auction catalog for operational visibility.
-        </p>
-        <p className="mt-2 max-w-2xl text-xs text-zinc-500 dark:text-zinc-500">
-          {ADMIN_AUCTION_READONLY_COPY}
         </p>
       </header>
 

@@ -10,7 +10,6 @@ import ProductModerationActions from '@/components/admin/ProductModerationAction
 import { getApiErrorMessage, getApiStatus } from '@/lib/apiErrors';
 import {
   ADMIN_PRODUCTS_PATH,
-  ADMIN_PRODUCT_READONLY_COPY,
   formatAdminProductCategory,
   formatAdminProductCondition,
   formatAdminProductSeller,
@@ -91,14 +90,9 @@ function ProductDetailBody({
           {title}
         </h1>
         <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-          Product record from the platform catalog. Catalog fields are
-          read-only.
+          Product record from the platform catalog.
         </p>
       </header>
-
-      <p className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900/60 dark:text-zinc-400">
-        {ADMIN_PRODUCT_READONLY_COPY}
-      </p>
 
       <ProductModerationActions
         product={product}

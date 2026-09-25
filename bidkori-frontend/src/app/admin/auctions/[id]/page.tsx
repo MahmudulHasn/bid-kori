@@ -11,7 +11,6 @@ import AuctionModerationActions from '@/components/admin/AuctionModerationAction
 import { getApiErrorMessage, getApiStatus } from '@/lib/apiErrors';
 import {
   ADMIN_AUCTIONS_PATH,
-  ADMIN_AUCTION_READONLY_COPY,
   buildAuctionBidHistoryApiPath,
   formatAdminAuctionFeaturedState,
   formatAdminAuctionPaidState,
@@ -114,7 +113,7 @@ function AuctionDetailBody({
           {title}
         </h1>
         <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-          Auction record from the platform catalog. Economics remain read-only.
+          Auction record from the platform catalog.
         </p>
         {productId != null ? (
           <p className="mt-3">
@@ -127,10 +126,6 @@ function AuctionDetailBody({
           </p>
         ) : null}
       </header>
-
-      <p className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900/60 dark:text-zinc-400">
-        {ADMIN_AUCTION_READONLY_COPY}
-      </p>
 
       <AuctionModerationActions
         auction={auction}

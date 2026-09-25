@@ -12,7 +12,6 @@ import {
   ADMIN_USERS_PATH,
   ADMIN_USER_ROLE_OPTIONS,
   ADMIN_USER_STATUS_OPTIONS,
-  ADMIN_USERS_READONLY_IDENTITY_COPY,
   adminUserDetailPath,
   adminUsersFiltersAreActive,
   buildAdminUserDetailApiPath,
@@ -207,9 +206,6 @@ export default function AdminUsersPage() {
         <p className="mt-2 max-w-2xl text-sm text-zinc-600 dark:text-zinc-400">
           Marketplace account directory with reversible Suspend and Reactivate
           controls.
-        </p>
-        <p className="mt-2 max-w-2xl text-xs text-zinc-500 dark:text-zinc-500">
-          {ADMIN_USERS_READONLY_IDENTITY_COPY}
         </p>
       </header>
 

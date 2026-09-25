@@ -8,7 +8,6 @@ import useSWR from 'swr';
 
 import {
   ADMIN_ANALYTICS_API_PATH,
-  ADMIN_ANALYTICS_PATH,
   ANALYTICS_ESCALATION_SAMPLE_HINT,
   ANALYTICS_PAGE_VOLUME_HINT,
   BIDDING_VOLUME_LABEL,
@@ -19,7 +18,6 @@ import {
 } from '@/lib/adminAnalytics';
 import { adminAnalyticsFetcher } from '@/lib/adminAnalyticsApi';
 import {
-  ADMIN_FINANCE_DISCLOSURE,
   ADMIN_FINANCE_SUMMARY_API_PATH,
   COMPLETED_CHECKOUT_VOLUME_LABEL,
   COMPLETED_SALES_COUNT_LABEL,
@@ -163,10 +161,6 @@ export default function AdminAnalyticsPage() {
             Staff-only auction and bidding metrics from the live analytics API,
             plus a separate mock-checkout financial summary. Bidding volume is not
             platform revenue.
-          </p>
-          <p className="text-xs text-zinc-500 dark:text-zinc-500">
-            Source: <code>{analyticsUrl}</code> · Route:{' '}
-            <code>{ADMIN_ANALYTICS_PATH}</code>
           </p>
         </div>
 
@@ -328,10 +322,6 @@ export default function AdminAnalyticsPage() {
           >
             Mock checkout financial summary
           </h2>
-          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-            Exact aggregates from <code>{ADMIN_FINANCE_SUMMARY_API_PATH}</code>.
-            Distinct from {BIDDING_VOLUME_LABEL}. {ADMIN_FINANCE_DISCLOSURE}
-          </p>
         </div>
 
         {financeErrorMessage ? (
