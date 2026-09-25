@@ -92,7 +92,9 @@ export function canGenerateAiListingDescription(
   if (input.generating) return false;
   if (!input.title.trim()) return false;
   if (!input.image) return false;
-  if (!validateApiKeyInput(input.apiKey).ok) return false;
+  if (input.apiKey && input.apiKey.trim() && !validateApiKeyInput(input.apiKey).ok) {
+    return false;
+  }
   return validateAiListingImage(input.image).ok;
 }
 
@@ -178,21 +180,21 @@ export const AI_LISTING_IMAGE_MAX_BYTES = PRODUCT_IMAGE_MAX_BYTES;
 
 // --- BYOK constants ---
 
-export const AI_BYOK_LABEL = 'OpenAI API Key';
+export const AI_BYOK_LABEL = 'AI Provider API Key (Optional)';
 
 export const AI_BYOK_HELPER_TEXT =
-  'Used only for this generation request. Supports Gemini (AQ.…), Groq (gsk_…), or OpenAI (sk-…). BidKori does not save your API key.';
+  'Optional: Leave blank to use BidKori built-in AI. Supports Gemini (AQ.…), Groq (gsk_…), or OpenAI (sk-…). BidKori does not save your API key.';
 
 export const AI_BYOK_KEY_CLEARED_MESSAGE =
   'Your API key has been cleared for security.';
 
-/** Basic client-side API key validation (non-empty, reasonable length). */
+/** Basic client-side API key validation (optional; if provided, must be within reasonable length). */
 export function validateApiKeyInput(
   key: string,
 ): { ok: true } | { ok: false; error: string } {
   const trimmed = (key ?? '').trim();
   if (!trimmed) {
-    return { ok: false, error: 'Enter your OpenAI API key.' };
+    return { ok: true };
   }
   if (trimmed.length > 256) {
     return { ok: false, error: 'API key is too long.' };

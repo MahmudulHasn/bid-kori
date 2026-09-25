@@ -302,6 +302,9 @@ class AIListingService:
             raise AIListingConfigurationError()
 
         started = time.monotonic()
+        server_key = getattr(settings, 'AI_API_KEY', '').strip()
+        has_custom_key = bool(api_key and api_key.strip())
+
         try:
             image_data_url = encode_uploaded_image_as_data_url(image_file)
             request = AIListingRequest(
@@ -310,7 +313,9 @@ class AIListingService:
                 category_name=category_name,
                 image_data_url=image_data_url,
             )
+
             raw = cls._call_provider(request, api_key=resolved_key)
+
             description = clean_description_output(raw)
             if not description:
                 raise AIListingEmptyOutputError()
@@ -335,6 +340,7 @@ class AIListingService:
                 int((time.monotonic() - started) * 1000),
             )
             raise AIListingProviderError() from None
+
 
     @classmethod
     def _build_client(cls, *, api_key: str):
@@ -518,28 +524,65 @@ class AIListingService:
         )
         max_tokens = int(getattr(settings, 'AI_LISTING_MAX_OUTPUT_TOKENS', 800) or 800)
 
+        # Ensure model is a valid OpenAI vision model (never send 'gemini-*' to OpenAI).
+        model = getattr(settings, 'AI_MODEL', '').strip()
+        if not model or not any(x in model.lower() for x in ('gpt', 'o1', 'o3', 'o4')):
+            model = 'gpt-4o-mini'
+
         try:
-            response = client.responses.create(
-                model=settings.AI_MODEL,
-                instructions=SERVER_INSTRUCTIONS,
-                input=[
+            if hasattr(client, 'responses'):
+                try:
+                    response = client.responses.create(
+                        model=model,
+                        instructions=SERVER_INSTRUCTIONS,
+                        input=[
+                            {
+                                'role': 'user',
+                                'content': [
+                                    {'type': 'input_text', 'text': user_text},
+                                    {
+                                        'type': 'input_image',
+                                        'image_url': request.image_data_url,
+                                    },
+                                ],
+                            }
+                        ],
+                        max_output_tokens=max_tokens,
+                    )
+                    extracted = extract_response_text(response)
+                    if extracted:
+                        return extracted
+                except (AttributeError, TypeError):
+                    pass
+
+            response = client.chat.completions.create(
+                model=model,
+                messages=[
+                    {'role': 'system', 'content': SERVER_INSTRUCTIONS},
                     {
                         'role': 'user',
                         'content': [
-                            {'type': 'input_text', 'text': user_text},
+                            {'type': 'text', 'text': user_text},
                             {
-                                'type': 'input_image',
-                                'image_url': request.image_data_url,
+                                'type': 'image_url',
+                                'image_url': {'url': request.image_data_url},
                             },
                         ],
-                    }
+                    },
                 ],
-                max_output_tokens=max_tokens,
+                max_tokens=max_tokens,
             )
+            content = response.choices[0].message.content or ''
+            if not content.strip():
+                raise AIListingEmptyOutputError()
+            return content
         except RateLimitError as exc:
             msg = str(exc).lower()
             if 'quota' in msg or 'credit' in msg:
-                raise AIListingQuotaError() from exc
+                raise AIListingQuotaError(
+                    'Your custom OpenAI API key has exhausted its credit balance. '
+                    'Please check your OpenAI billing or leave the API key blank to use BidKori built-in AI.'
+                ) from exc
             raise AIListingRateLimitError() from exc
         except APITimeoutError as exc:
             raise AIListingTimeoutError() from exc
@@ -548,9 +591,15 @@ class AIListingService:
         except APIStatusError as exc:
             status = getattr(exc, 'status_code', None)
             if status in (401, 403):
-                raise AIListingInvalidKeyError() from exc
+                raise AIListingInvalidKeyError(
+                    'The API key was rejected by the provider. '
+                    'Please check your key or leave it blank to use BidKori built-in AI.'
+                ) from exc
             if status == 402:
-                raise AIListingQuotaError() from exc
+                raise AIListingQuotaError(
+                    'Your custom API key has exhausted its credit balance. '
+                    'Please check your billing or leave the API key blank to use BidKori built-in AI.'
+                ) from exc
             if status == 429:
                 raise AIListingRateLimitError() from exc
             raise AIListingProviderError() from exc
@@ -562,7 +611,6 @@ class AIListingService:
                 raise AIListingTimeoutError() from exc
             raise AIListingProviderError() from exc
 
-        return extract_response_text(response)
 
     @classmethod
     def _call_provider(cls, request: AIListingRequest, *, api_key: str) -> str:

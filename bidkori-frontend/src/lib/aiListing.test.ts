@@ -232,7 +232,7 @@ describe('canGenerateAiListingDescription', () => {
         formEditable: true,
         apiKey: '',
       }),
-      false,
+      true,
     );
     assert.equal(
       canGenerateAiListingDescription({
@@ -241,6 +241,16 @@ describe('canGenerateAiListingDescription', () => {
         generating: false,
         formEditable: true,
         apiKey: '   ',
+      }),
+      true,
+    );
+    assert.equal(
+      canGenerateAiListingDescription({
+        title: 'Headphones',
+        image,
+        generating: false,
+        formEditable: true,
+        apiKey: 'x'.repeat(257),
       }),
       false,
     );
@@ -391,9 +401,9 @@ describe('validateApiKeyInput', () => {
     assert.equal(validateApiKeyInput('my-key').ok, true);
   });
 
-  it('rejects empty or whitespace-only', () => {
-    assert.equal(validateApiKeyInput('').ok, false);
-    assert.equal(validateApiKeyInput('   ').ok, false);
+  it('accepts empty or whitespace-only when optional', () => {
+    assert.equal(validateApiKeyInput('').ok, true);
+    assert.equal(validateApiKeyInput('   ').ok, true);
   });
 
   it('rejects keys longer than 256 characters', () => {
@@ -407,7 +417,7 @@ describe('validateApiKeyInput', () => {
 
 describe('BYOK constants', () => {
   it('exposes BYOK label and helper text', () => {
-    assert.equal(AI_BYOK_LABEL, 'OpenAI API Key');
+    assert.equal(AI_BYOK_LABEL, 'AI Provider API Key (Optional)');
     assert.match(AI_BYOK_HELPER_TEXT, /does not save/i);
     assert.match(AI_BYOK_KEY_CLEARED_MESSAGE, /cleared/i);
   });

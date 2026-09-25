@@ -384,7 +384,7 @@ export default function ProductForm({
                 autoComplete="off"
                 spellCheck={false}
                 disabled={controlsDisabled || aiGenerating}
-                placeholder="AQ.… / gsk_… / sk-…"
+                placeholder="Optional: Leave blank to use BidKori built-in AI"
                 aria-describedby="product-ai-api-key-help"
                 onChange={(event) => {
                   setApiKey(event.target.value);
