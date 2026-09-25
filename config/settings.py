@@ -537,3 +537,24 @@ LOGGING = {
         },
     },
 }
+
+# ---------------------------------------------------------------------------
+# SSLCOMMERZ Payment Gateway Settings
+# ---------------------------------------------------------------------------
+
+SSLCOMMERZ_STORE_ID = os.getenv('SSLCOMMERZ_STORE_ID', 'unica6ab6bc4a8cc25')
+SSLCOMMERZ_STORE_PASSWORD = os.getenv('SSLCOMMERZ_STORE_PASSWORD', 'unica6ab6bc4a8cc25@ssl')
+SSLCOMMERZ_IS_SANDBOX = _env_bool('SSLCOMMERZ_IS_SANDBOX', default=True)
+SSLCOMMERZ_SESSION_API = (
+    'https://sandbox.sslcommerz.com/gwprocess/v4/api.php'
+    if SSLCOMMERZ_IS_SANDBOX
+    else 'https://securepay.sslcommerz.com/gwprocess/v4/api.php'
+)
+SSLCOMMERZ_VALIDATION_API = (
+    'https://sandbox.sslcommerz.com/validator/api/validationserverAPI.php'
+    if SSLCOMMERZ_IS_SANDBOX
+    else 'https://securepay.sslcommerz.com/validator/api/validationserverAPI.php'
+)
+
+BACKEND_BASE_URL = os.getenv('BACKEND_BASE_URL', 'http://localhost:8000')
+FRONTEND_BASE_URL = os.getenv('FRONTEND_BASE_URL', 'http://localhost:3000')

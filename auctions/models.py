@@ -376,6 +376,30 @@ class WinnerDetailsUnlock(models.Model):
         unique=True,
         blank=True,
     )
+    payment_method = models.CharField(
+        max_length=50,
+        default='SSLCOMMERZ',
+        blank=True,
+        help_text='Payment gateway or method used (e.g. SSLCOMMERZ, MOCK).',
+    )
+    val_id = models.CharField(
+        max_length=100,
+        blank=True,
+        default='',
+        help_text='SSLCommerz validation ID.',
+    )
+    bank_tran_id = models.CharField(
+        max_length=100,
+        blank=True,
+        default='',
+        help_text='Bank transaction ID from gateway.',
+    )
+    card_type = models.CharField(
+        max_length=100,
+        blank=True,
+        default='',
+        help_text='Gateway card or channel used (e.g. BKASH, VISA).',
+    )
     paid_at = models.DateTimeField(null=True, blank=True)
     unlocked_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

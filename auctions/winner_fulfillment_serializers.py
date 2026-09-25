@@ -185,7 +185,7 @@ class WinnerDetailsUnlockStatusSerializer(serializers.Serializer):
 
 
 class WinnerDetailsUnlockResponseSerializer(serializers.Serializer):
-    """Confirmation payload returned upon successful mock payment and unlock."""
+    """Confirmation payload returned upon payment initialization or successful unlock."""
 
     auction_id = serializers.IntegerField()
     status = serializers.CharField()
@@ -194,5 +194,7 @@ class WinnerDetailsUnlockResponseSerializer(serializers.Serializer):
     fee_amount = serializers.DecimalField(max_digits=10, decimal_places=2)
     currency = serializers.CharField()
     payment_reference = serializers.CharField()
-    unlocked_at = serializers.DateTimeField()
+    unlocked_at = serializers.DateTimeField(required=False, allow_null=True)
+    gateway = serializers.CharField(required=False, default='sslcommerz')
+    gateway_url = serializers.CharField(required=False, allow_null=True, allow_blank=True, default=None)
 

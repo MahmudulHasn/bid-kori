@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { format } from 'date-fns';
 import {
   Check,
@@ -73,12 +73,38 @@ export default function SellerWinnerDetailsCard({
     mutate: mutateDetails,
   } = useSWR(detailsKey, sellerUnlockedWinnerDetailsFetcher);
 
+  // Handle return from SSLCOMMERZ gateway
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const urlParams = new URLSearchParams(window.location.search);
+    const payment = urlParams.get('payment');
+    if (!payment) return;
+
+    if (payment === 'success') {
+      toast.success('SSLCOMMERZ payment successful! Winner details unlocked.');
+      void mutateStatus();
+    } else if (payment === 'failed') {
+      toast.error('SSLCOMMERZ payment failed. Please try again.');
+    } else if (payment === 'cancelled') {
+      toast.error('SSLCOMMERZ payment was cancelled.');
+    }
+
+    // Clean up query param from URL
+    const nextUrl = window.location.pathname;
+    window.history.replaceState({}, '', nextUrl);
+  }, [mutateStatus]);
+
   const handleUnlockConfirm = async () => {
     setUnlocking(true);
     setUnlockError(null);
 
     try {
-      const response = await unlockSellerWinnerDetails(auctionId);
+      const response = await unlockSellerWinnerDetails(auctionId, 'sslcommerz');
+      if (response.gateway_url) {
+        toast.loading('Redirecting to SSLCOMMERZ Sandbox...');
+        window.location.href = response.gateway_url;
+        return;
+      }
       setModalOpen(false);
       await mutateStatus();
       if (response.already_unlocked) {

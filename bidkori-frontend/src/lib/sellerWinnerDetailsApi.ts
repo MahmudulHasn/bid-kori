@@ -41,15 +41,16 @@ export async function sellerWinnerDetailsStatusFetcher(
 }
 
 /**
- * Execute mock payment and unlock entitlement for the winning buyer's details.
- * Client does not control fee, currency, status, or timestamps.
+ * Initiate payment and unlock entitlement for the winning buyer's details.
+ * Supports SSLCOMMERZ gateway (default) and mock payment.
  */
 export async function unlockSellerWinnerDetails(
   auctionId: number,
+  gateway: 'sslcommerz' | 'mock' = 'sslcommerz',
 ): Promise<WinnerDetailsUnlockResponse> {
   const { data } = await api.post<WinnerDetailsUnlockResponse>(
     buildSellerWinnerDetailsUnlockPath(auctionId),
-    {},
+    { gateway },
   );
   return data;
 }

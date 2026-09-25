@@ -150,6 +150,10 @@ export type AdminFulfillmentDetail = {
   fee_amount: string | null;
   currency: string | null;
   payment_reference: string | null;
+  payment_method?: string | null;
+  val_id?: string | null;
+  bank_tran_id?: string | null;
+  card_type?: string | null;
   paid_at: string | null;
   unlocked_at: string | null;
   integrity_status: IntegrityStatus;

@@ -1246,6 +1246,229 @@ class WinnerDetailsUnlockService:
                     )
 
     @classmethod
+    def initiate_sslcommerz_unlock(cls, auction_id, user):
+        """Initiate SSLCOMMERZ gateway payment session for 2% unlock fee.
+
+        Creates or updates a PENDING WinnerDetailsUnlock record and returns GatewayPageURL.
+        """
+        import uuid
+        from django.conf import settings
+        from .fees import get_winner_details_unlock_fee
+        from .models import WinnerDetailsUnlock, WinnerFulfillmentDetails
+        from .sslcommerz import initiate_sslcommerz_session
+
+        with transaction.atomic():
+            auction = cls.verify_seller_eligibility(auction_id, user, for_update=True)
+
+            if auction.status != Auction.Status.CLOSED:
+                raise WinnerDetailsUnlockValidationError(
+                    f'Winner details unlock is only available for CLOSED auctions (current status: {auction.status}).'
+                )
+
+            if auction.winning_bidder_id is None:
+                raise WinnerDetailsUnlockValidationError(
+                    'This auction ended with no winning bidder.'
+                )
+
+            # Check existing unlock
+            try:
+                existing_unlock = auction.winner_details_unlock
+                if existing_unlock.status == WinnerDetailsUnlock.Status.PAID:
+                    return {
+                        'auction_id': auction.pk,
+                        'status': existing_unlock.status,
+                        'is_unlocked': True,
+                        'already_unlocked': True,
+                        'fee_amount': existing_unlock.fee_amount,
+                        'currency': existing_unlock.currency,
+                        'payment_reference': existing_unlock.payment_reference,
+                        'unlocked_at': existing_unlock.unlocked_at,
+                        'gateway': 'sslcommerz',
+                        'gateway_url': None,
+                    }
+            except WinnerDetailsUnlock.DoesNotExist:
+                existing_unlock = None
+
+            # Check WinnerFulfillmentDetails
+            try:
+                details = auction.winner_fulfillment_details
+            except WinnerFulfillmentDetails.DoesNotExist:
+                details = None
+
+            if details is None or details.status != WinnerFulfillmentDetails.Status.COMPLETED:
+                raise WinnerDetailsUnlockValidationError(
+                    'Winner details are not ready to unlock yet.'
+                )
+
+            if details.buyer_id != auction.winning_bidder_id:
+                raise WinnerDetailsUnlockValidationError(
+                    'Fulfillment details record is invalid.'
+                )
+
+            fee_amount = get_winner_details_unlock_fee(auction)
+            tran_id = f'WDU-{auction.pk}-{uuid.uuid4().hex[:10].upper()}'
+
+            backend_base = getattr(settings, 'BACKEND_BASE_URL', 'http://localhost:8000').rstrip('/')
+            success_url = f'{backend_base}/api/seller/payment/success/'
+            fail_url = f'{backend_base}/api/seller/payment/fail/'
+            cancel_url = f'{backend_base}/api/seller/payment/cancel/'
+            ipn_url = f'{backend_base}/api/seller/payment/ipn/'
+
+            customer_name = user.get_full_name() or user.username
+            customer_email = user.email or f'{user.username}@bidkori.com'
+            customer_phone = getattr(getattr(user, 'profile', None), 'phone', '') or '01700000000'
+
+            gateway_url = initiate_sslcommerz_session(
+                tran_id=tran_id,
+                amount=fee_amount,
+                customer_name=customer_name,
+                customer_email=customer_email,
+                customer_phone=customer_phone,
+                auction_id=auction.pk,
+                success_url=success_url,
+                fail_url=fail_url,
+                cancel_url=cancel_url,
+                ipn_url=ipn_url,
+            )
+
+            if existing_unlock is not None:
+                existing_unlock.fee_amount = fee_amount
+                existing_unlock.status = WinnerDetailsUnlock.Status.PENDING
+                existing_unlock.payment_reference = tran_id
+                existing_unlock.payment_method = 'SSLCOMMERZ'
+                existing_unlock.winner_details = details
+                existing_unlock.save(
+                    update_fields=[
+                        'fee_amount',
+                        'status',
+                        'payment_reference',
+                        'payment_method',
+                        'winner_details',
+                        'updated_at',
+                    ]
+                )
+            else:
+                WinnerDetailsUnlock.objects.create(
+                    auction=auction,
+                    seller=user,
+                    winner_details=details,
+                    fee_amount=fee_amount,
+                    currency='BDT',
+                    status=WinnerDetailsUnlock.Status.PENDING,
+                    payment_reference=tran_id,
+                    payment_method='SSLCOMMERZ',
+                )
+
+            return {
+                'auction_id': auction.pk,
+                'status': 'PENDING',
+                'is_unlocked': False,
+                'already_unlocked': False,
+                'fee_amount': fee_amount,
+                'currency': 'BDT',
+                'payment_reference': tran_id,
+                'unlocked_at': None,
+                'gateway': 'sslcommerz',
+                'gateway_url': gateway_url,
+            }
+
+    @classmethod
+    def handle_sslcommerz_success(cls, tran_id: str, val_id: str, post_data: dict) -> int:
+        """Process verified SSLCommerz payment callback and grant persistent unlock access.
+
+        Returns auction_id.
+        """
+        from .models import WinnerDetailsUnlock
+        from .sslcommerz import validate_sslcommerz_payment
+
+        val_data = validate_sslcommerz_payment(val_id)
+
+        with transaction.atomic():
+            unlock = (
+                WinnerDetailsUnlock.objects.select_for_update()
+                .filter(payment_reference=tran_id)
+                .first()
+            )
+            if unlock is None:
+                # Fallback: check value_a (auction_id)
+                auction_id_val = post_data.get('value_a') or val_data.get('value_a')
+                if auction_id_val:
+                    unlock = (
+                        WinnerDetailsUnlock.objects.select_for_update()
+                        .filter(auction_id=int(auction_id_val))
+                        .first()
+                    )
+
+            if unlock is None:
+                raise WinnerDetailsUnlockValidationError(
+                    f'Unlock record for transaction {tran_id} not found.'
+                )
+
+            if unlock.status == WinnerDetailsUnlock.Status.PAID:
+                return unlock.auction_id
+
+            now = timezone.now()
+            unlock.status = WinnerDetailsUnlock.Status.PAID
+            unlock.val_id = val_id
+            unlock.bank_tran_id = post_data.get('bank_tran_id') or val_data.get('bank_tran_id', '')
+            unlock.card_type = post_data.get('card_type') or val_data.get('card_type', '')
+            unlock.payment_method = 'SSLCOMMERZ'
+            unlock.paid_at = now
+            unlock.unlocked_at = now
+
+            if unlock.winner_details is None and hasattr(unlock.auction, 'winner_fulfillment_details'):
+                unlock.winner_details = unlock.auction.winner_fulfillment_details
+
+            unlock.save(
+                update_fields=[
+                    'status',
+                    'val_id',
+                    'bank_tran_id',
+                    'card_type',
+                    'payment_method',
+                    'paid_at',
+                    'unlocked_at',
+                    'winner_details',
+                    'updated_at',
+                ]
+            )
+
+            from notifications.services import schedule_winner_details_unlocked_notification
+
+            schedule_winner_details_unlocked_notification(
+                buyer_id=unlock.auction.winning_bidder_id,
+                auction_id=unlock.auction.pk,
+                product_title=unlock.auction.product.title if unlock.auction.product else f'Auction #{unlock.auction.pk}',
+            )
+
+            return unlock.auction_id
+
+    @classmethod
+    def handle_sslcommerz_fail(cls, tran_id: str, post_data: dict) -> int:
+        """Mark unlock status as FAILED if not already PAID."""
+        from .models import WinnerDetailsUnlock
+
+        with transaction.atomic():
+            unlock = (
+                WinnerDetailsUnlock.objects.select_for_update()
+                .filter(payment_reference=tran_id)
+                .first()
+            )
+            if unlock is not None and unlock.status != WinnerDetailsUnlock.Status.PAID:
+                unlock.status = WinnerDetailsUnlock.Status.FAILED
+                unlock.save(update_fields=['status', 'updated_at'])
+                return unlock.auction_id
+            return unlock.auction_id if unlock else 0
+
+    @classmethod
+    def handle_sslcommerz_cancel(cls, tran_id: str, post_data: dict) -> int:
+        """Handle cancellation from SSLCommerz."""
+        from .models import WinnerDetailsUnlock
+
+        unlock = WinnerDetailsUnlock.objects.filter(payment_reference=tran_id).first()
+        return unlock.auction_id if unlock else 0
+
+    @classmethod
     def seller_has_access(cls, auction_id, user):
         """Return True if user is the seller and a valid PAID unlock record exists."""
         from .models import WinnerDetailsUnlock

@@ -235,7 +235,9 @@ export type WinnerDetailsUnlockResponse = {
   fee_amount: string;
   currency: string;
   payment_reference: string;
-  unlocked_at: string;
+  unlocked_at?: string | null;
+  gateway?: string;
+  gateway_url?: string | null;
 };
 
 export type SellerUnlockedWinnerDetails = {

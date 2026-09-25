@@ -131,17 +131,30 @@ export default function SellerWinnerDetailsModal({
             </ul>
           </div>
 
-          <div className="rounded-xl border border-amber-200 bg-amber-50 p-3.5 text-xs text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
-            <div className="flex gap-2">
-              <ShieldCheck className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
-              <div className="space-y-1">
-                <p className="font-semibold">Mock / Internal Payment Mode</p>
-                <p>
-                  This development version uses BidKori&apos;s internal mock payment
-                  flow. Confirming will unlock the winner details for a fixed {Number(unlockFeePercent)}% fee of{' '}
-                  <span className="font-bold tabular-nums">{formattedFee}</span>
-                  {totalAmount ? ` (calculated from winning amount ${formatUnlockFee(totalAmount, currency)})` : ''}.
+          <div className="rounded-xl border border-sky-200 bg-sky-50/70 p-4 text-xs text-sky-950 dark:border-sky-900/50 dark:bg-sky-950/30 dark:text-sky-200">
+            <div className="flex gap-3">
+              <ShieldCheck className="h-5 w-5 shrink-0 text-sky-600 dark:text-sky-400 mt-0.5" />
+              <div className="space-y-1.5 flex-1">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="font-semibold text-sm text-sky-900 dark:text-sky-200">
+                    SSLCOMMERZ Payment Gateway (Sandbox)
+                  </p>
+                  <span className="rounded-full bg-sky-200/80 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-sky-800 dark:bg-sky-900 dark:text-sky-300">
+                    2% Fee
+                  </span>
+                </div>
+                <p className="text-zinc-600 dark:text-zinc-300 leading-relaxed">
+                  You will be securely redirected to the SSLCOMMERZ Sandbox payment gateway to complete the {Number(unlockFeePercent)}% unlock fee of{' '}
+                  <span className="font-bold tabular-nums text-sky-900 dark:text-white">{formattedFee}</span>
+                  {totalAmount ? ` (calculated from winning bid ${formatUnlockFee(totalAmount, currency)})` : ''}.
                 </p>
+                <div className="flex flex-wrap items-center gap-1.5 pt-1 text-[11px] text-zinc-500 dark:text-zinc-400">
+                  <span className="font-medium text-zinc-700 dark:text-zinc-300">Channels:</span>
+                  <span className="rounded bg-white/80 dark:bg-zinc-800 px-1.5 py-0.5 border border-zinc-200/60 dark:border-zinc-700">bKash</span>
+                  <span className="rounded bg-white/80 dark:bg-zinc-800 px-1.5 py-0.5 border border-zinc-200/60 dark:border-zinc-700">Nagad</span>
+                  <span className="rounded bg-white/80 dark:bg-zinc-800 px-1.5 py-0.5 border border-zinc-200/60 dark:border-zinc-700">Cards (Visa/Mastercard)</span>
+                  <span className="rounded bg-white/80 dark:bg-zinc-800 px-1.5 py-0.5 border border-zinc-200/60 dark:border-zinc-700">Internet Banking</span>
+                </div>
               </div>
             </div>
           </div>
@@ -175,15 +188,18 @@ export default function SellerWinnerDetailsModal({
             type="button"
             onClick={() => void onConfirm()}
             disabled={loading}
-            className="inline-flex h-10 items-center justify-center rounded-xl bg-sky-600 px-4 text-sm font-medium text-white shadow-sm transition hover:bg-sky-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-sky-500 dark:hover:bg-sky-400"
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-sky-600 px-5 text-sm font-medium text-white shadow-sm transition hover:bg-sky-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-sky-500 dark:hover:bg-sky-400"
           >
             {loading ? (
               <span className="flex items-center gap-2">
                 <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                Unlocking...
+                Connecting to SSLCOMMERZ...
               </span>
             ) : (
-              `Confirm Unlock — ${formattedFee}`
+              <>
+                <ShieldCheck className="h-4 w-4" />
+                <span>Pay {formattedFee} via SSLCOMMERZ</span>
+              </>
             )}
           </button>
         </div>

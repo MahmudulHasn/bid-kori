@@ -335,6 +335,10 @@ export default function AdminFulfillmentDetailPage() {
                 value={getUnlockStatusLabel(data.unlock_status)}
               />
               <MetaRow
+                label="Payment Gateway"
+                value={data.payment_method || 'SSLCOMMERZ'}
+              />
+              <MetaRow
                 label="Fee Amount"
                 value={formatFulfillmentMoney(data.fee_amount)}
               />
@@ -344,6 +348,15 @@ export default function AdminFulfillmentDetailPage() {
                 value={data.payment_reference}
                 mono
               />
+              {data.card_type ? (
+                <MetaRow label="Channel / Card" value={data.card_type} />
+              ) : null}
+              {data.val_id ? (
+                <MetaRow label="SSLCommerz Val ID" value={data.val_id} mono />
+              ) : null}
+              {data.bank_tran_id ? (
+                <MetaRow label="Bank Tran ID" value={data.bank_tran_id} mono />
+              ) : null}
               <MetaRow label="Paid At" value={formatTs(data.paid_at)} />
               <MetaRow
                 label="Unlocked At"

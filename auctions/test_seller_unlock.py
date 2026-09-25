@@ -532,6 +532,116 @@ class SellerWinnerDetailsUnlockTests(APITestCase):
         unlock = WinnerDetailsUnlock.objects.get(auction=self.closed_auction)
         self.assertEqual(unlock.fee_amount, Decimal('75.00'))
 
+    # ------------------------------------------------------------------------
+    # 57. SSLCOMMERZ GATEWAY INTEGRATION TESTS
+    # ------------------------------------------------------------------------
+    def test_sslcommerz_initiate_unlock(self):
+        """Initiating unlock with gateway='sslcommerz' returns GatewayPageURL and creates PENDING record."""
+        from unittest.mock import patch
+
+        self._create_completed_fulfillment()
+        self._auth(self.seller_token)
+        url = f'/api/seller/auctions/{self.closed_auction.pk}/winner-details/unlock/'
+
+        mock_gw_url = 'https://sandbox.sslcommerz.com/EasyCheckOut/testcde12345'
+        with patch('auctions.sslcommerz.initiate_sslcommerz_session', return_value=mock_gw_url) as mock_init:
+            response = self.client.post(url, {'gateway': 'sslcommerz'}, format='json')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['status'], 'PENDING')
+        self.assertFalse(response.data['is_unlocked'])
+        self.assertEqual(response.data['gateway_url'], mock_gw_url)
+        self.assertTrue(response.data['payment_reference'].startswith('WDU-'))
+        mock_init.assert_called_once()
+
+        # Check DB state
+        unlock = WinnerDetailsUnlock.objects.get(auction=self.closed_auction)
+        self.assertEqual(unlock.status, WinnerDetailsUnlock.Status.PENDING)
+        self.assertEqual(unlock.payment_method, 'SSLCOMMERZ')
+        self.assertEqual(unlock.fee_amount, Decimal('90.00'))
+
+    def test_sslcommerz_success_callback_flow(self):
+        """SSLCommerz POST success callback verifies val_id and marks unlock as PAID."""
+        from unittest.mock import patch
+
+        self._create_completed_fulfillment()
+        self._auth(self.seller_token)
+
+        # Initiate
+        tran_id = f'WDU-{self.closed_auction.pk}-TESTABC'
+        unlock = WinnerDetailsUnlock.objects.create(
+            auction=self.closed_auction,
+            seller=self.seller,
+            winner_details=self.closed_auction.winner_fulfillment_details,
+            fee_amount=Decimal('90.00'),
+            currency='BDT',
+            status=WinnerDetailsUnlock.Status.PENDING,
+            payment_reference=tran_id,
+            payment_method='SSLCOMMERZ',
+        )
+
+        mock_validation = {
+            'status': 'VALID',
+            'val_id': 'VAL999888',
+            'amount': '90.00',
+            'currency': 'BDT',
+            'bank_tran_id': 'BKASH123456',
+            'card_type': 'BKASH-BKash',
+        }
+
+        with patch('auctions.sslcommerz.validate_sslcommerz_payment', return_value=mock_validation):
+            callback_resp = self.client.post(
+                '/api/seller/payment/success/',
+                {
+                    'tran_id': tran_id,
+                    'val_id': 'VAL999888',
+                    'bank_tran_id': 'BKASH123456',
+                    'card_type': 'BKASH-BKash',
+                },
+            )
+
+        self.assertEqual(callback_resp.status_code, 302)
+        self.assertIn(f'/seller/auctions/{self.closed_auction.pk}?payment=success', callback_resp.url)
+
+        unlock.refresh_from_db()
+        self.assertEqual(unlock.status, WinnerDetailsUnlock.Status.PAID)
+        self.assertEqual(unlock.val_id, 'VAL999888')
+        self.assertEqual(unlock.bank_tran_id, 'BKASH123456')
+        self.assertEqual(unlock.card_type, 'BKASH-BKash')
+        self.assertIsNotNone(unlock.paid_at)
+        self.assertIsNotNone(unlock.unlocked_at)
+
+        # Winner details are now readable by seller
+        details_url = f'/api/seller/auctions/{self.closed_auction.pk}/winner-details/'
+        det_resp = self.client.get(details_url)
+        self.assertEqual(det_resp.status_code, 200)
+        self.assertEqual(det_resp.data['full_name'], 'Kavita Roy')
+
+    def test_sslcommerz_fail_callback_flow(self):
+        """SSLCommerz POST fail callback marks unlock as FAILED."""
+        self._create_completed_fulfillment()
+        tran_id = f'WDU-{self.closed_auction.pk}-FAILABC'
+        unlock = WinnerDetailsUnlock.objects.create(
+            auction=self.closed_auction,
+            seller=self.seller,
+            winner_details=self.closed_auction.winner_fulfillment_details,
+            fee_amount=Decimal('90.00'),
+            currency='BDT',
+            status=WinnerDetailsUnlock.Status.PENDING,
+            payment_reference=tran_id,
+            payment_method='SSLCOMMERZ',
+        )
+
+        resp = self.client.post(
+            '/api/seller/payment/fail/',
+            {'tran_id': tran_id, 'status': 'FAILED'},
+        )
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn(f'/seller/auctions/{self.closed_auction.pk}?payment=failed', resp.url)
+
+        unlock.refresh_from_db()
+        self.assertEqual(unlock.status, WinnerDetailsUnlock.Status.FAILED)
+
 
 class SellerWinnerDetailsConcurrencyTests(APITransactionTestCase):
     """PostgreSQL concurrency test: simultaneous unlock requests must create exactly one entitlement."""
@@ -620,3 +730,6 @@ class SellerWinnerDetailsConcurrencyTests(APITransactionTestCase):
         unlock = WinnerDetailsUnlock.objects.get(auction=self.auction)
         self.assertEqual(unlock.status, WinnerDetailsUnlock.Status.PAID)
         self.assertEqual(unlock.fee_amount, Decimal('70.00'))
+
+
+

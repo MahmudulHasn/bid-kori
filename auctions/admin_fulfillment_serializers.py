@@ -67,6 +67,10 @@ class AdminFulfillmentDetailSerializer(serializers.Serializer):
     fee_amount = serializers.CharField(allow_null=True)
     currency = serializers.CharField(allow_null=True)
     payment_reference = serializers.CharField(allow_null=True)
+    payment_method = serializers.CharField(allow_null=True, required=False)
+    val_id = serializers.CharField(allow_null=True, required=False)
+    bank_tran_id = serializers.CharField(allow_null=True, required=False)
+    card_type = serializers.CharField(allow_null=True, required=False)
     paid_at = serializers.DateTimeField(allow_null=True)
     unlocked_at = serializers.DateTimeField(allow_null=True)
 

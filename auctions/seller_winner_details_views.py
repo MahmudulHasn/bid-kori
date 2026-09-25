@@ -89,28 +89,38 @@ class SellerWinnerDetailsUnlockView(APIView):
     )
     def post(self, request, auction_id=None, pk=None):
         target_id = auction_id if auction_id is not None else pk
+        gateway = (request.data or {}).get('gateway', 'mock')
 
-        # Mass-assignment guard: request.data is ignored for all authoritative fields
         try:
-            unlock, created = WinnerDetailsUnlockService.unlock_for_seller(
-                target_id,
-                request.user,
-            )
+            if gateway == 'sslcommerz':
+                payload = WinnerDetailsUnlockService.initiate_sslcommerz_unlock(
+                    target_id,
+                    request.user,
+                )
+            else:
+                unlock, created = WinnerDetailsUnlockService.unlock_for_seller(
+                    target_id,
+                    request.user,
+                )
+                payload = {
+                    'auction_id': unlock.auction_id,
+                    'status': unlock.status,
+                    'is_unlocked': bool(unlock.status == WinnerDetailsUnlock.Status.PAID),
+                    'already_unlocked': not created,
+                    'fee_amount': unlock.fee_amount,
+                    'currency': unlock.currency,
+                    'payment_reference': unlock.payment_reference,
+                    'unlocked_at': unlock.unlocked_at,
+                    'gateway': 'mock',
+                    'gateway_url': None,
+                }
         except WinnerDetailsUnlockForbidden as exc:
             return Response({'error': exc.message}, status=status.HTTP_403_FORBIDDEN)
         except WinnerDetailsUnlockValidationError as exc:
             return Response({'error': exc.message}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
-        payload = {
-            'auction_id': unlock.auction_id,
-            'status': unlock.status,
-            'is_unlocked': bool(unlock.status == WinnerDetailsUnlock.Status.PAID),
-            'already_unlocked': not created,
-            'fee_amount': unlock.fee_amount,
-            'currency': unlock.currency,
-            'payment_reference': unlock.payment_reference,
-            'unlocked_at': unlock.unlocked_at,
-        }
         serializer = WinnerDetailsUnlockResponseSerializer(payload)
         return Response(serializer.data, status=status.HTTP_200_OK)
 

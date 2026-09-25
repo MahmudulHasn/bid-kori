@@ -89,15 +89,64 @@ class WinnerDetailsUnlockAdmin(admin.ModelAdmin):
         'auction',
         'seller',
         'status',
+        'payment_method',
         'fee_amount',
         'currency',
+        'payment_reference',
+        'val_id',
+        'card_type',
         'paid_at',
-        'unlocked_at',
         'created_at',
     )
-    list_filter = ('status', 'currency', 'created_at')
-    search_fields = ('auction__product__title', 'seller__username', 'payment_reference')
-    readonly_fields = ('created_at', 'updated_at', 'paid_at', 'unlocked_at')
+    list_filter = ('status', 'payment_method', 'card_type', 'currency', 'created_at')
+    search_fields = (
+        'auction__product__title',
+        'seller__username',
+        'payment_reference',
+        'val_id',
+        'bank_tran_id',
+        'card_type',
+    )
+    readonly_fields = (
+        'created_at',
+        'updated_at',
+        'paid_at',
+        'unlocked_at',
+        'payment_reference',
+        'payment_method',
+        'val_id',
+        'bank_tran_id',
+        'card_type',
+    )
+    fieldsets = (
+        (
+            'Auction & Seller',
+            {
+                'fields': ('auction', 'seller', 'winner_details'),
+            },
+        ),
+        (
+            'Payment & Gateway Details',
+            {
+                'fields': (
+                    'status',
+                    'fee_amount',
+                    'currency',
+                    'payment_method',
+                    'payment_reference',
+                    'val_id',
+                    'bank_tran_id',
+                    'card_type',
+                ),
+            },
+        ),
+        (
+            'Timestamps',
+            {
+                'fields': ('paid_at', 'unlocked_at', 'created_at', 'updated_at'),
+            },
+        ),
+    )
 
 
 
