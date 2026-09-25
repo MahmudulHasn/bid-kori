@@ -104,6 +104,8 @@ export function buildMarketplaceAuctionsHref(options?: {
 export const MARKETPLACE_STATS_API_PATH = '/auctions/stats/';
 
 export interface MarketplaceStats {
+  total_auctions?: number;
+  active_auctions?: number;
   active_bids: number;
   total_bids?: number;
   verified_sellers: number;

@@ -848,6 +848,17 @@ class MarketplaceStatsView(APIView):
 
         now = timezone.now()
 
+        # Count currently-active, visible auctions
+        active_auctions = Auction.objects.filter(
+            status=Auction.Status.ACTIVE,
+            start_time__lte=now,
+            end_time__gt=now,
+            is_hidden=False,
+        ).count()
+
+        # Total visible auctions across the platform
+        total_auctions = Auction.objects.filter(is_hidden=False).count()
+
         # Count bids on currently-active auctions
         active_bids = Bid.objects.filter(
             auction__status=Auction.Status.ACTIVE,
@@ -871,6 +882,8 @@ class MarketplaceStatsView(APIView):
 
         return Response(
             {
+                'total_auctions': total_auctions,
+                'active_auctions': active_auctions,
                 'active_bids': active_bids,
                 'total_bids': total_bids,
                 'verified_sellers': verified_sellers,

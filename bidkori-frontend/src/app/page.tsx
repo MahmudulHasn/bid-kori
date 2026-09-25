@@ -178,11 +178,9 @@ export default function HomePage() {
   const endingSoon = useMemo(() => sortAuctionsEndingSoon(auctions).slice(0, PREVIEW_LIMIT), [auctions]);
 
   // Derived real-time stats for hero floating chips with graceful fallbacks
-  const activeBidsDisplay = useMemo(() => {
-    if (!statsData) return '1,200+';
-    const count = statsData.active_bids > 0 ? statsData.active_bids : (statsData.total_bids ?? 0);
-    return formatStatNumber(count, '1,200+');
-  }, [statsData]);
+  const totalAuctionsDisplay = useMemo(() => {
+    return formatStatNumber(statsData?.total_auctions, '25+');
+  }, [statsData?.total_auctions]);
 
   const verifiedSellersDisplay = useMemo(() => {
     return formatStatNumber(statsData?.verified_sellers, '500+');
@@ -328,11 +326,11 @@ export default function HomePage() {
               {/* Floating Stat Chip — Top Left */}
               <div className="animate-float-chip absolute -top-5 -left-4 z-10 hidden sm:flex items-center gap-2 rounded-xl border border-amber-500/20 bg-zinc-900/80 backdrop-blur-md px-3 py-2 shadow-lg shadow-black/40">
                 <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-500/15">
-                  <Activity className="h-3.5 w-3.5 text-amber-400" />
+                  <Gavel className="h-3.5 w-3.5 text-amber-400" />
                 </div>
                 <div>
-                  <p className="text-[10px] font-medium text-zinc-400">Active Bids</p>
-                  <p className="text-xs font-bold text-white transition-colors duration-300">{activeBidsDisplay}</p>
+                  <p className="text-[10px] font-medium text-zinc-400">Total Auctions</p>
+                  <p className="text-xs font-bold text-white transition-colors duration-300">{totalAuctionsDisplay}</p>
                 </div>
               </div>
 
