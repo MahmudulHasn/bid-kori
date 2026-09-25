@@ -103,14 +103,15 @@ test('starter questions are supported BidKori topics only', () => {
   assert.ok(!blob.includes('dispute'));
 });
 
-test('shouldShowSupportChat hides Admin workspace', () => {
+test('shouldShowSupportChat shows across all workspaces including Admin', () => {
   assert.equal(shouldShowSupportChat('/'), true);
   assert.equal(shouldShowSupportChat('/auctions'), true);
   assert.equal(shouldShowSupportChat('/search'), true);
   assert.equal(shouldShowSupportChat('/buyer'), true);
   assert.equal(shouldShowSupportChat('/seller/auctions'), true);
-  assert.equal(shouldShowSupportChat('/admin'), false);
-  assert.equal(shouldShowSupportChat('/admin/analytics'), false);
+  assert.equal(shouldShowSupportChat('/admin'), true);
+  assert.equal(shouldShowSupportChat('/admin/analytics'), true);
+  assert.equal(shouldShowSupportChat('/admin/sellers'), true);
 });
 
 test('support chat helpers do not reference provider secrets', async () => {

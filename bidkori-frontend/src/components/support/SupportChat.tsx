@@ -3,8 +3,10 @@
 import {
   FormEvent,
   KeyboardEvent,
+  useCallback,
   useEffect,
   useId,
+  useMemo,
   useRef,
   useState,
 } from 'react';
@@ -27,12 +29,179 @@ import {
   appendUserMessage,
   canSendSupportChatMessage,
   clearSupportChatMessages,
+  createChatMessageId,
   createWelcomeMessages,
   getRoleBasedStarters,
   getSupportChatErrorMessage,
   normalizeSupportChatMessage,
   type ChatMessage,
 } from '@/lib/supportChat';
+
+function formatLineContent(text: string) {
+  const bulletMatch = text.match(/^(\s*[-*•]\s+)(.*)$/);
+  const numberMatch = text.match(/^(\s*\d+\.\s+)(.*)$/);
+
+  let prefix: React.ReactNode = null;
+  let body = text;
+
+  if (bulletMatch) {
+    prefix = (
+      <span className="mr-2 inline-block select-none font-bold text-amber-500">
+        •
+      </span>
+    );
+    body = bulletMatch[2];
+  } else if (numberMatch) {
+    prefix = (
+      <span className="mr-1.5 inline-block select-none font-semibold text-amber-500">
+        {numberMatch[1].trim()}
+      </span>
+    );
+    body = numberMatch[2];
+  }
+
+  // Parse **bold** markers safely
+  const parts = body.split(/(\*\*.*?\*\*)/g);
+  return (
+    <span className="inline">
+      {prefix}
+      {parts.map((part, i) => {
+        if (part.startsWith('**') && part.endsWith('**') && part.length > 4) {
+          return (
+            <strong
+              key={i}
+              className="font-semibold text-zinc-950 dark:text-white"
+            >
+              {part.slice(2, -2)}
+            </strong>
+          );
+        }
+        return part;
+      })}
+    </span>
+  );
+}
+
+function AnimatedAssistantBubble({
+  message,
+  shouldAnimate,
+  onLineRevealed,
+  onActionClick,
+}: {
+  message: ChatMessage;
+  shouldAnimate: boolean;
+  onLineRevealed: () => void;
+  onActionClick: (href: string) => void;
+}) {
+  const lines = useMemo(() => message.content.split('\n'), [message.content]);
+  const [visibleCount, setVisibleCount] = useState(() =>
+    shouldAnimate ? 1 : lines.length,
+  );
+  const [isDone, setIsDone] = useState(
+    () => !shouldAnimate || lines.length <= 1,
+  );
+
+  useEffect(() => {
+    if (!shouldAnimate || isDone) return;
+    if (visibleCount >= lines.length) {
+      setIsDone(true);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      setVisibleCount((prev) => {
+        const next = prev + 1;
+        if (next >= lines.length) {
+          setIsDone(true);
+        }
+        return next;
+      });
+      onLineRevealed();
+    }, 130);
+
+    return () => window.clearTimeout(timer);
+  }, [shouldAnimate, isDone, visibleCount, lines.length, onLineRevealed]);
+
+  const handleSkip = () => {
+    if (!isDone) {
+      setVisibleCount(lines.length);
+      setIsDone(true);
+      onLineRevealed();
+    }
+  };
+
+  const visibleLines = lines.slice(0, visibleCount);
+
+  return (
+    <div
+      onClick={handleSkip}
+      className={!isDone ? 'cursor-pointer select-text' : 'select-text'}
+      title={!isDone ? 'Click to show all lines' : undefined}
+    >
+      <div className="space-y-1">
+        {visibleLines.map((line, idx) => {
+          if (!line.trim()) {
+            return <div key={idx} className="h-1.5" />;
+          }
+          const isCurrentRevealedLine =
+            shouldAnimate && idx === visibleCount - 1 && !isDone;
+          return (
+            <div
+              key={idx}
+              className={[
+                'leading-relaxed break-words',
+                shouldAnimate && idx === visibleCount - 1
+                  ? 'animate-chat-line'
+                  : '',
+              ].join(' ')}
+            >
+              {formatLineContent(line)}
+              {isCurrentRevealedLine ? (
+                <span
+                  className="ml-1 inline-block h-3.5 w-1.5 rounded-xs bg-amber-500 animate-pulse align-middle"
+                  aria-hidden
+                />
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+
+      {isDone && message.action ? (
+        <div className="mt-2.5 pt-2 border-t border-zinc-200/80 dark:border-zinc-800 animate-chat-line">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onActionClick(message.action!.href);
+            }}
+            className="inline-flex min-h-[44px] items-center gap-2 rounded-xl bg-amber-600 px-4 py-2 text-xs font-bold text-white shadow-xs transition hover:bg-amber-500 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-500"
+          >
+            <span>{message.action.label}</span>
+            <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+          </button>
+        </div>
+      ) : null}
+
+      {isDone && message.suggestions && message.suggestions.length > 0 ? (
+        <div className="mt-2 flex flex-wrap gap-1.5 pt-1 animate-chat-line">
+          {message.suggestions.map((sug) => (
+            <button
+              key={sug.href + sug.label}
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onActionClick(sug.href);
+              }}
+              className="inline-flex min-h-[32px] items-center rounded-lg border border-zinc-300 bg-white px-2.5 py-1 text-[11px] font-medium text-zinc-700 transition hover:border-amber-500 hover:bg-amber-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-amber-950/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-500"
+            >
+              {sug.label} →
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 /**
  * Floating BidKori Help button + mobile-safe role-aware chat panel (CHAT-X01).
@@ -56,6 +225,7 @@ export default function SupportChat() {
   );
   const [draft, setDraft] = useState('');
   const [pending, setPending] = useState(false);
+  const [latestAnimatedId, setLatestAnimatedId] = useState<string | null>(null);
 
   const starters = getRoleBasedStarters(user?.role);
 
@@ -65,6 +235,12 @@ export default function SupportChat() {
       triggerRef.current?.focus();
     }, 0);
   };
+
+  const scrollToBottom = useCallback(() => {
+    if (listRef.current) {
+      listRef.current.scrollTop = listRef.current.scrollHeight;
+    }
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -76,10 +252,8 @@ export default function SupportChat() {
 
   useEffect(() => {
     if (!open) return;
-    const node = listRef.current;
-    if (!node) return;
-    node.scrollTop = node.scrollHeight;
-  }, [messages, pending, open]);
+    scrollToBottom();
+  }, [messages, pending, open, scrollToBottom]);
 
   // Accessibility: Close panel on Escape
   useEffect(() => {
@@ -118,12 +292,16 @@ export default function SupportChat() {
         pathname,
         clientContext,
       );
+      const newId = createChatMessageId();
+      setLatestAnimatedId(newId);
       setMessages((prev) =>
-        appendAssistantMessage(prev, answer, action, suggestions),
+        appendAssistantMessage(prev, answer, action, suggestions, newId),
       );
     } catch (error: unknown) {
       const message = getSupportChatErrorMessage(error);
-      setMessages((prev) => appendAssistantMessage(prev, message));
+      const errId = createChatMessageId();
+      setLatestAnimatedId(errId);
+      setMessages((prev) => appendAssistantMessage(prev, message, null, [], errId));
     } finally {
       setPending(false);
     }
@@ -205,7 +383,10 @@ export default function SupportChat() {
               <div className="flex shrink-0 items-center gap-1">
                 <button
                   type="button"
-                  onClick={() => setMessages(clearSupportChatMessages())}
+                  onClick={() => {
+                    setMessages(clearSupportChatMessages());
+                    setLatestAnimatedId(null);
+                  }}
                   className="rounded-lg p-2 text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500 dark:hover:bg-zinc-900 dark:hover:text-zinc-200"
                   aria-label="Clear chat"
                   title="Clear chat"
@@ -238,60 +419,52 @@ export default function SupportChat() {
               aria-relevant="additions"
               aria-label="BidKori Help conversation"
             >
-              {messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={[
-                    'max-w-[92%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap break-words',
-                    message.role === 'user'
-                      ? 'ml-auto bg-amber-600 text-white'
-                      : 'mr-auto bg-zinc-100 text-zinc-900 dark:bg-zinc-900 dark:text-zinc-100 border border-zinc-200/60 dark:border-zinc-800',
-                  ].join(' ')}
-                >
-                  <div>{message.content}</div>
-
-                  {message.action ? (
-                    <div className="mt-2.5 pt-2 border-t border-zinc-200/80 dark:border-zinc-800">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          closePanel();
-                          router.push(message.action!.href);
-                        }}
-                        className="inline-flex min-h-[44px] items-center gap-2 rounded-xl bg-amber-600 px-4 py-2 text-xs font-bold text-white shadow-xs transition hover:bg-amber-500 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-500"
-                      >
-                        <span>{message.action.label}</span>
-                        <ArrowRight className="h-3.5 w-3.5" aria-hidden />
-                      </button>
+              {messages.map((message) => {
+                if (message.role === 'user') {
+                  return (
+                    <div
+                      key={message.id}
+                      className="ml-auto max-w-[92%] rounded-2xl bg-amber-600 px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap break-words text-white shadow-xs"
+                    >
+                      {message.content}
                     </div>
-                  ) : null}
+                  );
+                }
 
-                  {message.suggestions && message.suggestions.length > 0 ? (
-                    <div className="mt-2 flex flex-wrap gap-1.5 pt-1">
-                      {message.suggestions.map((sug) => (
-                        <button
-                          key={sug.href + sug.label}
-                          type="button"
-                          onClick={() => {
-                            closePanel();
-                            router.push(sug.href);
-                          }}
-                          className="inline-flex min-h-[32px] items-center rounded-lg border border-zinc-300 bg-white px-2.5 py-1 text-[11px] font-medium text-zinc-700 transition hover:border-amber-500 hover:bg-amber-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-amber-950/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-500"
-                        >
-                          {sug.label} →
-                        </button>
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
-              ))}
+                return (
+                  <div
+                    key={message.id}
+                    className="mr-auto max-w-[92%] rounded-2xl border border-zinc-200/60 bg-zinc-100 px-3.5 py-2.5 text-sm leading-relaxed break-words text-zinc-900 shadow-xs dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100"
+                  >
+                    <AnimatedAssistantBubble
+                      message={message}
+                      shouldAnimate={
+                        message.id === latestAnimatedId &&
+                        message.id !== 'welcome'
+                      }
+                      onLineRevealed={scrollToBottom}
+                      onActionClick={(href) => {
+                        closePanel();
+                        router.push(href);
+                      }}
+                    />
+                  </div>
+                );
+              })}
 
               {pending ? (
                 <div
-                  className="mr-auto max-w-[92%] rounded-2xl bg-zinc-100 px-3 py-2 text-sm text-zinc-500 dark:bg-zinc-900 dark:text-zinc-400"
+                  className="mr-auto inline-flex items-center gap-2.5 rounded-2xl border border-zinc-200/60 bg-zinc-100 px-3.5 py-2 text-sm text-zinc-600 shadow-xs dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300"
                   aria-live="polite"
                 >
-                  BidKori Help is thinking…
+                  <span className="inline-flex items-center gap-1">
+                    <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-bounce [animation-delay:-0.3s]" />
+                    <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-bounce [animation-delay:-0.15s]" />
+                    <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-bounce" />
+                  </span>
+                  <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
+                    BidKori Help is thinking…
+                  </span>
                 </div>
               ) : null}
 

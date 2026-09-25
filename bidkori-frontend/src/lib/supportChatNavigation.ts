@@ -207,6 +207,14 @@ export const SAFE_ROUTE_REGISTRY: readonly SafeRouteEntry[] = [
     defaultLabel: 'Manage Users',
   },
   {
+    href: '/admin/sellers',
+    title: 'Seller Verifications',
+    description: 'Review and verify pending seller applications (NID/Passport, WhatsApp, Location).',
+    roles: ['ADMIN'],
+    keywords: ['seller verifications', 'verify sellers', 'seller verification', 'pending sellers', 'admin sellers'],
+    defaultLabel: 'Review Seller Verifications',
+  },
+  {
     href: '/admin/products',
     title: 'Product Moderation',
     description: 'Inspect and moderate all products submitted across the platform.',

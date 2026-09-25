@@ -169,8 +169,9 @@ export function appendAssistantMessage(
   content: string,
   action?: ChatAction | null,
   suggestions?: ChatSuggestion[],
+  id?: string,
 ): ChatMessage[] {
-  return [...messages, createChatMessage('assistant', content, undefined, action, suggestions)];
+  return [...messages, createChatMessage('assistant', content, id, action, suggestions)];
 }
 
 export function clearSupportChatMessages(): ChatMessage[] {
@@ -211,8 +212,7 @@ export function supportChatStartersAreSafe(): boolean {
   return !UNSUPPORTED_STARTER_MARKERS.some((marker) => blob.includes(marker));
 }
 
-/** Paths where the support chat must not mount (Admin workspace). */
+/** Paths where the support chat should mount. Shown across all workspaces including Admin. */
 export function shouldShowSupportChat(pathname: string | null): boolean {
-  if (!pathname) return true;
-  return !pathname.startsWith('/admin');
+  return true;
 }
