@@ -17,13 +17,16 @@ class Notification(models.Model):
         SELLER_WINNER_DETAILS_READY = 'SELLER_WINNER_DETAILS_READY', 'Seller Winner Details Ready'
         WINNER_DETAILS_UNLOCKED = 'WINNER_DETAILS_UNLOCKED', 'Winner Details Unlocked'
         SELLER_WINNER_DETAILS_UPDATED = 'SELLER_WINNER_DETAILS_UPDATED', 'Seller Winner Details Updated'
+        SELLER_VERIFICATION_SUBMITTED = 'SELLER_VERIFICATION_SUBMITTED', 'Seller Verification Submitted'
+        SELLER_VERIFICATION_APPROVED = 'SELLER_VERIFICATION_APPROVED', 'Seller Verification Approved'
+        SELLER_VERIFICATION_REJECTED = 'SELLER_VERIFICATION_REJECTED', 'Seller Verification Rejected'
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name='notifications',
     )
-    type = models.CharField(max_length=32, choices=Type.choices)
+    type = models.CharField(max_length=40, choices=Type.choices)
     title = models.CharField(max_length=120)
     message = models.CharField(max_length=500)
     auction = models.ForeignKey(

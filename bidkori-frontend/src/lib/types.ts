@@ -4,6 +4,8 @@ export type UserRole = 'BUYER' | 'SELLER' | 'ADMIN';
 /** Roles allowed on public registration (ADMIN is never selectable). */
 export type PublicRegistrationRole = 'BUYER' | 'SELLER';
 
+export type SellerVerificationStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | null;
+
 /** Authenticated user shape from /users/me/, login, and register. */
 export type AuthUser = {
   id: number;
@@ -11,7 +13,33 @@ export type AuthUser = {
   email: string;
   role: UserRole;
   is_staff: boolean;
+  seller_verified?: SellerVerificationStatus;
 };
+
+export type SellerVerificationRecord = {
+  id: number;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | null;
+  whatsapp_number?: string;
+  location?: string;
+  admin_note?: string;
+  submitted_at?: string;
+  reviewed_at?: string | null;
+};
+
+export type AdminSellerVerification = {
+  id: number;
+  user_id: number;
+  username: string;
+  email: string;
+  whatsapp_number: string;
+  location: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  admin_note?: string;
+  nid_passport_image: string;
+  submitted_at: string;
+  reviewed_at?: string | null;
+};
+
 
 /** Staff Admin user directory row from GET /admin/users/. */
 export type AdminUser = {

@@ -6,6 +6,7 @@ import { format } from 'date-fns';
 import { Gavel, Package, Store, Trophy } from 'lucide-react';
 import useSWR from 'swr';
 
+import SellerVerificationStatusCard from '@/components/seller/SellerVerificationStatusCard';
 import { useAuth } from '@/context/AuthContext';
 import { getApiErrorMessage } from '@/lib/apiErrors';
 import { formatAuctionMoney, getAuctionTitle } from '@/lib/auctionDisplay';
@@ -29,6 +30,7 @@ import {
   sellerAuctionDetailPath,
   sellerProductDetailPath,
 } from '@/lib/workspaceNavigation';
+
 
 function MetricCard({
   label,
@@ -243,7 +245,18 @@ export default function SellerHomePage() {
         </p>
       </header>
 
+      {user?.seller_verified !== 'APPROVED' && (
+        <SellerVerificationStatusCard
+          status={user?.seller_verified ?? null}
+          onRefresh={() => {
+            void mutateProducts();
+            void mutateAuctions();
+          }}
+        />
+      )}
+
       {loading ? <DashboardSkeleton /> : null}
+
 
       {error ? (
         <div

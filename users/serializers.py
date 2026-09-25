@@ -2,7 +2,7 @@ from django.contrib.auth.models import User
 from django.db import transaction
 from rest_framework import serializers
 
-from .models import UserProfile, resolve_user_role
+from .models import UserProfile, resolve_user_role, get_seller_verification_status
 
 # Public registration may only choose marketplace roles (never ADMIN).
 PUBLIC_REGISTRATION_ROLES = frozenset(
@@ -100,14 +100,18 @@ class UserSerializer(serializers.ModelSerializer):
 
     role = serializers.SerializerMethodField()
     is_staff = serializers.BooleanField(read_only=True)
+    seller_verified = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'role', 'is_staff']
+        fields = ['id', 'username', 'email', 'role', 'is_staff', 'seller_verified']
         read_only_fields = fields
 
     def get_role(self, obj):
         return resolve_user_role(obj)
+
+    def get_seller_verified(self, obj):
+        return get_seller_verification_status(obj)
 
 
 class AdminUserSerializer(serializers.ModelSerializer):

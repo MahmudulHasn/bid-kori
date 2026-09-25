@@ -13,6 +13,7 @@ import {
   Package,
   Shield,
   ShieldAlert,
+  ShieldCheck,
   SlidersHorizontal,
   Store,
   User,
@@ -30,6 +31,7 @@ import {
   ADMIN_MODERATION_PATH,
   ADMIN_PRODUCTS_PATH,
   ADMIN_PROFILE_PATH,
+  ADMIN_SELLERS_PATH,
   ADMIN_SETTINGS_PATH,
   ADMIN_USERS_PATH,
 } from '@/lib/workspaceNavigation';
@@ -37,6 +39,8 @@ import {
   ADMIN_DASHBOARD_SUMMARY_API_PATH,
   adminDashboardSummaryFetcher,
 } from '@/lib/adminDashboardApi';
+import { fetchAdminVerifications } from '@/lib/sellerVerificationApi';
+
 
 type SidebarGroup = {
   title: string;
@@ -64,7 +68,15 @@ export default function AdminSidebar({
     { dedupingInterval: 10000 },
   );
 
+  const { data: verifications } = useSWR(
+    '/admin/verifications/',
+    () => fetchAdminVerifications(),
+    { dedupingInterval: 10000 },
+  );
+
   const attentionCount = summary?.moderation?.total_attention_required || 0;
+  const pendingVerificationsCount =
+    verifications?.filter((v) => v.status === 'PENDING').length || 0;
 
   const groups: SidebarGroup[] = [
     {
@@ -122,6 +134,13 @@ export default function AdminSidebar({
           exact: true,
         },
         {
+          label: 'Seller Verifications',
+          href: ADMIN_SELLERS_PATH,
+          icon: ShieldCheck,
+          badge: pendingVerificationsCount > 0 ? pendingVerificationsCount : undefined,
+          badgeColor: 'bg-amber-500/20 text-amber-800 dark:bg-amber-500/30 dark:text-amber-200',
+        },
+        {
           label: 'Sellers',
           href: `${ADMIN_USERS_PATH}?role=SELLER`,
           icon: Store,
@@ -133,6 +152,7 @@ export default function AdminSidebar({
         },
       ],
     },
+
     {
       title: 'Analytics & Moderation',
       items: [

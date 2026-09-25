@@ -10,6 +10,7 @@ import {
   Search,
   Shield,
   ShieldAlert,
+  ShieldCheck,
   X,
   XCircle,
 } from 'lucide-react';
@@ -24,7 +25,10 @@ import { formatHealthStatus } from '@/lib/adminDashboard';
 import {
   ADMIN_MODERATION_PATH,
   ADMIN_PROFILE_PATH,
+  ADMIN_SELLERS_PATH,
 } from '@/lib/workspaceNavigation';
+import { fetchAdminVerifications } from '@/lib/sellerVerificationApi';
+
 
 export default function AdminHeader({
   menuOpen,
@@ -45,11 +49,20 @@ export default function AdminHeader({
     { dedupingInterval: 10000 },
   );
 
+  const { data: verifications } = useSWR(
+    '/admin/verifications/',
+    () => fetchAdminVerifications(),
+    { dedupingInterval: 10000 },
+  );
+
   const health = summary?.system_health;
   const dbHealth = formatHealthStatus(health?.database);
   const redisHealth = formatHealthStatus(health?.redis);
   const celeryHealth = formatHealthStatus(health?.celery_broker);
   const attentionCount = summary?.moderation?.total_attention_required || 0;
+  const pendingVerificationsCount =
+    verifications?.filter((v) => v.status === 'PENDING').length || 0;
+
 
   const handleRefreshClick = () => {
     if (onRefresh) {
@@ -138,6 +151,28 @@ export default function AdminHeader({
           </span>
         </button>
 
+        {/* Seller Verifications Alert */}
+        <Link
+          href={ADMIN_SELLERS_PATH}
+          title={
+            pendingVerificationsCount > 0
+              ? `${pendingVerificationsCount} new seller verification requests pending review`
+              : 'Seller verifications'
+          }
+          className="relative flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-200 bg-white text-zinc-600 shadow-2xs transition hover:border-zinc-300 hover:bg-zinc-100 hover:text-zinc-900 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-white"
+        >
+          <ShieldCheck
+            className={`h-4 w-4 ${
+              pendingVerificationsCount > 0 ? 'text-amber-500' : 'text-zinc-400'
+            }`}
+          />
+          {pendingVerificationsCount > 0 && (
+            <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-[10px] font-bold text-white shadow-xs animate-pulse">
+              {pendingVerificationsCount}
+            </span>
+          )}
+        </Link>
+
         {/* Moderation Alert Bell */}
         <Link
           href={ADMIN_MODERATION_PATH}
@@ -159,6 +194,7 @@ export default function AdminHeader({
             </span>
           )}
         </Link>
+
 
         {/* Profile Avatar Pill */}
         <Link

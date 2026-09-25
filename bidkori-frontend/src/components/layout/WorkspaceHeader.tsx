@@ -3,7 +3,17 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useId, useRef, useState } from 'react';
-import { ChevronDown, LogOut, Menu, Store, X } from 'lucide-react';
+import {
+  AlertCircle,
+  CheckCircle2,
+  ChevronDown,
+  Clock,
+  LogOut,
+  Menu,
+  ShieldAlert,
+  Store,
+  X,
+} from 'lucide-react';
 
 import NotificationBell from '@/components/notifications/NotificationBell';
 import { useAuth } from '@/context/AuthContext';
@@ -13,6 +23,7 @@ import {
   getWorkspaceAccountPaths,
   type WorkspaceConfig,
 } from '@/lib/workspaceNavigation';
+
 
 type WorkspaceHeaderProps = {
   config: WorkspaceConfig;
@@ -100,6 +111,36 @@ export default function WorkspaceHeader({
         </div>
 
         <div className="flex items-center gap-1.5 sm:gap-3">
+          {config.role === 'SELLER' && (
+            <div className="flex items-center">
+              {user?.seller_verified === 'APPROVED' ? (
+                <span
+                  title="Seller account is verified"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-600/20 dark:bg-emerald-950/40 dark:text-emerald-400 dark:ring-emerald-500/30"
+                >
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" aria-hidden />
+                  Verified
+                </span>
+              ) : user?.seller_verified === 'PENDING' ? (
+                <span
+                  title="Verification documents under review"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2.5 py-1 text-xs font-semibold text-amber-700 ring-1 ring-inset ring-amber-600/20 dark:bg-amber-950/40 dark:text-amber-400 dark:ring-amber-500/30"
+                >
+                  <Clock className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" aria-hidden />
+                  Pending Verification
+                </span>
+              ) : (
+                <span
+                  title="Verification required to add products"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-rose-500/15 px-2.5 py-1 text-xs font-semibold text-rose-700 ring-1 ring-inset ring-rose-600/20 dark:bg-rose-950/40 dark:text-rose-400 dark:ring-rose-500/30"
+                >
+                  <AlertCircle className="h-3.5 w-3.5 text-rose-600 dark:text-rose-400" aria-hidden />
+                  Unverified
+                </span>
+              )}
+            </div>
+          )}
+
           <Link
             href={config.marketplaceHref}
             aria-label={config.marketplaceLabel}
@@ -157,6 +198,7 @@ export default function WorkspaceHeader({
                     {roleLabel}
                   </p>
                 </div>
+
                 {accountPaths.profile ? (
                   <Link
                     href={accountPaths.profile}

@@ -16,6 +16,7 @@ import {
   Settings,
   Shield,
   ShieldAlert,
+  ShieldCheck,
   Sparkles,
   Store,
   TrendingUp,
@@ -35,9 +36,12 @@ import {
   ADMIN_AUCTIONS_PATH,
   ADMIN_BIDS_PATH,
   ADMIN_ANALYTICS_PATH,
+  ADMIN_SELLERS_PATH,
   ADMIN_USERS_PATH,
   ADMIN_MODERATION_PATH,
 } from '@/lib/workspaceNavigation';
+import { fetchAdminVerifications } from '@/lib/sellerVerificationApi';
+
 import {
   formatAdminMoney,
   formatHealthStatus,
@@ -160,9 +164,22 @@ export default function AdminHomePage() {
     },
   );
 
+  const { data: verifications } = useSWR(
+    '/admin/verifications/',
+    () => fetchAdminVerifications(),
+    {
+      revalidateOnFocus: true,
+      dedupingInterval: 5000,
+    },
+  );
+
+  const pendingVerificationsCount =
+    verifications?.filter((v) => v.status === 'PENDING').length || 0;
+
   const errorMessage = error
     ? getApiErrorMessage(error, 'Could not load administrative command center data.')
     : null;
+
 
   const users = data?.users;
   const auctions = data?.auctions;
@@ -283,8 +300,35 @@ export default function AdminHomePage() {
         </div>
       </section>
 
+      {/* SECTION: SELLER VERIFICATION PENDING ALERT */}
+      {pendingVerificationsCount > 0 && (
+        <div className="rounded-2xl border border-sky-200 bg-sky-50/80 p-4 text-sky-900 shadow-sm dark:border-sky-900/60 dark:bg-sky-950/30 dark:text-sky-200">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <ShieldCheck className="h-5 w-5 shrink-0 text-sky-600 dark:text-sky-400" />
+              <div>
+                <h3 className="text-sm font-semibold">
+                  New Seller Verification Requests ({pendingVerificationsCount})
+                </h3>
+                <p className="mt-0.5 text-xs text-sky-700 dark:text-sky-300">
+                  New sellers have submitted NID/Passport documents and are waiting for account verification.
+                </p>
+              </div>
+            </div>
+            <Link
+              href={ADMIN_SELLERS_PATH}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-sky-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-sky-700"
+            >
+              Review Applications
+              <ArrowUpRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+        </div>
+      )}
+
       {/* SECTION 10 — MODERATION ATTENTION ALERT */}
       {moderation && moderation.total_attention_required > 0 && (
+
         <div className="rounded-2xl border border-amber-200 bg-amber-50/80 p-4 text-amber-900 shadow-sm dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
@@ -893,7 +937,33 @@ export default function AdminHomePage() {
           </Link>
 
           <Link
+            href={ADMIN_SELLERS_PATH}
+            className="group rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm transition hover:border-violet-400 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-violet-600"
+          >
+            <div className="flex items-start justify-between">
+              <span className="rounded-xl bg-amber-100 p-2.5 text-amber-700 transition group-hover:bg-amber-600 group-hover:text-white dark:bg-amber-950/60 dark:text-amber-300 dark:group-hover:bg-amber-600">
+                <ShieldCheck className="h-5 w-5" aria-hidden />
+              </span>
+              <div className="flex items-center gap-1.5">
+                {pendingVerificationsCount > 0 && (
+                  <span className="rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-bold text-white shadow-xs">
+                    {pendingVerificationsCount} pending
+                  </span>
+                )}
+                <ArrowUpRight className="h-4 w-4 text-zinc-400 transition group-hover:text-violet-600 dark:group-hover:text-violet-400" />
+              </div>
+            </div>
+            <h3 className="mt-3 text-sm font-semibold text-zinc-900 group-hover:text-violet-700 dark:text-white dark:group-hover:text-violet-300">
+              Seller Verifications
+            </h3>
+            <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+              Review NID/Passport documents and approve or reject seller applications.
+            </p>
+          </Link>
+
+          <Link
             href={ADMIN_PRODUCTS_PATH}
+
             className="group rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm transition hover:border-violet-400 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-violet-600"
           >
             <div className="flex items-start justify-between">

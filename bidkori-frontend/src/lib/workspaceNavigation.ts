@@ -54,6 +54,7 @@ export {
   ADMIN_CATEGORIES_PATH,
 };
 export const ADMIN_MODERATION_PATH = '/admin/moderation';
+export const ADMIN_SELLERS_PATH = '/admin/sellers';
 export { ADMIN_FULFILLMENT_PATH };
 export const SELLER_PRODUCTS_PATH = '/seller/products';
 export const SELLER_PRODUCT_CREATE_PATH = '/seller/products/create';
@@ -125,6 +126,7 @@ const SELLER_NAV: readonly WorkspaceNavItem[] = [
 const ADMIN_NAV: readonly WorkspaceNavItem[] = [
   { id: 'dashboard', label: 'Dashboard', href: '/admin', enabled: true },
   { id: 'users', label: 'Users', href: ADMIN_USERS_PATH, enabled: true },
+  { id: 'sellers', label: 'Seller Verifications', href: ADMIN_SELLERS_PATH, enabled: true },
   { id: 'products', label: 'Products', href: ADMIN_PRODUCTS_PATH, enabled: true },
   { id: 'auctions', label: 'Auctions', href: ADMIN_AUCTIONS_PATH, enabled: true },
   { id: 'bids', label: 'Bids', href: ADMIN_BIDS_PATH, enabled: true },

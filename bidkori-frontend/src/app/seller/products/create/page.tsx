@@ -2,11 +2,14 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useSWRConfig } from 'swr';
 
 import ProductForm from '@/components/seller/ProductForm';
+import SellerVerificationModal from '@/components/seller/SellerVerificationModal';
+import SellerVerificationStatusCard from '@/components/seller/SellerVerificationStatusCard';
+import { useAuth } from '@/context/AuthContext';
 import { getApiErrorMessage, getApiFieldErrors } from '@/lib/apiErrors';
 import {
   MY_LISTINGS_API_PATH,
@@ -19,12 +22,17 @@ import {
   type ProductFormValues,
 } from '@/lib/seller';
 import {
+  getSellerVerificationStatus,
+} from '@/lib/sellerVerificationApi';
+import type { SellerVerificationRecord } from '@/lib/types';
+import {
   SELLER_PRODUCTS_PATH,
   sellerProductDetailPath,
 } from '@/lib/workspaceNavigation';
 
 export default function SellerCreateProductPage() {
   const router = useRouter();
+  const { user, refreshUser } = useAuth();
   const { mutate } = useSWRConfig();
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string>();
@@ -32,7 +40,41 @@ export default function SellerCreateProductPage() {
     Partial<Record<keyof ProductFormValues, string>>
   >({});
 
+  // Verification state tracking
+  const [verificationRecord, setVerificationRecord] = useState<SellerVerificationRecord | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [loadingStatus, setLoadingStatus] = useState(true);
+
+  const fetchStatus = async () => {
+    try {
+      setLoadingStatus(true);
+      const record = await getSellerVerificationStatus();
+      setVerificationRecord(record);
+      if (record.status !== 'APPROVED' && record.status !== 'PENDING' && record.status !== 'REJECTED') {
+        // First-time seller: automatically show the verification popup
+        setIsModalOpen(true);
+      }
+    } catch {
+      // If error or unauthenticated, fallback to auth context
+    } finally {
+      setLoadingStatus(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchStatus();
+  }, []);
+
+  const currentStatus = verificationRecord?.status ?? user?.seller_verified ?? null;
+  const isApproved = currentStatus === 'APPROVED';
+
   const handleSubmit = async (values: ProductFormValues) => {
+    if (!isApproved) {
+      toast.error('You must be verified before creating products.');
+      setIsModalOpen(true);
+      return;
+    }
+
     if (submitting) return;
     setSubmitting(true);
     setFormError(undefined);
@@ -83,17 +125,43 @@ export default function SellerCreateProductPage() {
         </p>
       </header>
 
-      <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 sm:p-6">
-        <ProductForm
-          initialValues={emptyProductFormValues()}
-          submitting={submitting}
-          submitLabel="Create Product"
-          submittingLabel="Creating product…"
-          formError={formError}
-          fieldErrors={fieldErrors}
-          onSubmit={(values) => void handleSubmit(values)}
-        />
-      </div>
+      {/* Verification Gate */}
+      {!loadingStatus && !isApproved ? (
+        <div className="space-y-6">
+          <SellerVerificationStatusCard
+            status={currentStatus}
+            verificationRecord={verificationRecord}
+            onRefresh={async () => {
+              await fetchStatus();
+              await refreshUser();
+            }}
+          />
+
+          <SellerVerificationModal
+            isOpen={isModalOpen}
+            onClose={() => setIsModalOpen(false)}
+            onSuccess={async () => {
+              await fetchStatus();
+              await refreshUser();
+            }}
+            initialWhatsapp={verificationRecord?.whatsapp_number || ''}
+            initialLocation={verificationRecord?.location || ''}
+          />
+        </div>
+      ) : (
+        <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 sm:p-6">
+          <ProductForm
+            initialValues={emptyProductFormValues()}
+            submitting={submitting}
+            submitLabel="Create Product"
+            submittingLabel="Creating product…"
+            formError={formError}
+            fieldErrors={fieldErrors}
+            onSubmit={(values) => void handleSubmit(values)}
+          />
+        </div>
+      )}
     </div>
   );
 }
+

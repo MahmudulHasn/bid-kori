@@ -38,7 +38,22 @@ class IsSellerOrAdminForProductCreate(BasePermission):
         if not request.user or not request.user.is_authenticated:
             return False
         role = resolve_user_role(request.user)
-        return role in ('SELLER', 'ADMIN')
+        if role == 'ADMIN':
+            return True
+        if role == 'SELLER':
+            from users.models import SellerVerification
+            verification = (
+                SellerVerification.objects
+                .filter(user=request.user)
+                .first()
+            )
+            if not verification or verification.status != SellerVerification.Status.APPROVED:
+                self.message = (
+                    'You must complete seller verification before adding products.'
+                )
+                return False
+            return True
+        return False
 
 
 class IsSellerOrAdminForAIListing(BasePermission):
@@ -56,4 +71,20 @@ class IsSellerOrAdminForAIListing(BasePermission):
         if not request.user or not request.user.is_authenticated:
             return False
         role = resolve_user_role(request.user)
-        return role in ('SELLER', 'ADMIN')
+        if role == 'ADMIN':
+            return True
+        if role == 'SELLER':
+            from users.models import SellerVerification
+            verification = (
+                SellerVerification.objects
+                .filter(user=request.user)
+                .first()
+            )
+            if not verification or verification.status != SellerVerification.Status.APPROVED:
+                self.message = (
+                    'You must complete seller verification before generating AI descriptions.'
+                )
+                return False
+            return True
+        return False
+
