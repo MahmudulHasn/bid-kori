@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import { Toaster } from 'react-hot-toast';
+import { Toaster as SonnerToaster } from '@/components/ui/sonner';
 import type { ReactNode } from 'react';
 
 import Navbar from '@/components/Navbar';
@@ -45,6 +46,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <MobileBottomNav />
           <SupportChatHost />
           <Toaster position="top-right" />
+          <SonnerToaster />
         </AuthProvider>
       </body>
     </html>

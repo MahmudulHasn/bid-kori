@@ -1,9 +1,10 @@
 'use client';
 
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Search, X } from 'lucide-react';
 
+import { Button } from '@/components/ui/button';
 import { buildSearchPageHref } from '@/lib/marketplace';
 
 type AuctionToolbarProps = {
@@ -28,10 +29,12 @@ export default function AuctionToolbar({
 }: AuctionToolbarProps) {
   const router = useRouter();
   const [query, setQuery] = useState(initialQuery);
+  const [prevInitialQuery, setPrevInitialQuery] = useState(initialQuery);
 
-  useEffect(() => {
+  if (initialQuery !== prevInitialQuery) {
+    setPrevInitialQuery(initialQuery);
     setQuery(initialQuery);
-  }, [initialQuery]);
+  }
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -79,7 +82,7 @@ export default function AuctionToolbar({
             <button
               type="button"
               onClick={handleClear}
-              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-0.5 text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
               title="Clear search"
               aria-label="Clear search"
             >
@@ -87,12 +90,14 @@ export default function AuctionToolbar({
             </button>
           ) : null}
         </div>
-        <button
+        <Button
           type="submit"
-          className="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-zinc-900 px-5 text-sm font-semibold text-white shadow-xs transition hover:bg-zinc-800 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+          variant="secondary"
+          size="default"
+          className="min-h-[44px] px-5 font-semibold"
         >
           Search
-        </button>
+        </Button>
       </form>
       {resultSummary ? (
         <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">

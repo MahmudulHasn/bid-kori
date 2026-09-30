@@ -12,14 +12,19 @@ function LoadingBarInner() {
   // When pathname or searchParams change, route navigation has finished
   useEffect(() => {
     if (loading) {
-      setProgress(100);
+      const finishTimer = setTimeout(() => {
+        setProgress(100);
+      }, 0);
       const timer = setTimeout(() => {
         setLoading(false);
         setProgress(0);
       }, 350);
-      return () => clearTimeout(timer);
+      return () => {
+        clearTimeout(finishTimer);
+        clearTimeout(timer);
+      };
     }
-  }, [pathname, searchParams]);
+  }, [loading, pathname, searchParams]);
 
   // Listen for clicks on internal navigation links
   useEffect(() => {

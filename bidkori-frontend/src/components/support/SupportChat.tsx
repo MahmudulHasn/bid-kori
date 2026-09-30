@@ -103,8 +103,8 @@ function AnimatedAssistantBubble({
   useEffect(() => {
     if (!shouldAnimate || isDone) return;
     if (visibleCount >= lines.length) {
-      setIsDone(true);
-      return;
+      const finishTimer = window.setTimeout(() => setIsDone(true), 0);
+      return () => window.clearTimeout(finishTimer);
     }
     const timer = window.setTimeout(() => {
       setVisibleCount((prev) => {

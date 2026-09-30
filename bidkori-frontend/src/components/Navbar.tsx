@@ -13,10 +13,17 @@ import {
   Store,
   User,
   UserPlus,
-  X,
 } from 'lucide-react';
 
 import BidKoriLogo from '@/components/brand/BidKoriLogo';
+import { Button } from '@/components/ui/button';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet';
 import { useAuth } from '@/context/AuthContext';
 import { getRoleHome, isRoleWorkspacePath } from '@/lib/authRouting';
 import { MARKETPLACE_ROUTES, PUBLIC_NAV_LINKS } from '@/lib/marketplace';
@@ -40,7 +47,7 @@ export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
   const { isAuthenticated, user, logout, isLoading } = useAuth();
-  const [mobileOpen, setMobileOpen] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   // Role workspaces render their own chrome via RoleWorkspaceLayout.
   if (isRoleWorkspacePath(pathname)) {
@@ -49,7 +56,7 @@ export default function Navbar() {
 
   const handleLogout = async () => {
     await logout();
-    setMobileOpen(false);
+    setSheetOpen(false);
     router.push('/');
   };
 
@@ -117,126 +124,127 @@ export default function Navbar() {
                   </span>
                 ) : null}
               </div>
-              <button
-                type="button"
+              <Button
+                variant="secondary"
+                size="sm"
                 onClick={handleLogout}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-xs font-semibold text-zinc-700 shadow-2xs transition-all hover:bg-zinc-100 hover:text-zinc-900 active:scale-98 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-white"
+                className="gap-1.5"
               >
                 <LogOut className="h-3.5 w-3.5" aria-hidden />
                 Logout
-              </button>
+              </Button>
             </div>
           ) : (
             <div className="flex items-center gap-2 pl-2">
-              <Link
-                href="/auth/login"
-                className="group inline-flex items-center gap-1.5 rounded-xl border border-zinc-200 bg-white px-3.5 py-2 text-xs font-semibold text-zinc-800 shadow-2xs transition-all duration-200 hover:border-amber-500/50 hover:bg-amber-500/10 hover:text-amber-600 hover:shadow-xs hover:shadow-amber-500/10 active:scale-98 dark:border-zinc-800 dark:bg-zinc-900/80 dark:text-zinc-200 dark:hover:border-amber-500/50 dark:hover:bg-amber-500/10 dark:hover:text-amber-400 dark:hover:shadow-amber-500/10"
-              >
-                <LogIn className="h-3.5 w-3.5 transition-colors group-hover:text-amber-600 dark:group-hover:text-amber-400" aria-hidden />
-                Login
-              </Link>
-              <Link
-                href="/auth/register"
-                className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 px-3.5 py-2 text-xs font-semibold text-white shadow-sm shadow-amber-600/20 transition-all hover:from-amber-500 hover:to-amber-400 active:scale-98"
-              >
-                <UserPlus className="h-3.5 w-3.5" aria-hidden />
-                Register
-              </Link>
+              <Button variant="secondary" size="sm" asChild>
+                <Link href="/auth/login" className="gap-1.5">
+                  <LogIn className="h-3.5 w-3.5 text-amber-500" aria-hidden />
+                  Login
+                </Link>
+              </Button>
+              <Button variant="default" size="sm" asChild>
+                <Link href="/auth/register" className="gap-1.5">
+                  <UserPlus className="h-3.5 w-3.5" aria-hidden />
+                  Register
+                </Link>
+              </Button>
             </div>
           )}
         </div>
 
-        {/* Mobile Hamburger Button */}
+        {/* Mobile Navigation Sheet */}
         <div className="flex md:hidden items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setMobileOpen(!mobileOpen)}
-            aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
-            className="inline-flex items-center justify-center rounded-xl p-2 text-zinc-700 transition-all duration-200 hover:bg-zinc-100 active:scale-90 dark:text-zinc-300 dark:hover:bg-zinc-800"
-          >
-            {mobileOpen ? (
-              <X className="h-5 w-5 transition-transform duration-200 rotate-90" aria-hidden />
-            ) : (
-              <Menu className="h-5 w-5 transition-transform duration-200" aria-hidden />
-            )}
-          </button>
+          <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+            <SheetTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Open menu"
+                className="h-10 w-10 rounded-xl"
+              >
+                <Menu className="h-5 w-5" aria-hidden />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="right" className="flex flex-col justify-between w-full max-w-xs">
+              <div className="space-y-6">
+                <SheetHeader>
+                  <SheetTitle className="text-left flex items-center gap-2">
+                    <BidKoriLogo size="sm" />
+                  </SheetTitle>
+                </SheetHeader>
+
+                <div className="flex flex-col gap-1.5">
+                  {PUBLIC_NAV_LINKS.map((link) => {
+                    const Icon = navIcons[link.label];
+                    const active =
+                      link.href === '/'
+                        ? pathname === '/'
+                        : pathname === link.href || pathname.startsWith(`${link.href}/`);
+                    return (
+                      <Link
+                        key={link.href}
+                        href={link.href}
+                        onClick={() => setSheetOpen(false)}
+                        className={navLinkClass(active)}
+                      >
+                        <Icon className="h-4 w-4" aria-hidden />
+                        {link.label}
+                      </Link>
+                    );
+                  })}
+
+                  {isAuthenticated && workspaceHref && workspaceLabel ? (
+                    <Link
+                      href={workspaceHref}
+                      onClick={() => setSheetOpen(false)}
+                      className={navLinkClass(pathname.startsWith(workspaceHref))}
+                    >
+                      <LayoutDashboard className="h-4 w-4" aria-hidden />
+                      {workspaceLabel}
+                    </Link>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800">
+                {isAuthenticated ? (
+                  <div className="space-y-3">
+                    <div className="text-xs text-zinc-500 dark:text-zinc-400">
+                      Signed in as{' '}
+                      <span className="font-semibold text-zinc-800 dark:text-zinc-200">
+                        {user?.username}
+                      </span>
+                    </div>
+                    <Button
+                      variant="secondary"
+                      className="w-full justify-center gap-2"
+                      onClick={handleLogout}
+                    >
+                      <LogOut className="h-4 w-4" aria-hidden />
+                      Logout
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button variant="secondary" asChild onClick={() => setSheetOpen(false)}>
+                      <Link href="/auth/login" className="gap-1.5 justify-center">
+                        <LogIn className="h-4 w-4 text-amber-500" aria-hidden />
+                        Login
+                      </Link>
+                    </Button>
+                    <Button variant="default" asChild onClick={() => setSheetOpen(false)}>
+                      <Link href="/auth/register" className="gap-1.5 justify-center">
+                        <UserPlus className="h-4 w-4" aria-hidden />
+                        Register
+                      </Link>
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </SheetContent>
+          </Sheet>
         </div>
       </nav>
-
-      {/* Mobile Drawer Menu */}
-      {mobileOpen ? (
-        <div className="border-b border-zinc-200 bg-white/95 px-4 py-4 backdrop-blur-md md:hidden dark:border-zinc-800 dark:bg-zinc-950/95 space-y-3 animate-menu-slide-down shadow-xl shadow-zinc-950/5">
-          <div className="flex flex-col gap-1">
-            {PUBLIC_NAV_LINKS.map((link) => {
-              const Icon = navIcons[link.label];
-              const active =
-                link.href === '/'
-                  ? pathname === '/'
-                  : pathname === link.href || pathname.startsWith(`${link.href}/`);
-              return (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  onClick={() => setMobileOpen(false)}
-                  className={navLinkClass(active)}
-                >
-                  <Icon className="h-4 w-4" aria-hidden />
-                  {link.label}
-                </Link>
-              );
-            })}
-
-            {isAuthenticated && workspaceHref && workspaceLabel ? (
-              <Link
-                href={workspaceHref}
-                onClick={() => setMobileOpen(false)}
-                className={navLinkClass(pathname.startsWith(workspaceHref))}
-              >
-                <LayoutDashboard className="h-4 w-4" aria-hidden />
-                {workspaceLabel}
-              </Link>
-            ) : null}
-          </div>
-
-          <div className="pt-3 border-t border-zinc-200 dark:border-zinc-800">
-            {isAuthenticated ? (
-              <div className="space-y-2">
-                <div className="text-xs text-zinc-500 dark:text-zinc-400">
-                  Signed in as <span className="font-semibold text-zinc-800 dark:text-zinc-200">{user?.username}</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleLogout}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-zinc-900 px-4 py-2.5 text-xs font-semibold text-white dark:bg-zinc-100 dark:text-zinc-900"
-                >
-                  <LogOut className="h-4 w-4" aria-hidden />
-                  Logout
-                </button>
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-2">
-                <Link
-                  href="/auth/login"
-                  onClick={() => setMobileOpen(false)}
-                  className="group flex items-center justify-center gap-1.5 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-xs font-semibold text-zinc-800 transition-all duration-200 hover:border-amber-500/50 hover:bg-amber-500/10 hover:text-amber-600 dark:border-zinc-800 dark:bg-zinc-900/80 dark:text-zinc-200 dark:hover:border-amber-500/50 dark:hover:bg-amber-500/10 dark:hover:text-amber-400"
-                >
-                  <LogIn className="h-4 w-4 transition-colors group-hover:text-amber-600 dark:group-hover:text-amber-400" aria-hidden />
-                  Login
-                </Link>
-                <Link
-                  href="/auth/register"
-                  onClick={() => setMobileOpen(false)}
-                  className="flex items-center justify-center gap-1.5 rounded-xl bg-amber-600 px-3 py-2 text-xs font-semibold text-white"
-                >
-                  <UserPlus className="h-4 w-4" aria-hidden />
-                  Register
-                </Link>
-              </div>
-            )}
-          </div>
-        </div>
-      ) : null}
     </header>
   );
 }
-

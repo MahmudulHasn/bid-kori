@@ -1,45 +1,50 @@
 'use client';
 
-
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
+import gsap from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import {
-  Activity,
   ArrowRight,
-  BookOpen,
-  Camera,
   Clock,
   CreditCard,
-  Gamepad2,
+  Flame,
   Gavel,
-  Gem,
   Headphones,
-  Home,
-  Laptop,
-  MoreHorizontal,
+  Play,
   Search,
   ShieldCheck,
-  Shirt,
-  Smartphone,
   Sparkles,
   Tag,
   Trophy,
   UserPlus,
-  Watch,
   Zap,
 } from 'lucide-react';
 import useSWR from 'swr';
 
+import AuctionCard from '@/components/AuctionCard';
 import AuctionGrid from '@/components/marketplace/AuctionGrid';
 import {
   AuctionGridSkeleton,
   MarketplaceEmptyState,
   MarketplaceErrorState,
 } from '@/components/marketplace/MarketplaceStates';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { useAuth } from '@/context/AuthContext';
+import { useAuctionTimer } from '@/hooks/useAuctionTimer';
 import { auctionListFetcher, marketplaceStatsFetcher } from '@/lib/auctionsApi';
+import {
+  formatAuctionMoney,
+  getAuctionPriceLabel,
+  getAuctionProduct,
+  getAuctionTitle,
+} from '@/lib/auctionDisplay';
 import { CATEGORIES_API_PATH, categoriesFetcher } from '@/lib/categoriesApi';
+import { getCategoryVisual } from '@/lib/categoryVisuals';
 import {
   ACTIVE_AUCTIONS_API_PATH,
   MARKETPLACE_ROUTES,
@@ -50,9 +55,13 @@ import {
   formatTradedAmount,
   sortAuctionsEndingSoon,
 } from '@/lib/marketplace';
-import { getCategoryVisual } from '@/lib/categoryVisuals';
 import { resolveMediaUrl } from '@/lib/media';
-import type { Category } from '@/lib/types';
+import { isReducedMotionPreferred, MOTION_DURATIONS, MOTION_EASINGS } from '@/lib/motionTokens';
+import type { Auction, Category } from '@/lib/types';
+
+if (typeof window !== 'undefined') {
+  gsap.registerPlugin(ScrollTrigger);
+}
 
 const PREVIEW_LIMIT = 4;
 
@@ -70,33 +79,148 @@ function HomepageCategoryCard({ cat }: { cat: Category }) {
   const Icon = visual.icon;
   const resolvedUrl = cat.image ? resolveMediaUrl(cat.image) : null;
   const showImage = Boolean(resolvedUrl && !imageError);
+  const prefersReduced = useReducedMotion();
+
+  return (
+    <motion.div
+      whileHover={
+        prefersReduced
+          ? undefined
+          : {
+              y: -4,
+              transition: {
+                duration: MOTION_DURATIONS.fast,
+                ease: MOTION_EASINGS.easeOutCubic,
+              },
+            }
+      }
+      className="h-full"
+    >
+      <Link
+        href={`${MARKETPLACE_ROUTES.auctions}?category=${encodeURIComponent(cat.slug || cat.name)}`}
+        className="group flex flex-col items-center justify-center rounded-2xl border border-zinc-800/90 bg-[#0B0F1A] p-3 text-center transition-all duration-200 hover:border-amber-500/50 hover:bg-[#0F1424] hover:shadow-lg hover:shadow-amber-500/5 h-full"
+      >
+        <div
+          className={`relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-xl border ${
+            showImage
+              ? 'border-zinc-700/80 bg-zinc-900/60 shadow-inner'
+              : visual.color
+          } transition-transform duration-200 group-hover:scale-110`}
+        >
+          {showImage ? (
+            <img
+              src={resolvedUrl!}
+              alt={cat.name}
+              className="h-full w-full object-cover"
+              onError={() => setImageError(true)}
+            />
+          ) : (
+            <Icon className="h-5 w-5" />
+          )}
+        </div>
+        <span className="mt-2.5 text-[11px] font-semibold text-zinc-300 group-hover:text-white transition line-clamp-1">
+          {cat.name}
+        </span>
+      </Link>
+    </motion.div>
+  );
+}
+
+/**
+ * Featured Live Auction Card for Hero Section
+ */
+function FeaturedHeroAuction({ auction }: { auction: Auction }) {
+  const [imgError, setImgError] = useState(false);
+  const title = getAuctionTitle(auction);
+  const product = getAuctionProduct(auction);
+  const imageUrl = resolveMediaUrl(
+    auction.images?.[0]?.image ??
+      (product as { images?: { image?: string }[] } | null)?.images?.[0]?.image
+  );
+  const price = getAuctionPriceLabel(auction);
+  const timer = useAuctionTimer(auction.end_time, auction.server_time, {
+    startTime: auction.start_time,
+  });
+
+
 
   return (
     <Link
-      href={`${MARKETPLACE_ROUTES.auctions}?category=${encodeURIComponent(cat.slug || cat.name)}`}
-      className="group flex flex-col items-center justify-center rounded-2xl border border-zinc-800 bg-[#0B0F1A] p-3 text-center transition-all duration-300 hover:border-amber-500/50 hover:bg-[#0F1424] hover:shadow-lg hover:shadow-amber-500/5"
+      href={MARKETPLACE_ROUTES.auctionDetail(auction.id)}
+      className="group relative block w-full max-w-[460px] overflow-hidden rounded-3xl border border-amber-500/40 bg-[#0B0F1A] p-4 sm:p-5 shadow-2xl shadow-black/80 transition-all duration-300 hover:border-amber-400 hover:scale-[1.01]"
     >
-      <div
-        className={`relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-xl border ${
-          showImage
-            ? 'border-zinc-700/80 bg-zinc-900/60 shadow-inner'
-            : visual.color
-        } transition-transform duration-200 group-hover:scale-110`}
-      >
-        {showImage ? (
-          <img
-            src={resolvedUrl!}
-            alt={cat.name}
-            className="h-full w-full object-cover"
-            onError={() => setImageError(true)}
+      <div className="relative aspect-[16/10] w-full overflow-hidden rounded-2xl border border-zinc-800/80 bg-[#070A0F] flex items-center justify-center">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(245,158,11,0.12),transparent_70%)]"
+        />
+
+        {imageUrl && !imgError ? (
+          <Image
+            src={imageUrl}
+            alt={title}
+            fill
+            sizes="(max-width: 640px) 100vw, 460px"
+            className="object-contain p-4 transition-transform duration-500 group-hover:scale-105"
+            onError={() => setImgError(true)}
           />
         ) : (
-          <Icon className="h-5 w-5" />
+          <div className="flex flex-col items-center text-zinc-500">
+            <Gavel className="h-10 w-10 text-zinc-600 mb-2" />
+            <span className="text-xs">Featured Live Listing</span>
+          </div>
         )}
+
+        {/* Live Signal Badge */}
+        <div className="absolute left-3 top-3 flex items-center gap-1.5">
+          <Badge variant="live" className="backdrop-blur-md bg-black/70 px-2.5 py-1">
+            <span className="relative flex h-2 w-2">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
+            </span>
+            <Flame className="h-3 w-3 text-emerald-400" />
+            <span>Featured Live</span>
+          </Badge>
+        </div>
+
+        {/* Countdown Badge */}
+        <div className="absolute right-3 top-3">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-zinc-800 bg-black/75 px-3 py-1 text-xs font-semibold text-zinc-200 backdrop-blur-md">
+            <Clock className="h-3.5 w-3.5 text-amber-400" />
+            <span>
+              {timer.days > 0
+                ? `${timer.days}d ${timer.hours}h`
+                : `${timer.hours}h ${timer.minutes}m ${timer.seconds}s`}
+            </span>
+          </span>
+        </div>
       </div>
-      <span className="mt-2.5 text-[11px] font-semibold text-zinc-300 group-hover:text-white transition line-clamp-1">
-        {cat.name}
-      </span>
+
+      <div className="mt-4">
+        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-amber-500">
+          <Tag className="h-3.5 w-3.5" />
+          <span>Active Auction</span>
+        </div>
+        <h3 className="mt-1 text-lg font-bold text-white line-clamp-1 group-hover:text-amber-400 transition-colors">
+          {title}
+        </h3>
+
+        <div className="mt-3 flex items-end justify-between border-t border-zinc-800/80 pt-3">
+          <div>
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
+              {price.label}
+            </span>
+            <p className="text-2xl font-black text-white tabular-nums">
+              {formatAuctionMoney(price.amount)}
+            </p>
+          </div>
+
+          <span className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 px-4 py-2 text-xs font-bold text-zinc-950 shadow-md shadow-amber-500/20 group-hover:from-amber-400 group-hover:to-amber-500 transition-all">
+            <span>Place Bid</span>
+            <ArrowRight className="h-3.5 w-3.5" />
+          </span>
+        </div>
+      </div>
     </Link>
   );
 }
@@ -111,7 +235,7 @@ const WHY_CHOOSE_ITEMS = [
   {
     icon: Zap,
     title: 'Real-Time Bidding',
-    description: 'Sub-second updates with WebSocket sync for instant live results.',
+    description: 'Sub-second updates with live WebSocket sync for instant results.',
   },
   {
     icon: CreditCard,
@@ -157,6 +281,8 @@ export default function HomePage() {
   const router = useRouter();
   const { isAuthenticated, user } = useAuth();
   const [query, setQuery] = useState('');
+  const [heroMode, setHeroMode] = useState<'auction' | 'video'>('auction');
+  const landingContainerRef = useRef<HTMLDivElement>(null);
 
   const {
     data: auctionsData,
@@ -165,25 +291,35 @@ export default function HomePage() {
     mutate: mutateAuctions,
   } = useSWR(ACTIVE_AUCTIONS_API_PATH, auctionListFetcher);
 
-  const {
-    data: categoriesData,
-  } = useSWR<Category[]>(CATEGORIES_API_PATH, categoriesFetcher);
+  const { data: categoriesData } = useSWR<Category[]>(
+    CATEGORIES_API_PATH,
+    categoriesFetcher
+  );
 
-  const {
-    data: statsData,
-  } = useSWR<MarketplaceStats>(MARKETPLACE_STATS_API_PATH, marketplaceStatsFetcher, {
-    refreshInterval: 15000,
-  });
+  const { data: statsData } = useSWR<MarketplaceStats>(
+    MARKETPLACE_STATS_API_PATH,
+    marketplaceStatsFetcher,
+    {
+      refreshInterval: 15000,
+    }
+  );
 
   const auctions = useMemo(() => auctionsData ?? [], [auctionsData]);
   const categories = useMemo(() => categoriesData ?? [], [categoriesData]);
   const activePreview = useMemo(() => auctions.slice(0, PREVIEW_LIMIT), [auctions]);
-  const endingSoon = useMemo(() => sortAuctionsEndingSoon(auctions).slice(0, PREVIEW_LIMIT), [auctions]);
+  const endingSoon = useMemo(
+    () => sortAuctionsEndingSoon(auctions).slice(0, PREVIEW_LIMIT),
+    [auctions]
+  );
+
+  const featuredAuction = useMemo(() => {
+    return auctions.length > 0 ? auctions[0] : null;
+  }, [auctions]);
 
   // Derived real-time stats for hero floating chips with graceful fallbacks
   const totalAuctionsDisplay = useMemo(() => {
-    return formatStatNumber(statsData?.total_auctions, '25+');
-  }, [statsData?.total_auctions]);
+    return formatStatNumber(statsData?.total_auctions, `${auctions.length > 0 ? auctions.length : '25'}+`);
+  }, [statsData?.total_auctions, auctions.length]);
 
   const verifiedSellersDisplay = useMemo(() => {
     return formatStatNumber(statsData?.verified_sellers, '500+');
@@ -198,7 +334,6 @@ export default function HomePage() {
     if (categories.length > 0) {
       return categories.slice(0, 9);
     }
-    // Graceful fallback while categories are loading
     return [
       { id: 1, name: 'Smartphones', slug: 'smartphones' },
       { id: 2, name: 'Laptops', slug: 'laptops' },
@@ -212,6 +347,56 @@ export default function HomePage() {
     ];
   }, [categories]);
 
+  // GSAP Cinematic Entrance & ScrollTrigger Animation with Cleanup
+  useEffect(() => {
+    if (typeof window === 'undefined' || isReducedMotionPreferred()) return;
+
+    const ctx = gsap.context(() => {
+      // Hero entrance sequence with fromTo to guarantee opacity 1
+      const tl = gsap.timeline({ defaults: { ease: 'power3.out', duration: 0.6 } });
+      tl.fromTo('.gsap-hero-badge', { opacity: 0, y: -12 }, { opacity: 1, y: 0, delay: 0.05 })
+        .fromTo('.gsap-hero-title', { opacity: 0, y: 18 }, { opacity: 1, y: 0 }, '-=0.35')
+        .fromTo('.gsap-hero-desc', { opacity: 0, y: 14 }, { opacity: 1, y: 0 }, '-=0.35')
+        .fromTo('.gsap-hero-cta', { opacity: 0, y: 10 }, { opacity: 1, y: 0 }, '-=0.35')
+        .fromTo('.gsap-hero-visual', { opacity: 0, scale: 0.96, y: 16 }, { opacity: 1, scale: 1, y: 0 }, '-=0.4');
+
+      // ScrollTrigger section reveals
+      const scrollSections = [
+        { trigger: '.gsap-categories', y: 20 },
+        { trigger: '.gsap-live-auctions', y: 24 },
+        { trigger: '.gsap-ending-soon', y: 24 },
+        { trigger: '.gsap-why-choose', y: 24 },
+        { trigger: '.gsap-how-works', y: 24 },
+        { trigger: '.gsap-seller-cta', y: 24 },
+      ];
+
+      scrollSections.forEach(({ trigger, y }) => {
+        const el = document.querySelector(trigger);
+        if (el) {
+          gsap.fromTo(
+            el,
+            { opacity: 0, y },
+            {
+              scrollTrigger: {
+                trigger: el,
+                start: 'top 88%',
+                toggleActions: 'play none none none',
+              },
+              opacity: 1,
+              y: 0,
+              duration: 0.6,
+              ease: 'power2.out',
+            }
+          );
+        }
+      });
+    }, landingContainerRef);
+
+    return () => {
+      ctx.revert();
+    };
+  }, []);
+
   const handleSearch = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     router.push(buildSearchPageHref(query));
@@ -222,31 +407,39 @@ export default function HomePage() {
     router.push(buildSearchPageHref(term));
   };
 
-  const sellerDestination = isAuthenticated ? (user?.role === 'SELLER' ? '/seller' : '/seller') : '/auth/register';
+  const sellerDestination = isAuthenticated
+    ? user?.role === 'SELLER'
+      ? '/seller'
+      : '/seller'
+    : '/auth/register';
 
   return (
-    <main className="min-h-screen bg-[#06080D] text-white">
+    <main ref={landingContainerRef} className="min-h-screen bg-[#06080D] text-white">
       {/* ========================================================================= */}
       {/* 1. HERO SECTION */}
       {/* ========================================================================= */}
       <section className="relative overflow-hidden pt-8 pb-14 sm:pt-12 sm:pb-20 border-b border-zinc-800/80">
-        {/* Ambient radial amber glow in background */}
+        {/* Layered premium ambient glow */}
         <div
           aria-hidden="true"
           className="pointer-events-none absolute top-1/4 right-1/4 -z-10 h-96 w-96 rounded-full bg-amber-500/15 blur-[130px]"
+        />
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute top-1/2 left-1/10 -z-10 h-80 w-80 rounded-full bg-orange-600/10 blur-[120px]"
         />
 
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
           {/* Left Column: Heading, Subtitle, Search & CTAs */}
           <div className="max-w-xl">
             {/* Pill Eyebrow */}
-            <div className="inline-flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-3.5 py-1 text-xs font-semibold text-amber-400">
+            <div className="gsap-hero-badge inline-flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-3.5 py-1 text-xs font-semibold text-amber-400">
               <Zap className="h-3.5 w-3.5 text-amber-400" aria-hidden />
               <span>Real-Time Online Auctions</span>
             </div>
 
             {/* Main Headline */}
-            <h1 className="mt-4 text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-white leading-[1.08]">
+            <h1 className="gsap-hero-title mt-4 text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-white leading-[1.08]">
               Bid on what <br />
               <span className="bg-gradient-to-r from-amber-400 to-amber-500 bg-clip-text text-transparent">
                 matters.
@@ -254,15 +447,15 @@ export default function HomePage() {
             </h1>
 
             {/* Subheading */}
-            <p className="mt-4 text-sm sm:text-base text-zinc-400 leading-relaxed max-w-lg">
-              Discover verified marketplace listings, place competitive bids in real time, and win items transparently.
+            <p className="gsap-hero-desc mt-4 text-sm sm:text-base text-zinc-400 leading-relaxed max-w-lg">
+              Discover verified marketplace listings, place competitive bids in real time, and win items with fair, transparent pricing.
             </p>
 
             {/* Integrated Search Bar */}
             <form
               onSubmit={handleSearch}
               role="search"
-              className="mt-6 flex items-center rounded-2xl border border-zinc-800 bg-[#0B0F1A] p-1.5 pl-4 shadow-xl shadow-black/40 focus-within:border-amber-500/60 focus-within:ring-2 focus-within:ring-amber-500/20 transition"
+              className="mt-6 flex min-h-[52px] w-full max-w-xl items-center rounded-2xl border border-zinc-800 bg-[#0B0F1A] p-1.5 pl-4 shadow-xl shadow-black/40 focus-within:border-amber-500/60 focus-within:ring-2 focus-within:ring-amber-500/20 transition-colors"
             >
               <Search className="h-4 w-4 text-zinc-400 shrink-0" aria-hidden />
               <input
@@ -270,16 +463,17 @@ export default function HomePage() {
                 type="search"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search for products, laptops, phones, furniture..."
+                placeholder="Search for products, laptops, phones, collectibles..."
                 className="w-full bg-transparent px-3 py-2 text-sm text-white placeholder-zinc-500 outline-none focus:outline-none focus-visible:outline-none focus:ring-0 focus-visible:ring-0 border-none"
                 style={{ outline: 'none', boxShadow: 'none' }}
               />
-              <button
+              <Button
                 type="submit"
-                className="shrink-0 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 px-6 py-2.5 text-sm font-bold text-zinc-950 shadow-md shadow-amber-500/20 transition hover:from-amber-400 hover:to-amber-500 active:scale-98"
+                variant="default"
+                className="shrink-0 h-10 px-6 font-bold"
               >
                 Search
-              </button>
+              </Button>
             </form>
 
             {/* Popular Searches */}
@@ -298,97 +492,137 @@ export default function HomePage() {
             </div>
 
             {/* CTA Buttons */}
-            <div className="mt-6 flex flex-wrap items-center gap-3.5">
-              <Link
-                href={MARKETPLACE_ROUTES.auctions}
-                className="inline-flex min-h-[44px] items-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 px-5 py-2.5 text-sm font-bold text-zinc-950 shadow-lg shadow-amber-500/25 transition-all hover:from-amber-400 hover:to-amber-500 active:scale-98"
-              >
-                <Gavel className="h-4 w-4 text-zinc-950" aria-hidden />
-                <span>Browse Auctions</span>
-                <ArrowRight className="h-4 w-4" aria-hidden />
-              </Link>
-              <Link
-                href={sellerDestination}
-                className="inline-flex min-h-[44px] items-center gap-2 rounded-xl border border-zinc-700 bg-zinc-900/60 px-5 py-2.5 text-sm font-semibold text-white shadow-2xs transition-all hover:border-zinc-500 hover:bg-zinc-850 active:scale-98"
-              >
-                <Tag className="h-4 w-4 text-zinc-400" aria-hidden />
-                <span>Sell on BidKori</span>
-              </Link>
+            <div className="gsap-hero-cta mt-6 flex flex-wrap items-center gap-3.5">
+              <Button variant="default" size="lg" asChild>
+                <Link href={MARKETPLACE_ROUTES.auctions} className="gap-2">
+                  <Gavel className="h-4 w-4" aria-hidden />
+                  <span>Browse Auctions</span>
+                  <ArrowRight className="h-4 w-4" aria-hidden />
+                </Link>
+              </Button>
+              <Button variant="secondary" size="lg" asChild>
+                <Link href={sellerDestination} className="gap-2">
+                  <Tag className="h-4 w-4 text-zinc-400" aria-hidden />
+                  <span>Sell on BidKori</span>
+                </Link>
+              </Button>
             </div>
           </div>
 
-          {/* Right Column: Cinematic Video Showcase */}
-          <div className="relative flex items-center justify-center lg:justify-end">
-            {/* Ambient Glow Orbs - layered behind video for depth */}
+          {/* Right Column: Hero Showcase (Dynamic Live Auction or Cinematic Showcase) */}
+          <div className="gsap-hero-visual relative flex flex-col items-center justify-center lg:items-end">
+            {/* Ambient Glow Orbs */}
             <div className="animate-orb-pulse pointer-events-none absolute -top-10 -right-10 h-72 w-72 rounded-full bg-amber-500/20 blur-[100px]" />
             <div className="animate-orb-pulse-slow pointer-events-none absolute -bottom-8 -left-6 h-56 w-56 rounded-full bg-amber-600/15 blur-[80px]" />
-            <div className="animate-orb-pulse pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-40 w-40 rounded-full bg-orange-500/10 blur-[60px]" />
 
-            {/* Main Video Container */}
-            <div className="relative">
+            {/* Switch Toggle if featured auction is available */}
+            {featuredAuction && (
+              <div className="mb-3 flex items-center gap-2 self-center lg:self-end">
+                <button
+                  type="button"
+                  onClick={() => setHeroMode('auction')}
+                  className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
+                    heroMode === 'auction'
+                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                      : 'text-zinc-500 hover:text-zinc-300'
+                  }`}
+                >
+                  Live Auction
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setHeroMode('video')}
+                  className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
+                    heroMode === 'video'
+                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                      : 'text-zinc-500 hover:text-zinc-300'
+                  }`}
+                >
+                  Showcase
+                </button>
+              </div>
+            )}
+
+            {/* Main Hero Showcase Container */}
+            <div className="relative w-full max-w-[480px]">
               {/* Floating Stat Chip — Top Left */}
-              <div className="animate-float-chip absolute -top-5 -left-4 z-10 hidden sm:flex items-center gap-2 rounded-xl border border-amber-500/20 bg-zinc-900/80 backdrop-blur-md px-3 py-2 shadow-lg shadow-black/40">
+              <div className="animate-float-chip absolute -top-5 -left-4 z-10 hidden sm:flex items-center gap-2 rounded-xl border border-amber-500/20 bg-zinc-900/85 backdrop-blur-md px-3 py-2 shadow-lg shadow-black/40">
                 <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-500/15">
                   <Gavel className="h-3.5 w-3.5 text-amber-400" />
                 </div>
                 <div>
                   <p className="text-[10px] font-medium text-zinc-400">Total Auctions</p>
-                  <p className="text-xs font-bold text-white transition-colors duration-300">{totalAuctionsDisplay}</p>
+                  <p className="text-xs font-bold text-white transition-colors duration-300">
+                    {totalAuctionsDisplay}
+                  </p>
                 </div>
               </div>
 
               {/* Floating Stat Chip — Top Right */}
-              <div className="animate-float-chip-alt absolute -top-3 -right-4 z-10 hidden sm:flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-zinc-900/80 backdrop-blur-md px-3 py-2 shadow-lg shadow-black/40" style={{ animationDelay: '0.8s' }}>
+              <div
+                className="animate-float-chip-alt absolute -top-3 -right-4 z-10 hidden sm:flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-zinc-900/85 backdrop-blur-md px-3 py-2 shadow-lg shadow-black/40"
+                style={{ animationDelay: '0.8s' }}
+              >
                 <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500/15">
                   <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
                 </div>
                 <div>
                   <p className="text-[10px] font-medium text-zinc-400">Verified Sellers</p>
-                  <p className="text-xs font-bold text-white transition-colors duration-300">{verifiedSellersDisplay}</p>
+                  <p className="text-xs font-bold text-white transition-colors duration-300">
+                    {verifiedSellersDisplay}
+                  </p>
                 </div>
               </div>
 
               {/* Floating Stat Chip — Bottom Right */}
-              <div className="animate-float-chip absolute -bottom-4 -right-2 z-10 hidden sm:flex items-center gap-2 rounded-xl border border-violet-500/20 bg-zinc-900/80 backdrop-blur-md px-3 py-2 shadow-lg shadow-black/40" style={{ animationDelay: '1.5s' }}>
-                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-500/15">
-                  <Trophy className="h-3.5 w-3.5 text-violet-400" />
+              <div
+                className="animate-float-chip absolute -bottom-4 -right-2 z-10 hidden sm:flex items-center gap-2 rounded-xl border border-amber-500/20 bg-zinc-900/85 backdrop-blur-md px-3 py-2 shadow-lg shadow-black/40"
+                style={{ animationDelay: '1.5s' }}
+              >
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-500/15">
+                  <Trophy className="h-3.5 w-3.5 text-amber-400" />
                 </div>
                 <div>
                   <p className="text-[10px] font-medium text-zinc-400">Items Traded</p>
-                  <p className="text-xs font-bold text-white transition-colors duration-300">{itemsTradedDisplay}</p>
+                  <p className="text-xs font-bold text-white transition-colors duration-300">
+                    {itemsTradedDisplay}
+                  </p>
                 </div>
               </div>
 
-              {/* Video Frame with Rotating Gradient Border */}
-              <Link
-                href={MARKETPLACE_ROUTES.auctions}
-                className="hero-video-frame hero-video-shine group relative block overflow-hidden rounded-2xl transition-transform duration-500 hover:scale-[1.02]"
-                aria-label="Explore featured live auctions"
-              >
-                {/* LIVE Badge */}
-                <div className="absolute bottom-3 left-3 z-10 flex items-center gap-1.5 rounded-lg bg-black/60 backdrop-blur-sm px-2.5 py-1">
-                  <span className="animate-live-pulse h-2 w-2 rounded-full bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.7)]" />
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-white">Live</span>
-                </div>
+              {/* Showcase Card: Either Live Auction or Video Frame */}
+              {featuredAuction && heroMode === 'auction' ? (
+                <FeaturedHeroAuction auction={featuredAuction} />
+              ) : (
+                <Link
+                  href={MARKETPLACE_ROUTES.auctions}
+                  className="hero-video-frame hero-video-shine group relative block overflow-hidden rounded-3xl transition-transform duration-500 hover:scale-[1.02]"
+                  aria-label="Explore featured live auctions"
+                >
+                  <div className="absolute bottom-3 left-3 z-10 flex items-center gap-1.5 rounded-lg bg-black/60 backdrop-blur-sm px-2.5 py-1">
+                    <span className="animate-live-pulse h-2 w-2 rounded-full bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.7)]" />
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-white">
+                      Live
+                    </span>
+                  </div>
 
-                {/* Video Element */}
-                <video
-                  src="/hero-showcase.mp4"
-                  autoPlay
-                  loop
-                  muted
-                  playsInline
-                  className="w-full max-w-[520px] h-auto rounded-2xl object-contain"
-                />
+                  <video
+                    src="/hero-showcase.mp4"
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    className="w-full max-w-[520px] h-auto rounded-3xl object-contain"
+                  />
 
-                {/* Hover Overlay — "Watch Now" CTA */}
-                <div className="absolute inset-0 z-[3] flex items-end justify-center rounded-2xl bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 pb-5">
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/90 px-4 py-1.5 text-xs font-bold text-zinc-950 shadow-lg backdrop-blur-sm">
-                    <Gavel className="h-3.5 w-3.5" />
-                    Explore Auctions
-                  </span>
-                </div>
-              </Link>
+                  <div className="absolute inset-0 z-[3] flex items-end justify-center rounded-3xl bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 pb-5">
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/90 px-4 py-1.5 text-xs font-bold text-zinc-950 shadow-lg backdrop-blur-sm">
+                      <Play className="h-3.5 w-3.5 fill-current" />
+                      Explore Live Auctions
+                    </span>
+                  </div>
+                </Link>
+              )}
             </div>
           </div>
         </div>
@@ -397,11 +631,17 @@ export default function HomePage() {
       {/* ========================================================================= */}
       {/* 2. BROWSE BY CATEGORY */}
       {/* ========================================================================= */}
-      <section aria-labelledby="categories-heading" className="py-12 border-b border-zinc-800/80">
+      <section
+        aria-labelledby="categories-heading"
+        className="gsap-categories py-12 border-b border-zinc-800/80"
+      >
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
           <div className="flex items-center justify-between pb-6">
             <div>
-              <h2 id="categories-heading" className="text-xl sm:text-2xl font-bold tracking-tight text-white">
+              <h2
+                id="categories-heading"
+                className="text-xl sm:text-2xl font-bold tracking-tight text-white"
+              >
                 Browse by Category
               </h2>
               <p className="mt-1 text-xs text-zinc-400 sm:text-sm">
@@ -417,7 +657,7 @@ export default function HomePage() {
             </Link>
           </div>
 
-          {/* Dynamic 9-card category row/grid */}
+          {/* Dynamic Category Grid */}
           <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-9 gap-3">
             {displayCategories.map((cat) => (
               <HomepageCategoryCard key={cat.id} cat={cat} />
@@ -429,16 +669,22 @@ export default function HomePage() {
       {/* ========================================================================= */}
       {/* 3. LIVE AUCTIONS SECTION */}
       {/* ========================================================================= */}
-      <section aria-labelledby="live-auctions-heading" className="py-14 border-b border-zinc-800/80">
+      <section
+        aria-labelledby="live-auctions-heading"
+        className="gsap-live-auctions py-14 border-b border-zinc-800/80"
+      >
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
           <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
             <div>
               <div className="flex items-center gap-2">
                 <span className="relative flex h-2.5 w-2.5">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-rose-400 opacity-75" />
-                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-rose-500" />
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
                 </span>
-                <h2 id="live-auctions-heading" className="text-xl sm:text-2xl font-bold tracking-tight text-white">
+                <h2
+                  id="live-auctions-heading"
+                  className="text-xl sm:text-2xl font-bold tracking-tight text-white"
+                >
                   Live Auctions
                 </h2>
               </div>
@@ -455,9 +701,11 @@ export default function HomePage() {
             </Link>
           </div>
 
-          {/* Dynamic Auction Grid with Skeletons / Error / Empty States */}
+          {/* Dynamic Auction Grid */}
           {auctionsLoading ? <AuctionGridSkeleton count={4} /> : null}
-          {auctionsError ? <MarketplaceErrorState onRetry={() => mutateAuctions()} /> : null}
+          {auctionsError ? (
+            <MarketplaceErrorState onRetry={() => mutateAuctions()} />
+          ) : null}
           {!auctionsLoading && !auctionsError && activePreview.length === 0 ? (
             <MarketplaceEmptyState message="No live auctions available right now. Check back soon or list an item!" />
           ) : null}
@@ -468,10 +716,13 @@ export default function HomePage() {
       </section>
 
       {/* ========================================================================= */}
-      {/* 4. ENDING SOON SECTION (Shown if ending soon items exist) */}
+      {/* 4. ENDING SOON SECTION */}
       {/* ========================================================================= */}
       {!auctionsLoading && !auctionsError && endingSoon.length > 0 && (
-        <section aria-labelledby="ending-soon-heading" className="py-14 border-b border-zinc-800/80">
+        <section
+          aria-labelledby="ending-soon-heading"
+          className="gsap-ending-soon py-14 border-b border-zinc-800/80"
+        >
           <div className="mx-auto max-w-6xl px-4 sm:px-6">
             <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
               <div>
@@ -504,14 +755,15 @@ export default function HomePage() {
       {/* ========================================================================= */}
       {/* 5. WHY CHOOSE BIDKORI? SECTION */}
       {/* ========================================================================= */}
-      <section aria-labelledby="why-choose-heading" className="py-14 border-b border-zinc-800/80">
+      <section
+        aria-labelledby="why-choose-heading"
+        className="gsap-why-choose py-14 border-b border-zinc-800/80"
+      >
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
           <div className="rounded-3xl border border-zinc-800 bg-[#0B0F1A]/90 p-8 sm:p-10 shadow-2xl relative overflow-hidden backdrop-blur-md">
-            {/* Ambient subtle glow */}
             <div className="pointer-events-none absolute -bottom-10 -right-10 h-64 w-64 rounded-full bg-amber-500/10 blur-3xl" />
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-              {/* Left headline */}
               <div className="lg:col-span-4">
                 <span className="text-xs font-bold uppercase tracking-wider text-amber-500">
                   Why Choose BidKori?
@@ -523,11 +775,10 @@ export default function HomePage() {
                   A modern marketplace built for real people.
                 </h2>
                 <p className="mt-3 text-xs sm:text-sm text-zinc-400 leading-relaxed">
-                  BidKori makes buying and selling simple, secure, and exciting. Join thousands of users who trust BidKori for the best deals.
+                  BidKori makes buying and selling simple, secure, and exciting. Join active bidders who trust BidKori for authentic, verified deals.
                 </p>
               </div>
 
-              {/* Right 4 feature cards */}
               <div className="lg:col-span-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
                 {WHY_CHOOSE_ITEMS.map((item, idx) => {
                   const Icon = item.icon;
@@ -545,7 +796,6 @@ export default function HomePage() {
                       <p className="mt-1 text-[11px] text-zinc-400 leading-relaxed">
                         {item.description}
                       </p>
-                      {/* Desktop connector arrow */}
                       {idx < WHY_CHOOSE_ITEMS.length - 1 && (
                         <ArrowRight className="hidden lg:block absolute -right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-600 z-10" />
                       )}
@@ -561,11 +811,13 @@ export default function HomePage() {
       {/* ========================================================================= */}
       {/* 6. HOW BIDKORI WORKS SECTION */}
       {/* ========================================================================= */}
-      <section aria-labelledby="how-it-works-heading" className="py-14 border-b border-zinc-800/80">
+      <section
+        aria-labelledby="how-it-works-heading"
+        className="gsap-how-works py-14 border-b border-zinc-800/80"
+      >
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
           <div className="rounded-3xl border border-zinc-800 bg-[#0B0F1A]/90 p-8 sm:p-10 shadow-2xl relative overflow-hidden">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-              {/* Left headline */}
               <div className="lg:col-span-4">
                 <span className="text-xs font-bold uppercase tracking-wider text-amber-500">
                   Easy Process
@@ -581,7 +833,6 @@ export default function HomePage() {
                 </p>
               </div>
 
-              {/* Right 4 steps with timeline stepper */}
               <div className="lg:col-span-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
                 {HOW_IT_WORKS_STEPS.map((s, idx) => {
                   const Icon = s.icon;
@@ -602,7 +853,6 @@ export default function HomePage() {
                       <p className="mt-1 text-[11px] text-zinc-400 leading-relaxed">
                         {s.description}
                       </p>
-                      {/* Desktop connector arrow */}
                       {idx < HOW_IT_WORKS_STEPS.length - 1 && (
                         <ArrowRight className="hidden lg:block absolute -right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-600 z-10" />
                       )}
@@ -618,7 +868,10 @@ export default function HomePage() {
       {/* ========================================================================= */}
       {/* 7. SELLER CTA SECTION */}
       {/* ========================================================================= */}
-      <section aria-labelledby="seller-cta-heading" className="py-14">
+      <section
+        aria-labelledby="seller-cta-heading"
+        className="gsap-seller-cta py-14"
+      >
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
           <div className="rounded-3xl border border-amber-500/30 bg-gradient-to-r from-amber-500/10 via-[#0B0F1A] to-amber-500/10 p-8 sm:p-12 shadow-2xl relative overflow-hidden text-center lg:text-left flex flex-col lg:flex-row items-center justify-between gap-8">
             <div className="max-w-2xl">
@@ -633,24 +886,22 @@ export default function HomePage() {
                 Have something worth bidding on?
               </h2>
               <p className="mt-3 text-xs sm:text-sm text-zinc-400 leading-relaxed max-w-xl">
-                Turn your products into competitive auctions with BidKori. Reach thousands of active bidders with transparent commissions and guaranteed payouts.
+                Turn your products into competitive auctions with BidKori. Reach thousands of active bidders with transparent commissions and clear settlement.
               </p>
             </div>
 
             <div className="flex flex-col sm:flex-row items-center gap-3 shrink-0">
-              <Link
-                href={sellerDestination}
-                className="inline-flex min-h-[48px] items-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 px-6 py-3 text-sm font-bold text-zinc-950 shadow-lg shadow-amber-500/25 transition-all hover:from-amber-400 hover:to-amber-500 active:scale-98"
-              >
-                <span>Start Selling</span>
-                <ArrowRight className="h-4 w-4" />
-              </Link>
-              <Link
-                href={MARKETPLACE_ROUTES.auctions}
-                className="inline-flex min-h-[48px] items-center gap-2 rounded-xl border border-zinc-700 bg-zinc-900/60 px-5 py-3 text-sm font-semibold text-white shadow-2xs transition-all hover:border-zinc-500 hover:bg-zinc-850 active:scale-98"
-              >
-                <span>Explore Live Market</span>
-              </Link>
+              <Button variant="default" size="lg" asChild>
+                <Link href={sellerDestination} className="gap-2">
+                  <span>Start Selling</span>
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              </Button>
+              <Button variant="secondary" size="lg" asChild>
+                <Link href={MARKETPLACE_ROUTES.auctions}>
+                  <span>Explore Live Market</span>
+                </Link>
+              </Button>
             </div>
           </div>
         </div>

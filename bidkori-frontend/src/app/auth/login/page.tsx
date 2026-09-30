@@ -3,11 +3,15 @@
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FormEvent, Suspense, useEffect, useState } from 'react';
-import { LogIn } from 'lucide-react';
+import { motion, useReducedMotion } from 'framer-motion';
+import { Eye, EyeOff, LogIn } from 'lucide-react';
 import toast from 'react-hot-toast';
 
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { useAuth } from '@/context/AuthContext';
 import { resolvePostAuthPath } from '@/lib/authRouting';
+import { MOTION_DURATIONS, MOTION_EASINGS } from '@/lib/motionTokens';
 
 function LoginForm() {
   const router = useRouter();
@@ -15,7 +19,9 @@ function LoginForm() {
   const { login, isAuthenticated, isLoading, user } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const prefersReduced = useReducedMotion();
 
   const nextPath = searchParams.get('next');
 
@@ -50,13 +56,21 @@ function LoginForm() {
       {/* Subtle ambient light */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute top-1/3 left-1/2 -z-10 h-72 w-72 -translate-x-1/2 -translate-y-1/2 rounded-full bg-amber-500/10 blur-3xl dark:bg-amber-500/5"
+        className="pointer-events-none absolute top-1/3 left-1/2 -z-10 h-80 w-80 -translate-x-1/2 -translate-y-1/2 rounded-full bg-amber-500/10 blur-3xl"
       />
 
-      <div className="w-full max-w-md rounded-3xl border border-zinc-200/90 bg-white/95 p-8 shadow-xl shadow-zinc-950/5 backdrop-blur-sm dark:border-zinc-800/90 dark:bg-zinc-900/90 sm:p-10">
+      <motion.div
+        initial={prefersReduced ? false : { opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{
+          duration: MOTION_DURATIONS.normal,
+          ease: MOTION_EASINGS.easeOutCubic,
+        }}
+        className="w-full max-w-md rounded-3xl border border-zinc-200/90 bg-white/95 p-8 shadow-2xl backdrop-blur-md dark:border-zinc-800/90 dark:bg-[#0B0F1A]/95 sm:p-10"
+      >
         <div className="mb-6 flex items-center gap-3.5">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-500/15 text-amber-700 shadow-2xs dark:bg-amber-500/20 dark:text-amber-300">
-            <LogIn className="h-5 w-5" aria-hidden />
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/15 text-amber-700 shadow-2xs dark:bg-amber-500/20 dark:text-amber-300">
+            <LogIn className="h-6 w-6" aria-hidden />
           </div>
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">
@@ -73,14 +87,14 @@ function LoginForm() {
             <span className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
               Username
             </span>
-            <input
+            <Input
               type="text"
               required
               autoComplete="username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               placeholder="Enter your username"
-              className="min-h-[46px] w-full rounded-xl border border-zinc-200 bg-zinc-50/50 px-4 py-2.5 text-base sm:text-sm text-zinc-900 outline-none transition focus:border-amber-500 focus:bg-white focus:ring-2 focus:ring-amber-500/20 dark:border-zinc-800 dark:bg-zinc-800/60 dark:text-white dark:focus:bg-zinc-900"
+              className="h-11"
             />
           </label>
 
@@ -88,24 +102,41 @@ function LoginForm() {
             <span className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
               Password
             </span>
-            <input
-              type="password"
-              required
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              className="min-h-[46px] w-full rounded-xl border border-zinc-200 bg-zinc-50/50 px-4 py-2.5 text-base sm:text-sm text-zinc-900 outline-none transition focus:border-amber-500 focus:bg-white focus:ring-2 focus:ring-amber-500/20 dark:border-zinc-800 dark:bg-zinc-800/60 dark:text-white dark:focus:bg-zinc-900"
-            />
+            <div className="relative">
+              <Input
+                type={showPassword ? 'text' : 'password'}
+                required
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="h-11 pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+              >
+                {showPassword ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+              </button>
+            </div>
           </label>
 
-          <button
+          <Button
             type="submit"
-            disabled={submitting}
-            className="mt-2 flex min-h-[46px] w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 px-4 py-3 text-sm font-bold text-white shadow-sm shadow-amber-600/20 transition hover:from-amber-500 hover:to-amber-400 active:scale-98 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-500 disabled:cursor-not-allowed disabled:opacity-60"
+            variant="default"
+            size="lg"
+            isLoading={submitting}
+            loadingText="Signing in…"
+            className="w-full mt-2 font-bold"
           >
-            {submitting ? 'Signing in…' : 'Sign In'}
-          </button>
+            Sign In
+          </Button>
         </form>
 
         <p className="mt-6 text-center text-xs text-zinc-500 dark:text-zinc-400">
@@ -117,7 +148,7 @@ function LoginForm() {
             Create account &rarr;
           </Link>
         </p>
-      </div>
+      </motion.div>
     </main>
   );
 }

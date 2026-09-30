@@ -3,14 +3,18 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { FormEvent, useEffect, useState } from 'react';
-import { UserPlus } from 'lucide-react';
+import { motion, useReducedMotion } from 'framer-motion';
+import { Eye, EyeOff, UserPlus } from 'lucide-react';
 import toast from 'react-hot-toast';
 
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { useAuth } from '@/context/AuthContext';
 import {
   PUBLIC_ACCOUNT_TYPE_OPTIONS,
   resolvePostAuthPath,
 } from '@/lib/authRouting';
+import { MOTION_DURATIONS, MOTION_EASINGS } from '@/lib/motionTokens';
 import type { PublicRegistrationRole } from '@/lib/types';
 
 export default function RegisterPage() {
@@ -20,8 +24,11 @@ export default function RegisterPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [role, setRole] = useState<PublicRegistrationRole>('BUYER');
   const [submitting, setSubmitting] = useState(false);
+  const prefersReduced = useReducedMotion();
 
   useEffect(() => {
     if (!isLoading && isAuthenticated && user) {
@@ -60,7 +67,10 @@ export default function RegisterPage() {
         const values = Object.values(data.error);
         if (values.length > 0) {
           const first = values[0];
-          message = Array.isArray(first) && first.length > 0 ? String(first[0]) : String(first);
+          message =
+            Array.isArray(first) && first.length > 0
+              ? String(first[0])
+              : String(first);
         }
       }
       toast.error(message);
@@ -74,13 +84,21 @@ export default function RegisterPage() {
       {/* Subtle ambient light */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute top-1/3 left-1/2 -z-10 h-80 w-80 -translate-x-1/2 -translate-y-1/2 rounded-full bg-amber-500/10 blur-3xl dark:bg-amber-500/5"
+        className="pointer-events-none absolute top-1/3 left-1/2 -z-10 h-80 w-80 -translate-x-1/2 -translate-y-1/2 rounded-full bg-amber-500/10 blur-3xl"
       />
 
-      <div className="w-full max-w-md rounded-3xl border border-zinc-200/90 bg-white/95 p-8 shadow-xl shadow-zinc-950/5 backdrop-blur-sm dark:border-zinc-800/90 dark:bg-zinc-900/90 sm:p-10">
+      <motion.div
+        initial={prefersReduced ? false : { opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{
+          duration: MOTION_DURATIONS.normal,
+          ease: MOTION_EASINGS.easeOutCubic,
+        }}
+        className="w-full max-w-md rounded-3xl border border-zinc-200/90 bg-white/95 p-8 shadow-2xl backdrop-blur-md dark:border-zinc-800/90 dark:bg-[#0B0F1A]/95 sm:p-10"
+      >
         <div className="mb-6 flex items-center gap-3.5">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-500/15 text-amber-700 shadow-2xs dark:bg-amber-500/20 dark:text-amber-300">
-            <UserPlus className="h-5 w-5" aria-hidden />
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/15 text-amber-700 shadow-2xs dark:bg-amber-500/20 dark:text-amber-300">
+            <UserPlus className="h-6 w-6" aria-hidden />
           </div>
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">
@@ -103,12 +121,11 @@ export default function RegisterPage() {
                 return (
                   <label
                     key={option.role}
-                    className={[
-                      'relative flex cursor-pointer flex-col rounded-2xl border p-3.5 transition-all active:scale-98',
+                    className={`relative flex cursor-pointer flex-col rounded-2xl border p-3.5 transition-all active:scale-[0.98] ${
                       selected
-                        ? 'border-amber-500 bg-amber-500/10 ring-1 ring-amber-500/30 dark:bg-amber-500/15'
-                        : 'border-zinc-200 bg-zinc-50/50 hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-800/40 dark:hover:border-zinc-700',
-                    ].join(' ')}
+                        ? 'border-amber-500 bg-amber-500/10 ring-1 ring-amber-500/40 dark:bg-amber-500/15'
+                        : 'border-zinc-200 bg-zinc-50/50 hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-800/40 dark:hover:border-zinc-700'
+                    }`}
                   >
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-bold text-zinc-900 dark:text-white">
@@ -120,7 +137,7 @@ export default function RegisterPage() {
                         value={option.role}
                         checked={selected}
                         onChange={() => setRole(option.role)}
-                        className="accent-amber-600"
+                        className="accent-amber-500"
                       />
                     </div>
                     <span className="mt-1 text-[11px] leading-tight text-zinc-500 dark:text-zinc-400">
@@ -136,14 +153,14 @@ export default function RegisterPage() {
             <span className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
               Username
             </span>
-            <input
+            <Input
               type="text"
               required
               autoComplete="username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               placeholder="e.g. johndoe"
-              className="min-h-[46px] w-full rounded-xl border border-zinc-200 bg-zinc-50/50 px-4 py-2.5 text-base sm:text-sm text-zinc-900 outline-none transition focus:border-amber-500 focus:bg-white focus:ring-2 focus:ring-amber-500/20 dark:border-zinc-800 dark:bg-zinc-800/60 dark:text-white dark:focus:bg-zinc-900"
+              className="h-11"
             />
           </label>
 
@@ -151,14 +168,14 @@ export default function RegisterPage() {
             <span className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
               Email
             </span>
-            <input
+            <Input
               type="email"
               required
               autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
-              className="min-h-[46px] w-full rounded-xl border border-zinc-200 bg-zinc-50/50 px-4 py-2.5 text-base sm:text-sm text-zinc-900 outline-none transition focus:border-amber-500 focus:bg-white focus:ring-2 focus:ring-amber-500/20 dark:border-zinc-800 dark:bg-zinc-800/60 dark:text-white dark:focus:bg-zinc-900"
+              className="h-11"
             />
           </label>
 
@@ -166,41 +183,72 @@ export default function RegisterPage() {
             <span className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
               Password
             </span>
-            <input
-              type="password"
-              required
-              minLength={8}
-              autoComplete="new-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="At least 8 characters"
-              className="min-h-[46px] w-full rounded-xl border border-zinc-200 bg-zinc-50/50 px-4 py-2.5 text-base sm:text-sm text-zinc-900 outline-none transition focus:border-amber-500 focus:bg-white focus:ring-2 focus:ring-amber-500/20 dark:border-zinc-800 dark:bg-zinc-800/60 dark:text-white dark:focus:bg-zinc-900"
-            />
+            <div className="relative">
+              <Input
+                type={showPassword ? 'text' : 'password'}
+                required
+                minLength={8}
+                autoComplete="new-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="At least 8 characters"
+                className="h-11 pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+              >
+                {showPassword ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+              </button>
+            </div>
           </label>
 
           <label className="block space-y-1.5">
             <span className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
               Confirm password
             </span>
-            <input
-              type="password"
-              required
-              minLength={8}
-              autoComplete="new-password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="Repeat password"
-              className="min-h-[46px] w-full rounded-xl border border-zinc-200 bg-zinc-50/50 px-4 py-2.5 text-base sm:text-sm text-zinc-900 outline-none transition focus:border-amber-500 focus:bg-white focus:ring-2 focus:ring-amber-500/20 dark:border-zinc-800 dark:bg-zinc-800/60 dark:text-white dark:focus:bg-zinc-900"
-            />
+            <div className="relative">
+              <Input
+                type={showConfirmPassword ? 'text' : 'password'}
+                required
+                minLength={8}
+                autoComplete="new-password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Repeat password"
+                className="h-11 pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+              >
+                {showConfirmPassword ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+              </button>
+            </div>
           </label>
 
-          <button
+          <Button
             type="submit"
-            disabled={submitting}
-            className="mt-2 flex min-h-[46px] w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 px-4 py-3 text-sm font-bold text-white shadow-sm shadow-amber-600/20 transition hover:from-amber-500 hover:to-amber-400 active:scale-98 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-500 disabled:cursor-not-allowed disabled:opacity-60"
+            variant="default"
+            size="lg"
+            isLoading={submitting}
+            loadingText="Creating account…"
+            className="w-full mt-2 font-bold"
           >
-            {submitting ? 'Creating account…' : 'Create Account'}
-          </button>
+            Create Account
+          </Button>
         </form>
 
         <p className="mt-6 text-center text-xs text-zinc-500 dark:text-zinc-400">
@@ -212,7 +260,7 @@ export default function RegisterPage() {
             Sign in &rarr;
           </Link>
         </p>
-      </div>
+      </motion.div>
     </main>
   );
 }
