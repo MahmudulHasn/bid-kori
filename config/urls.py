@@ -8,6 +8,7 @@ from drf_spectacular.views import (
     SpectacularRedocView,
     SpectacularSwaggerView,
 )
+from users.google_views import GoogleAuthView
 
 
 def api_root(request):
@@ -21,6 +22,7 @@ def api_root(request):
             "auctions": "/api/auctions/",
             "register": "/api/users/register/",
             "login": "/api/users/login/",
+            "google_auth": "/api/users/google/",
             "logout": "/api/users/logout/",
             "me": "/api/users/me/",
             "admin_users": "/api/admin/users/",
@@ -49,6 +51,7 @@ urlpatterns = [
     path('api/auctions/', include('auctions.urls')),
     path('api/buyer/', include('auctions.buyer_urls')),
     path('api/users/', include('users.urls')),
+    path('api/auth/google/', GoogleAuthView.as_view(), name='auth-google'),
     path('api/users/verification/', include('users.seller_verification_urls')),
     path('api/admin/users/', include('users.admin_urls')),
     path('api/admin/verifications/', include('users.admin_verification_urls')),

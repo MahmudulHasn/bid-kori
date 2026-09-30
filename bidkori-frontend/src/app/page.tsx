@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
@@ -9,7 +8,6 @@ import {
   ArrowRight,
   Clock,
   CreditCard,
-  Flame,
   Gavel,
   Headphones,
   Play,
@@ -30,17 +28,9 @@ import {
   MarketplaceEmptyState,
   MarketplaceErrorState,
 } from '@/components/marketplace/MarketplaceStates';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/context/AuthContext';
-import { useAuctionTimer } from '@/hooks/useAuctionTimer';
 import { auctionListFetcher, marketplaceStatsFetcher } from '@/lib/auctionsApi';
-import {
-  formatAuctionMoney,
-  getAuctionPriceLabel,
-  getAuctionProduct,
-  getAuctionTitle,
-} from '@/lib/auctionDisplay';
 import { CATEGORIES_API_PATH, categoriesFetcher } from '@/lib/categoriesApi';
 import { getCategoryVisual } from '@/lib/categoryVisuals';
 import {
@@ -56,7 +46,7 @@ import {
 import { resolveMediaUrl } from '@/lib/media';
 import { MOTION_DURATIONS, MOTION_EASINGS } from '@/lib/motionTokens';
 import { initLandingHero, initLandingScrollTriggers } from '@/lib/motion/gsap';
-import type { Auction, Category } from '@/lib/types';
+import type { Category } from '@/lib/types';
 
 const PREVIEW_LIMIT = 4;
 
@@ -121,105 +111,6 @@ function HomepageCategoryCard({ cat }: { cat: Category }) {
   );
 }
 
-/**
- * Featured Live Auction Card for Hero Section
- */
-function FeaturedHeroAuction({ auction }: { auction: Auction }) {
-  const [imgError, setImgError] = useState(false);
-  const title = getAuctionTitle(auction);
-  const product = getAuctionProduct(auction);
-  const imageUrl = resolveMediaUrl(
-    auction.images?.[0]?.image ??
-      (product as { images?: { image?: string }[] } | null)?.images?.[0]?.image
-  );
-  const price = getAuctionPriceLabel(auction);
-  const timer = useAuctionTimer(auction.end_time, auction.server_time, {
-    startTime: auction.start_time,
-  });
-
-
-
-  return (
-    <Link
-      href={MARKETPLACE_ROUTES.auctionDetail(auction.id)}
-      className="group relative block w-full max-w-[460px] overflow-hidden rounded-3xl border border-amber-500/40 bg-[#0B0F1A] p-4 sm:p-5 shadow-2xl shadow-black/80 transition-all duration-300 hover:border-amber-400 hover:scale-[1.01]"
-    >
-      <div className="relative aspect-[16/10] w-full overflow-hidden rounded-2xl border border-zinc-800/80 bg-[#070A0F] flex items-center justify-center">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(245,158,11,0.12),transparent_70%)]"
-        />
-
-        {imageUrl && !imgError ? (
-          <Image
-            src={imageUrl}
-            alt={title}
-            fill
-            sizes="(max-width: 640px) 100vw, 460px"
-            className="object-contain p-4 transition-transform duration-500 group-hover:scale-105"
-            onError={() => setImgError(true)}
-          />
-        ) : (
-          <div className="flex flex-col items-center text-zinc-500">
-            <Gavel className="h-10 w-10 text-zinc-600 mb-2" />
-            <span className="text-xs">Featured Live Listing</span>
-          </div>
-        )}
-
-        {/* Live Signal Badge */}
-        <div className="absolute left-3 top-3 flex items-center gap-1.5">
-          <Badge variant="live" className="backdrop-blur-md bg-black/70 px-2.5 py-1">
-            <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
-            </span>
-            <Flame className="h-3 w-3 text-emerald-400" />
-            <span>Featured Live</span>
-          </Badge>
-        </div>
-
-        {/* Countdown Badge */}
-        <div className="absolute right-3 top-3">
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-zinc-800 bg-black/75 px-3 py-1 text-xs font-semibold text-zinc-200 backdrop-blur-md">
-            <Clock className="h-3.5 w-3.5 text-amber-400" />
-            <span>
-              {timer.days > 0
-                ? `${timer.days}d ${timer.hours}h`
-                : `${timer.hours}h ${timer.minutes}m ${timer.seconds}s`}
-            </span>
-          </span>
-        </div>
-      </div>
-
-      <div className="mt-4">
-        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-amber-500">
-          <Tag className="h-3.5 w-3.5" />
-          <span>Active Auction</span>
-        </div>
-        <h3 className="mt-1 text-lg font-bold text-white line-clamp-1 group-hover:text-amber-400 transition-colors">
-          {title}
-        </h3>
-
-        <div className="mt-3 flex items-end justify-between border-t border-zinc-800/80 pt-3">
-          <div>
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
-              {price.label}
-            </span>
-            <p className="text-2xl font-black text-white tabular-nums">
-              {formatAuctionMoney(price.amount)}
-            </p>
-          </div>
-
-          <span className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 px-4 py-2 text-xs font-bold text-zinc-950 shadow-md shadow-amber-500/20 group-hover:from-amber-400 group-hover:to-amber-500 transition-all">
-            <span>Place Bid</span>
-            <ArrowRight className="h-3.5 w-3.5" />
-          </span>
-        </div>
-      </div>
-    </Link>
-  );
-}
-
 // 4 concise value propositions for "Why Choose BidKori?"
 const WHY_CHOOSE_ITEMS = [
   {
@@ -276,7 +167,6 @@ export default function HomePage() {
   const router = useRouter();
   const { isAuthenticated, user } = useAuth();
   const [query, setQuery] = useState('');
-  const [heroMode, setHeroMode] = useState<'auction' | 'video'>('auction');
   const landingContainerRef = useRef<HTMLDivElement>(null);
 
   const {
@@ -306,10 +196,6 @@ export default function HomePage() {
     () => sortAuctionsEndingSoon(auctions).slice(0, PREVIEW_LIMIT),
     [auctions]
   );
-
-  const featuredAuction = useMemo(() => {
-    return auctions.length > 0 ? auctions[0] : null;
-  }, [auctions]);
 
   // Derived real-time stats for hero floating chips with graceful fallbacks
   const totalAuctionsDisplay = useMemo(() => {
@@ -494,34 +380,6 @@ export default function HomePage() {
             <div className="animate-orb-pulse pointer-events-none absolute -top-10 -right-10 h-72 w-72 rounded-full bg-amber-500/20 blur-[100px]" />
             <div className="animate-orb-pulse-slow pointer-events-none absolute -bottom-8 -left-6 h-56 w-56 rounded-full bg-amber-600/15 blur-[80px]" />
 
-            {/* Switch Toggle if featured auction is available */}
-            {featuredAuction && (
-              <div className="mb-3 flex items-center gap-2 self-center lg:self-end">
-                <button
-                  type="button"
-                  onClick={() => setHeroMode('auction')}
-                  className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
-                    heroMode === 'auction'
-                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
-                      : 'text-zinc-500 hover:text-zinc-300'
-                  }`}
-                >
-                  Live Auction
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setHeroMode('video')}
-                  className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
-                    heroMode === 'video'
-                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
-                      : 'text-zinc-500 hover:text-zinc-300'
-                  }`}
-                >
-                  Showcase
-                </button>
-              </div>
-            )}
-
             {/* Main Hero Showcase Container */}
             <div className="relative w-full max-w-[480px]">
               {/* Floating Stat Chip — Top Left */}
@@ -569,39 +427,35 @@ export default function HomePage() {
                 </div>
               </div>
 
-              {/* Showcase Card: Either Live Auction or Video Frame */}
-              {featuredAuction && heroMode === 'auction' ? (
-                <FeaturedHeroAuction auction={featuredAuction} />
-              ) : (
-                <Link
-                  href={MARKETPLACE_ROUTES.auctions}
-                  className="hero-video-frame hero-video-shine group relative block overflow-hidden rounded-3xl transition-transform duration-500 hover:scale-[1.02]"
-                  aria-label="Explore featured live auctions"
-                >
-                  <div className="absolute bottom-3 left-3 z-10 flex items-center gap-1.5 rounded-lg bg-black/60 backdrop-blur-sm px-2.5 py-1">
-                    <span className="animate-live-pulse h-2 w-2 rounded-full bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.7)]" />
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-white">
-                      Live
-                    </span>
-                  </div>
+              {/* Video Frame */}
+              <Link
+                href={MARKETPLACE_ROUTES.auctions}
+                className="hero-video-frame hero-video-shine group relative block overflow-hidden rounded-3xl transition-transform duration-500 hover:scale-[1.02]"
+                aria-label="Explore featured live auctions"
+              >
+                <div className="absolute bottom-3 left-3 z-10 flex items-center gap-1.5 rounded-lg bg-black/60 backdrop-blur-sm px-2.5 py-1">
+                  <span className="animate-live-pulse h-2 w-2 rounded-full bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.7)]" />
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-white">
+                    Live
+                  </span>
+                </div>
 
-                  <video
-                    src="/hero-showcase.mp4"
-                    autoPlay
-                    loop
-                    muted
-                    playsInline
-                    className="w-full max-w-[520px] h-auto rounded-3xl object-contain"
-                  />
+                <video
+                  src="/hero-showcase.mp4"
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  className="w-full max-w-[520px] h-auto rounded-3xl object-contain"
+                />
 
-                  <div className="absolute inset-0 z-[3] flex items-end justify-center rounded-3xl bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 pb-5">
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/90 px-4 py-1.5 text-xs font-bold text-zinc-950 shadow-lg backdrop-blur-sm">
-                      <Play className="h-3.5 w-3.5 fill-current" />
-                      Explore Live Auctions
-                    </span>
-                  </div>
-                </Link>
-              )}
+                <div className="absolute inset-0 z-[3] flex items-end justify-center rounded-3xl bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 pb-5">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/90 px-4 py-1.5 text-xs font-bold text-zinc-950 shadow-lg backdrop-blur-sm">
+                    <Play className="h-3.5 w-3.5 fill-current" />
+                    Explore Live Auctions
+                  </span>
+                </div>
+              </Link>
             </div>
           </div>
         </div>

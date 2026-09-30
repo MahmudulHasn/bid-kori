@@ -136,3 +136,48 @@ def get_seller_verification_status(user) -> str | None:
     )
 
 
+class SocialAccount(models.Model):
+    """External social/OAuth identity provider linking for BidKori users.
+
+    Stores Google subject ID (``sub``) as the permanent provider identifier.
+    Tokens (ID token, access token, refresh token) are NEVER persisted here.
+    """
+
+    class Provider(models.TextChoices):
+        GOOGLE = 'GOOGLE', 'Google'
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='social_accounts',
+    )
+    provider = models.CharField(
+        max_length=20,
+        choices=Provider.choices,
+        default=Provider.GOOGLE,
+    )
+    provider_user_id = models.CharField(
+        max_length=255,
+        help_text='Provider-specific permanent user ID (e.g. Google sub).',
+    )
+    email = models.EmailField(
+        max_length=254,
+        help_text='Verified email address returned by identity provider.',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['provider', 'provider_user_id'],
+                name='unique_social_provider_user_id',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.provider}:{self.provider_user_id} -> {self.user.username}'
+
+
+

@@ -9,17 +9,20 @@ import toast from 'react-hot-toast';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import GoogleSignInButton from '@/components/auth/GoogleSignInButton';
+import RoleSelectionModal from '@/components/auth/RoleSelectionModal';
 import { useAuth } from '@/context/AuthContext';
 import {
   PUBLIC_ACCOUNT_TYPE_OPTIONS,
   resolvePostAuthPath,
 } from '@/lib/authRouting';
+import { getGoogleAuthErrorMessage } from '@/lib/googleAuth';
 import { MOTION_DURATIONS, MOTION_EASINGS } from '@/lib/motionTokens';
 import type { PublicRegistrationRole } from '@/lib/types';
 
 export default function RegisterPage() {
   const router = useRouter();
-  const { register, isAuthenticated, user, isLoading } = useAuth();
+  const { register, loginWithGoogle, isAuthenticated, user, isLoading } = useAuth();
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -28,6 +31,12 @@ export default function RegisterPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [role, setRole] = useState<PublicRegistrationRole>('BUYER');
   const [submitting, setSubmitting] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [pendingRoleData, setPendingRoleData] = useState<{
+    signupToken: string;
+    email?: string;
+    name?: string;
+  } | null>(null);
   const prefersReduced = useReducedMotion();
 
   useEffect(() => {
@@ -79,6 +88,48 @@ export default function RegisterPage() {
     }
   };
 
+  const handleGoogleSuccess = async (credential: string) => {
+    setGoogleLoading(true);
+    try {
+      const result = await loginWithGoogle({ credential, role });
+      if (result.requiresRoleSelection && result.signupToken) {
+        setPendingRoleData({
+          signupToken: result.signupToken,
+          email: result.email,
+          name: result.name,
+        });
+        return;
+      }
+      if (result.user) {
+        router.push(resolvePostAuthPath(null, result.user.role));
+      }
+    } catch (error: unknown) {
+      toast.error(getGoogleAuthErrorMessage(error));
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
+  const handleRoleSelected = async (selectedRole: PublicRegistrationRole) => {
+    if (!pendingRoleData) return;
+    setGoogleLoading(true);
+    try {
+      const result = await loginWithGoogle({
+        signupToken: pendingRoleData.signupToken,
+        role: selectedRole,
+      });
+      setPendingRoleData(null);
+      if (result.user) {
+        router.push(resolvePostAuthPath(null, result.user.role));
+      }
+    } catch (error: unknown) {
+      toast.error(getGoogleAuthErrorMessage(error));
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
+
   return (
     <main className="relative flex min-h-[calc(100vh-4rem)] w-full flex-1 items-center justify-center px-4 py-12">
       {/* Subtle ambient light */}
@@ -107,6 +158,28 @@ export default function RegisterPage() {
             <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
               Start bidding on live auctions or sell your items.
             </p>
+          </div>
+        </div>
+
+        {/* Google Signup Option */}
+        <div className="mb-6">
+          <GoogleSignInButton
+            onSuccess={handleGoogleSuccess}
+            onError={(err) => toast.error(err.message)}
+            isLoading={googleLoading}
+            disabled={submitting || googleLoading}
+            text="signup"
+          />
+
+          <div className="relative my-5">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-zinc-200 dark:border-zinc-800" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-white px-3 font-medium text-zinc-500 dark:bg-[#0B0F1A] dark:text-zinc-400">
+                or register manually
+              </span>
+            </div>
           </div>
         </div>
 
@@ -260,6 +333,16 @@ export default function RegisterPage() {
             Sign in &rarr;
           </Link>
         </p>
+
+        {/* First-time Google Signup Role Selection */}
+        <RoleSelectionModal
+          isOpen={Boolean(pendingRoleData)}
+          email={pendingRoleData?.email}
+          name={pendingRoleData?.name}
+          isLoading={googleLoading}
+          onSelectRole={handleRoleSelected}
+          onCancel={() => setPendingRoleData(null)}
+        />
       </motion.div>
     </main>
   );

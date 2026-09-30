@@ -22,9 +22,18 @@ import {
   clearClientAuthStorage,
   setSessionHintCookie,
 } from '@/lib/authStorage';
+import { authenticateWithGoogle, buildGoogleAuthPayload } from '@/lib/googleAuth';
 import type { AuthUser, PublicRegistrationRole } from '@/lib/types';
 
 export type { AuthUser, PublicRegistrationRole, UserRole } from '@/lib/types';
+
+export type GoogleAuthResult = {
+  user?: AuthUser;
+  requiresRoleSelection?: boolean;
+  signupToken?: string;
+  email?: string;
+  name?: string;
+};
 
 type AuthContextValue = {
   user: AuthUser | null;
@@ -39,6 +48,11 @@ type AuthContextValue = {
     confirmPassword: string,
     role?: PublicRegistrationRole,
   ) => Promise<AuthUser>;
+  loginWithGoogle: (options: {
+    credential?: string;
+    signupToken?: string;
+    role?: PublicRegistrationRole;
+  }) => Promise<GoogleAuthResult>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<AuthUser | null>;
 };
@@ -156,6 +170,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [persistSession],
   );
 
+  const loginWithGoogle = useCallback(
+    async (options: {
+      credential?: string;
+      signupToken?: string;
+      role?: PublicRegistrationRole;
+    }): Promise<GoogleAuthResult> => {
+      const payload = buildGoogleAuthPayload(options);
+      const data = await authenticateWithGoogle(payload);
+
+      if (data.requires_role_selection) {
+        return {
+          requiresRoleSelection: true,
+          signupToken: data.signup_token,
+          email: data.email,
+          name: data.name,
+        };
+      }
+
+      if (data.token && data.user) {
+        persistSession(data.token, data.user);
+        toast.success(`Welcome, ${data.user.username}!`);
+        return { user: data.user };
+      }
+
+      throw new Error('Google authentication returned incomplete user details.');
+    },
+    [persistSession],
+  );
+
   const logout = useCallback(async () => {
     try {
       await api.post('/users/logout/');
@@ -195,10 +238,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAuthenticated: Boolean(token && user),
       login,
       register,
+      loginWithGoogle,
       logout,
       refreshUser,
     }),
-    [user, token, isLoading, login, register, logout, refreshUser],
+    [user, token, isLoading, login, register, loginWithGoogle, logout, refreshUser],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

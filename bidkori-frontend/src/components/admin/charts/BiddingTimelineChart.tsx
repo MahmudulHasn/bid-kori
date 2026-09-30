@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 import { Line } from 'react-chartjs-2';
+import type { ChartOptions, TooltipItem } from 'chart.js';
 import { format } from 'date-fns';
 import { ensureChartRegistered } from './ChartSetup';
 
@@ -89,7 +90,7 @@ export default function BiddingTimelineChart({
         boxPadding: 4,
         usePointStyle: true,
         callbacks: {
-          label: (context: any) => {
+          label: (context: TooltipItem<'line'>) => {
             const idx = context.dataIndex;
             const item = details[idx];
             const amount = Number(item?.amount || 0).toLocaleString('en-US', {
@@ -121,7 +122,7 @@ export default function BiddingTimelineChart({
         ticks: {
           color: '#71717a',
           font: { size: 11 },
-          callback: (val: any) => `৳${Number(val).toLocaleString()}`,
+          callback: (val: string | number) => `৳${Number(val).toLocaleString()}`,
         },
       },
     },
@@ -129,7 +130,7 @@ export default function BiddingTimelineChart({
 
   return (
     <div style={{ height }}>
-      <Line data={chartData} options={options as any} />
+      <Line data={chartData} options={options as ChartOptions<'line'>} />
     </div>
   );
 }

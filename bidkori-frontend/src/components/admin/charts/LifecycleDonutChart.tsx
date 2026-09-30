@@ -1,6 +1,7 @@
 'use client';
 
 import { Doughnut } from 'react-chartjs-2';
+import type { ChartOptions, TooltipItem } from 'chart.js';
 import { ensureChartRegistered } from './ChartSetup';
 
 ensureChartRegistered();
@@ -83,8 +84,8 @@ export default function LifecycleDonutChart({
         borderWidth: 1,
         padding: 10,
         callbacks: {
-          label: (context: any) => {
-            const val = context.raw || 0;
+          label: (context: TooltipItem<'doughnut'>) => {
+            const val = Number(context.raw) || 0;
             const pct = total > 0 ? Math.round((val / total) * 100) : 0;
             return ` ${context.label}: ${val} (${pct}%)`;
           },
@@ -95,7 +96,7 @@ export default function LifecycleDonutChart({
 
   return (
     <div className="relative flex flex-col items-center justify-center" style={{ height }}>
-      <Doughnut data={chartData} options={options as any} />
+      <Doughnut data={chartData} options={options as ChartOptions<'doughnut'>} />
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center pb-8">
         <span className="text-2xl font-bold tabular-nums text-zinc-900 dark:text-white">
           {total}

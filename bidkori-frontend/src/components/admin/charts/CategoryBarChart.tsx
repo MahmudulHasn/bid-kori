@@ -1,6 +1,7 @@
 'use client';
 
 import { Bar } from 'react-chartjs-2';
+import type { ChartOptions, TooltipItem } from 'chart.js';
 import { ensureChartRegistered } from './ChartSetup';
 
 ensureChartRegistered();
@@ -64,7 +65,7 @@ export default function CategoryBarChart({
         borderWidth: 1,
         padding: 10,
         callbacks: {
-          label: (context: any) => {
+          label: (context: TooltipItem<'bar'>) => {
             const idx = context.dataIndex;
             const item = sorted[idx];
             const avgBid = Number(item.avg_highest_bid || 0).toLocaleString('en-US', {
@@ -105,7 +106,7 @@ export default function CategoryBarChart({
 
   return (
     <div style={{ height }}>
-      <Bar data={chartData} options={options as any} />
+      <Bar data={chartData} options={options as ChartOptions<'bar'>} />
     </div>
   );
 }

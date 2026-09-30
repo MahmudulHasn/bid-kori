@@ -47,22 +47,38 @@ export default function SellerCreateProductPage() {
 
   const fetchStatus = async () => {
     try {
-      setLoadingStatus(true);
       const record = await getSellerVerificationStatus();
       setVerificationRecord(record);
       if (record.status !== 'APPROVED' && record.status !== 'PENDING' && record.status !== 'REJECTED') {
-        // First-time seller: automatically show the verification popup
         setIsModalOpen(true);
       }
     } catch {
-      // If error or unauthenticated, fallback to auth context
+      // Fallback to auth context
     } finally {
       setLoadingStatus(false);
     }
   };
 
   useEffect(() => {
-    fetchStatus();
+    let isMounted = true;
+    getSellerVerificationStatus()
+      .then((record) => {
+        if (!isMounted) return;
+        setVerificationRecord(record);
+        if (record.status !== 'APPROVED' && record.status !== 'PENDING' && record.status !== 'REJECTED') {
+          setIsModalOpen(true);
+        }
+      })
+      .catch(() => {
+        // Fallback to auth context
+      })
+      .finally(() => {
+        if (isMounted) setLoadingStatus(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const currentStatus = verificationRecord?.status ?? user?.seller_verified ?? null;

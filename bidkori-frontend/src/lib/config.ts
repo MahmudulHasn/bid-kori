@@ -36,3 +36,12 @@ export function getMediaOrigin(): string {
   }
   return DEFAULT_MEDIA_ORIGIN;
 }
+
+/**
+ * Google Client ID for Google Identity Services (GIS).
+ * Public client ID from process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID.
+ */
+export function getGoogleClientId(): string {
+  return process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID?.trim() || '';
+}
+

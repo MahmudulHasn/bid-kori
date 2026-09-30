@@ -558,3 +558,11 @@ SSLCOMMERZ_VALIDATION_API = (
 
 BACKEND_BASE_URL = os.getenv('BACKEND_BASE_URL', 'http://localhost:8000')
 FRONTEND_BASE_URL = os.getenv('FRONTEND_BASE_URL', 'http://localhost:3000')
+
+# ---------------------------------------------------------------------------
+# Google OAuth / Identity Services (GIS)
+# ---------------------------------------------------------------------------
+
+GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID', '').strip()
+GOOGLE_CLIENT_SECRET = os.getenv('GOOGLE_CLIENT_SECRET', '').strip()
+
