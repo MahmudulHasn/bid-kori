@@ -21,6 +21,7 @@ interface GoogleAccountsId {
       shape?: 'rectangular' | 'pill' | 'circle' | 'square';
       logo_alignment?: 'left' | 'center';
       width?: number | string;
+      locale?: string;
     }
   ) => void;
 }
@@ -91,6 +92,7 @@ export default function GoogleSignInButton({
             shape: 'pill',
             logo_alignment: 'left',
             width: 340,
+            locale: 'en',
           });
         }
 
