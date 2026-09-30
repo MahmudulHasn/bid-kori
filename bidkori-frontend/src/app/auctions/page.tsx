@@ -1,10 +1,10 @@
 'use client';
 
-import { Suspense, useMemo } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import useSWR from 'swr';
-import { Tag } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Layers } from 'lucide-react';
 
 import AuctionGrid from '@/components/marketplace/AuctionGrid';
 import AuctionToolbar from '@/components/marketplace/AuctionToolbar';
@@ -15,12 +15,80 @@ import {
 } from '@/components/marketplace/MarketplaceStates';
 import { auctionListFetcher } from '@/lib/auctionsApi';
 import { CATEGORIES_API_PATH, categoriesFetcher } from '@/lib/categoriesApi';
+import { getCategoryVisual } from '@/lib/categoryVisuals';
 import {
   buildActiveAuctionsApiPath,
   buildMarketplaceAuctionsHref,
   normalizeSearchQuery,
 } from '@/lib/marketplace';
+import { resolveMediaUrl } from '@/lib/media';
 import type { Category } from '@/lib/types';
+
+function MarketplaceCategoryCard({
+  cat,
+  isSelected,
+  searchQuery,
+}: {
+  cat: Category;
+  isSelected: boolean;
+  searchQuery: string;
+}) {
+  const [imageError, setImageError] = useState(false);
+  const visual = getCategoryVisual(cat.name);
+  const Icon = visual.icon;
+  const resolvedUrl = cat.image ? resolveMediaUrl(cat.image) : null;
+  const showImage = Boolean(resolvedUrl && !imageError);
+
+  return (
+    <Link
+      href={buildMarketplaceAuctionsHref({
+        category: cat.slug || cat.name,
+        query: searchQuery,
+      })}
+      className={`group relative flex min-w-[105px] sm:min-w-[120px] max-w-[135px] flex-col items-center justify-center rounded-2xl border p-3 text-center transition-all duration-300 shrink-0 ${
+        isSelected
+          ? 'border-amber-500 bg-amber-500/10 shadow-lg shadow-amber-500/10 ring-1 ring-amber-500/40 dark:border-amber-400 dark:bg-amber-400/10'
+          : 'border-zinc-200/90 bg-white hover:border-amber-400 hover:bg-zinc-50 hover:shadow-md dark:border-zinc-800 dark:bg-[#0B0F1A] dark:hover:border-amber-500/50 dark:hover:bg-[#0F1424] dark:hover:shadow-amber-500/5'
+      }`}
+    >
+      {isSelected && (
+        <span className="absolute -top-1 -right-1 flex h-3 w-3">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
+          <span className="relative inline-flex h-3 w-3 rounded-full bg-amber-500" />
+        </span>
+      )}
+      <div
+        className={`relative flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center overflow-hidden rounded-xl border transition-transform duration-200 group-hover:scale-110 ${
+          showImage
+            ? isSelected
+              ? 'border-amber-500 bg-zinc-900/60 shadow-inner'
+              : 'border-zinc-200 dark:border-zinc-700/80 bg-zinc-100 dark:bg-zinc-900/60 shadow-inner'
+            : visual.color
+        }`}
+      >
+        {showImage ? (
+          <img
+            src={resolvedUrl!}
+            alt={cat.name}
+            className="h-full w-full object-cover"
+            onError={() => setImageError(true)}
+          />
+        ) : (
+          <Icon className="h-5 w-5" />
+        )}
+      </div>
+      <span
+        className={`mt-2.5 text-xs font-semibold line-clamp-1 transition ${
+          isSelected
+            ? 'text-amber-800 dark:text-amber-300 font-bold'
+            : 'text-zinc-700 group-hover:text-amber-700 dark:text-zinc-300 dark:group-hover:text-white'
+        }`}
+      >
+        {cat.name}
+      </span>
+    </Link>
+  );
+}
 
 function AuctionsContent() {
   const router = useRouter();
@@ -75,6 +143,39 @@ function AuctionsContent() {
     return `${auctions.length} active listing${auctions.length === 1 ? '' : 's'}`;
   }, [auctions.length, searchQuery, isLoading, error]);
 
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(true);
+
+  const checkScrollability = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setCanScrollLeft(el.scrollLeft > 6);
+    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 6);
+  }, []);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    checkScrollability();
+    el.addEventListener('scroll', checkScrollability, { passive: true });
+    window.addEventListener('resize', checkScrollability);
+    return () => {
+      el.removeEventListener('scroll', checkScrollability);
+      window.removeEventListener('resize', checkScrollability);
+    };
+  }, [checkScrollability, categories]);
+
+  const handleScroll = (direction: 'left' | 'right') => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const distance = 360;
+    el.scrollBy({
+      left: direction === 'left' ? -distance : distance,
+      behavior: 'smooth',
+    });
+  };
+
   return (
     <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6 sm:py-12">
       {/* Header Banner */}
@@ -115,41 +216,123 @@ function AuctionsContent() {
         />
       </div>
 
-      {/* Category Pills Bar */}
+      {/* Category Section (Large Cards with Left-Right Scrolling Controls) */}
       {categories.length > 0 && (
-        <div className="mb-8 flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
-          <Link
-            href={buildMarketplaceAuctionsHref({ query: searchQuery })}
-            className={`inline-flex min-h-[36px] shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all ${
-              !selectedCategory
-                ? 'bg-zinc-900 text-white shadow-xs dark:bg-zinc-100 dark:text-zinc-900'
-                : 'border border-zinc-200/90 bg-white text-zinc-600 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900/60 dark:text-zinc-300 dark:hover:bg-zinc-800'
-            }`}
-          >
-            <span>All Categories</span>
-          </Link>
-          {categories.map((cat) => {
-            const isSelected =
-              selectedCategory.toLowerCase() === (cat.slug || cat.name).toLowerCase();
-            return (
+        <section aria-label="Marketplace Categories" className="mb-8">
+          <div className="mb-3.5 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300 sm:text-base">
+                Browse by Category
+              </h2>
+              <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-semibold text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+                {categories.length}
+              </span>
+            </div>
+
+            {/* Left - Right Scrolling Navigation Controls <- -> */}
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => handleScroll('left')}
+                disabled={!canScrollLeft}
+                aria-label="Scroll categories left"
+                title="Scroll categories left"
+                className="flex h-8 w-8 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-700 shadow-2xs transition hover:border-amber-400 hover:text-amber-600 disabled:cursor-not-allowed disabled:opacity-30 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-amber-500 dark:hover:text-amber-400"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => handleScroll('right')}
+                disabled={!canScrollRight}
+                aria-label="Scroll categories right"
+                title="Scroll categories right"
+                className="flex h-8 w-8 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-700 shadow-2xs transition hover:border-amber-400 hover:text-amber-600 disabled:cursor-not-allowed disabled:opacity-30 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-amber-500 dark:hover:text-amber-400"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Carousel Track with Floating Left-Right Side Buttons */}
+          <div className="relative group/carousel">
+            {canScrollLeft && (
+              <button
+                type="button"
+                onClick={() => handleScroll('left')}
+                aria-label="Scroll categories left"
+                className="absolute -left-3 top-1/2 -translate-y-1/2 z-10 hidden sm:flex h-9 w-9 items-center justify-center rounded-full border border-zinc-200 bg-white/95 text-zinc-800 shadow-lg backdrop-blur-md transition hover:scale-110 hover:border-amber-400 hover:text-amber-600 dark:border-zinc-700 dark:bg-zinc-900/95 dark:text-zinc-200 dark:hover:border-amber-500 dark:hover:text-amber-400"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </button>
+            )}
+
+            <div
+              ref={scrollRef}
+              className="flex items-center gap-3 overflow-x-auto pb-3 pt-1 scroll-smooth scrollbar-none"
+            >
+              {/* All Categories Card */}
               <Link
-                key={cat.id}
-                href={buildMarketplaceAuctionsHref({
-                  category: cat.slug || cat.name,
-                  query: searchQuery,
-                })}
-                className={`inline-flex min-h-[36px] shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-medium transition-all ${
-                  isSelected
-                    ? 'bg-amber-600 text-white shadow-xs shadow-amber-600/20 dark:bg-amber-500 dark:text-zinc-950 font-semibold'
-                    : 'border border-zinc-200/90 bg-white text-zinc-700 hover:border-amber-400 hover:text-amber-800 dark:border-zinc-800 dark:bg-zinc-900/60 dark:text-zinc-300 dark:hover:border-amber-500'
+                href={buildMarketplaceAuctionsHref({ query: searchQuery })}
+                className={`group relative flex min-w-[105px] sm:min-w-[120px] max-w-[135px] flex-col items-center justify-center rounded-2xl border p-3 text-center transition-all duration-300 shrink-0 ${
+                  !selectedCategory
+                    ? 'border-amber-500 bg-amber-500/10 shadow-lg shadow-amber-500/10 ring-1 ring-amber-500/40 dark:border-amber-400 dark:bg-amber-400/10'
+                    : 'border-zinc-200/90 bg-white hover:border-amber-400 hover:bg-zinc-50 hover:shadow-md dark:border-zinc-800 dark:bg-[#0B0F1A] dark:hover:border-amber-500/50 dark:hover:bg-[#0F1424] dark:hover:shadow-amber-500/5'
                 }`}
               >
-                <Tag className="h-3 w-3 shrink-0" aria-hidden />
-                <span>{cat.name}</span>
+                {!selectedCategory && (
+                  <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
+                    <span className="relative inline-flex h-3 w-3 rounded-full bg-amber-500" />
+                  </span>
+                )}
+                <div
+                  className={`relative flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center overflow-hidden rounded-xl border transition-transform duration-200 group-hover:scale-110 ${
+                    !selectedCategory
+                      ? 'border-amber-500/50 bg-amber-500/20 text-amber-600 dark:text-amber-300'
+                      : 'border-zinc-200 dark:border-zinc-700/80 bg-zinc-100 dark:bg-zinc-900/60 text-zinc-500 dark:text-zinc-400'
+                  }`}
+                >
+                  <Layers className="h-5 w-5" />
+                </div>
+                <span
+                  className={`mt-2.5 text-xs font-semibold line-clamp-1 transition ${
+                    !selectedCategory
+                      ? 'text-amber-800 dark:text-amber-300 font-bold'
+                      : 'text-zinc-700 group-hover:text-amber-700 dark:text-zinc-300 dark:group-hover:text-white'
+                  }`}
+                >
+                  All Categories
+                </span>
               </Link>
-            );
-          })}
-        </div>
+
+              {/* Dynamic Category Cards */}
+              {categories.map((cat) => {
+                const isSelected =
+                  selectedCategory.toLowerCase() === (cat.slug || cat.name).toLowerCase();
+                return (
+                  <MarketplaceCategoryCard
+                    key={cat.id}
+                    cat={cat}
+                    isSelected={isSelected}
+                    searchQuery={searchQuery}
+                  />
+                );
+              })}
+            </div>
+
+            {canScrollRight && (
+              <button
+                type="button"
+                onClick={() => handleScroll('right')}
+                aria-label="Scroll categories right"
+                className="absolute -right-3 top-1/2 -translate-y-1/2 z-10 hidden sm:flex h-9 w-9 items-center justify-center rounded-full border border-zinc-200 bg-white/95 text-zinc-800 shadow-lg backdrop-blur-md transition hover:scale-110 hover:border-amber-400 hover:text-amber-600 dark:border-zinc-700 dark:bg-zinc-900/95 dark:text-zinc-200 dark:hover:border-amber-500 dark:hover:text-amber-400"
+              >
+                <ChevronRight className="h-5 w-5" />
+              </button>
+            )}
+          </div>
+        </section>
       )}
 
       {/* Content Grid */}

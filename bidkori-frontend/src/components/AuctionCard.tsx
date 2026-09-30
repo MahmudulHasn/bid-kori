@@ -80,6 +80,15 @@ export default function AuctionCard({ auction }: AuctionCardProps) {
         : 'AUCTION';
   const categoryName = rawCategory.toUpperCase();
 
+  const rawCatImage =
+    typeof (product as Record<string, unknown>)?.category_image === 'string'
+      ? (product as Record<string, unknown>).category_image as string
+      : typeof (auction as Record<string, unknown>)?.category_image === 'string'
+        ? (auction as Record<string, unknown>).category_image as string
+        : null;
+  const categoryImageUrl = resolveMediaUrl(rawCatImage);
+  const [catImgError, setCatImgError] = useState(false);
+
   return (
     <Link
       href={MARKETPLACE_ROUTES.auctionDetail(auction.id)}
@@ -148,7 +157,17 @@ export default function AuctionCard({ auction }: AuctionCardProps) {
       <div className="flex flex-1 flex-col pt-3.5 sm:pt-4">
         {/* Category Header */}
         <div className="flex items-center gap-1.5 text-[11px] sm:text-xs font-bold tracking-wider text-zinc-400 uppercase">
-          <Tag className="h-3.5 w-3.5 text-amber-500 fill-amber-500/10 shrink-0" aria-hidden />
+          {categoryImageUrl && !catImgError ? (
+            <img
+              src={categoryImageUrl}
+              alt=""
+              aria-hidden
+              className="h-3.5 w-3.5 rounded-full object-cover shrink-0 border border-zinc-700/80"
+              onError={() => setCatImgError(true)}
+            />
+          ) : (
+            <Tag className="h-3.5 w-3.5 text-amber-500 fill-amber-500/10 shrink-0" aria-hidden />
+          )}
           <span className="truncate">{categoryName}</span>
         </div>
 

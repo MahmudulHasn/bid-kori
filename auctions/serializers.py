@@ -69,6 +69,11 @@ class AuctionSerializer(serializers.ModelSerializer):
         read_only=True,
         default=None,
     )
+    category_image = serializers.ImageField(
+        source='product.category.image',
+        read_only=True,
+        default=None,
+    )
     uploaded_images = serializers.ListField(
         child=AuctionImageField(max_length=None, allow_empty_file=False),
         write_only=True,
@@ -125,6 +130,7 @@ class AuctionSerializer(serializers.ModelSerializer):
             'id',
             'product',
             'category_name',
+            'category_image',
             'starting_bid',
             'current_highest_bid',
             'min_increment',
@@ -152,6 +158,7 @@ class AuctionSerializer(serializers.ModelSerializer):
             'winning_bidder',
             'winning_bidder_username',
             'category_name',
+            'category_image',
             'status',
             'is_paid',
             # Featured placement is a platform capability (Django admin / staff).
@@ -642,6 +649,11 @@ class AuctionDetailSerializer(serializers.ModelSerializer):
         read_only=True,
         default=None,
     )
+    category_image = serializers.ImageField(
+        source='product.category.image',
+        read_only=True,
+        default=None,
+    )
     winning_bidder_username = serializers.CharField(
         source='winning_bidder.username',
         read_only=True,
@@ -660,6 +672,7 @@ class AuctionDetailSerializer(serializers.ModelSerializer):
             'product',
             'product_title',
             'category_name',
+            'category_image',
             'start_time',
             'end_time',
             'current_highest_bid',

@@ -80,6 +80,8 @@ export type AuctionProduct = {
   description?: string;
   condition?: string;
   category?: number | null;
+  category_name?: string | null;
+  category_image?: string | null;
   /** Product seller user id — used for UX ownership checks only. */
   seller?: number | string | null;
   /** Visibility moderation (Seller/Admin/private responses). */
@@ -97,6 +99,7 @@ export type Product = {
   category?: number | null;
   /** Human-readable category name resolved by the backend. */
   category_name?: string | null;
+  category_image?: string | null;
   seller?: number | string | null;
   /** Nested Product images ordered by uploaded_at, id (first = display default). */
   images?: ProductImage[];
@@ -113,6 +116,7 @@ export type Category = {
   id: number;
   name: string;
   slug: string;
+  image?: string | null;
 };
 
 export type Auction = {
@@ -153,6 +157,7 @@ export type Auction = {
   images?: AuctionImage[];
   /** Human-readable category name from the backend serializer. */
   category_name?: string | null;
+  category_image?: string | null;
   /** Optional recent bids (active list); used for honest starting vs current labels. */
   recent_bids?: UserBid[];
   /** Visibility moderation (Seller/Admin/private responses). */

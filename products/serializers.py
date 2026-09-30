@@ -66,6 +66,11 @@ class ProductSerializer(serializers.ModelSerializer):
         read_only=True,
         default=None,
     )
+    category_image = serializers.ImageField(
+        source='category.image',
+        read_only=True,
+        default=None,
+    )
 
     class Meta:
         model = Product
@@ -74,6 +79,7 @@ class ProductSerializer(serializers.ModelSerializer):
             'seller',
             'category',
             'category_name',
+            'category_image',
             'title',
             'description',
             'condition',
@@ -88,6 +94,7 @@ class ProductSerializer(serializers.ModelSerializer):
             'seller',
             'images',
             'category_name',
+            'category_image',
             'is_hidden',
             'moderation_reason',
             'moderated_at',

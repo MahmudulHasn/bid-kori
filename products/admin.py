@@ -12,4 +12,8 @@ class ProductAdmin(admin.ModelAdmin):
     search_fields = ('title', 'description')
 
 
-bidkori_admin_site.register(Category)
+@admin.register(Category, site=bidkori_admin_site)
+class CategoryAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name', 'slug', 'image', 'created_at', 'updated_at')
+    search_fields = ('name', 'slug')
+    prepopulated_fields = {'slug': ('name',)}
