@@ -37,8 +37,8 @@ export type AiListingGenerateEligibilityInput = {
   generating: boolean;
   /** False when ProductForm fields are frozen/disabled. */
   formEditable: boolean;
-  /** Seller-supplied API key (BYOK). */
-  apiKey: string;
+  /** Optional seller-supplied API key (BYOK). */
+  apiKey?: string;
 };
 
 /**
