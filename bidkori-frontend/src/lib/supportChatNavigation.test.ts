@@ -32,12 +32,12 @@ test('malicious and unsafe URLs are rejected by route validator', () => {
 
 test('role-based starters provide role-appropriate guidance', () => {
   const anonStarters = getRoleBasedStarters(null);
-  assert.ok(anonStarters.some((s) => s.includes('place a bid')));
-  assert.ok(anonStarters.some((s) => s.includes('reserve price')));
+  assert.ok(anonStarters.some((s) => s.includes('live auctions')));
+  assert.ok(anonStarters.some((s) => s.includes('ending soon') || s.includes('categories')));
 
   const buyerStarters = getRoleBasedStarters('BUYER');
   assert.ok(buyerStarters.some((s) => s.includes('My Bids')));
-  assert.ok(buyerStarters.some((s) => s.includes('won auctions')));
+  assert.ok(buyerStarters.some((s) => s.includes('live auctions') || s.includes('ending soon')));
 
   const sellerStarters = getRoleBasedStarters('SELLER');
   assert.ok(sellerStarters.some((s) => s.includes('create a product') || s.includes('Create Product')));

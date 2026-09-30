@@ -258,10 +258,11 @@ _NAVIGATE_PATTERNS = [
 
 # Patterns for private-data or action requests (security guard)
 _PRIVATE_DATA_PATTERNS = [
-    r'(?:show|tell|give)\s+(?:me\s+)?(?:\w+\'?s?\s+)?(?:bids?|bidding|bid history)',
-    r'(?:show|tell|give)\s+(?:me\s+)?(?:user|bidder|seller)\s+\w+(?:\'?s?)?\s+(?:data|info|email|phone|address)',
+    r'(?:show|tell|give)\s+(?:me\s+)?(?:\w+\s+)?(?:bids?|bidding|bid history)',
+    r'(?:show|tell|give)\s+(?:me\s+)?(?:user|bidder|seller)\s+\w+\s+(?:data|info|email|phone|address|bids?)',
     r'(?:what|who)\s+(?:did|has)\s+(?:user|bidder)\s+\w+\s+(?:bid|win|buy)',
     r'(?:who\s+is|who\'s)\s+(?:winning|leading|the\s+(?:highest|top)\s+bidder)',
+    r'(?:show|give|tell)\s+(?:me\s+)?\w+\s+(?:bid|bidding)\s+(?:history|data|info)',
 ]
 
 
@@ -365,13 +366,6 @@ def detect_auction_intent(
         sort_by = _extract_sort(norm)
         search_query = _extract_search_query(norm)
 
-        # Check if it's a navigate intent (single item search)
-        if _matches_any(norm, _NAVIGATE_PATTERNS) and search_query:
-            return {
-                'intent': 'NAVIGATE_TO_AUCTION',
-                'search_query': search_query,
-            }
-
         return {
             'intent': 'SEARCH_AUCTIONS',
             'query': search_query,
@@ -381,7 +375,7 @@ def detect_auction_intent(
             'sort_by': sort_by,
         }
 
-    # ── Navigate to auction by name (broader pattern) ──
+    # ── Navigate to auction by name (broader pattern — only if not a search) ──
     if _matches_any(norm, _NAVIGATE_PATTERNS):
         search_query = _extract_search_query(norm)
         if search_query:

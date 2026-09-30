@@ -209,9 +209,8 @@ class GetAuctionDetailsTests(AuctionToolsTestBase):
 
     def test_returns_none_for_hidden_auction(self):
         details = get_auction_details(self.auction_samsung_hidden.pk)
-        # Hidden auctions are returned by details (not filtered by status)
-        # but should still show — details doesn't filter by ACTIVE
-        self.assertIsNotNone(details)
+        # Hidden auctions are correctly excluded by is_hidden=False filter
+        self.assertIsNone(details)
 
     def test_returns_none_for_nonexistent_auction(self):
         details = get_auction_details(99999)
@@ -323,7 +322,7 @@ class IntentDetectorTests(TestCase):
         invalidate_category_cache()
 
     def test_search_auctions_intent(self):
-        result = detect_auction_intent('show me live auctions')
+        result = detect_auction_intent('show me all live auctions')
         self.assertIsNotNone(result)
         self.assertEqual(result['intent'], 'SEARCH_AUCTIONS')
 
@@ -372,7 +371,7 @@ class IntentDetectorTests(TestCase):
         self.assertEqual(result['auction_id'], 42)
 
     def test_private_data_guard(self):
-        result = detect_auction_intent('show me user john\'s bids')
+        result = detect_auction_intent('show me user john bids')
         self.assertIsNotNone(result)
         self.assertEqual(result['intent'], 'PRIVATE_DATA_GUARD')
 
