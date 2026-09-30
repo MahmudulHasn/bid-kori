@@ -3,8 +3,8 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
-import { motion, useReducedMotion } from 'framer-motion';
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import {
   ArrowRight,
   Clock,
@@ -24,6 +24,7 @@ import {
 import useSWR from 'swr';
 
 import AuctionGrid from '@/components/marketplace/AuctionGrid';
+import BidKoriLoader from '@/components/loading/BidKoriLoader';
 import {
   AuctionGridSkeleton,
   MarketplaceEmptyState,
@@ -341,9 +342,19 @@ export default function HomePage() {
     ];
   }, [categories]);
 
+  const [showLoader, setShowLoader] = useState(true);
+  const heroInitializedRef = useRef(false);
+
+  const handleLoaderComplete = useCallback(() => {
+    setShowLoader(false);
+  }, []);
+
   // GSAP Cinematic Entrance & ScrollTrigger Animation with Scoped Context & Cleanup
+  // Coordinated with BidKoriLoader handoff so no conflicting animations occur
   useEffect(() => {
-    if (!landingContainerRef.current) return;
+    if (showLoader || !landingContainerRef.current) return;
+    if (heroInitializedRef.current) return;
+    heroInitializedRef.current = true;
 
     const hero = initLandingHero(landingContainerRef.current);
     const cleanupTriggers = initLandingScrollTriggers(landingContainerRef.current);
@@ -352,7 +363,7 @@ export default function HomePage() {
       hero.cleanup();
       cleanupTriggers();
     };
-  }, []);
+  }, [showLoader]);
 
   const handleSearch = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -371,7 +382,18 @@ export default function HomePage() {
     : '/auth/register';
 
   return (
-    <main ref={landingContainerRef} className="min-h-screen bg-[#06080D] text-white">
+    <>
+      <AnimatePresence mode="wait">
+        {showLoader && (
+          <BidKoriLoader
+            key="bidkori-home-loader"
+            isLoading={auctionsLoading}
+            onComplete={handleLoaderComplete}
+          />
+        )}
+      </AnimatePresence>
+
+      <main ref={landingContainerRef} className="min-h-screen bg-[#06080D] text-white">
       {/* ========================================================================= */}
       {/* 1. HERO SECTION */}
       {/* ========================================================================= */}
@@ -864,5 +886,6 @@ export default function HomePage() {
         </div>
       </section>
     </main>
+    </>
   );
 }
