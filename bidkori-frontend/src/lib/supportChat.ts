@@ -22,12 +22,28 @@ export type ChatSuggestion = {
   href: string;
 };
 
+export type ChatAuctionCard = {
+  auction_id: number;
+  title: string;
+  image_url: string | null;
+  current_bid: string;
+  starting_bid: string;
+  bid_count: number;
+  ends_in_seconds: number;
+  status: string;
+  category_name: string | null;
+  has_reserve: boolean;
+  reserve_met: boolean | null;
+  href: string;
+};
+
 export type ChatMessage = {
   id: string;
   role: ChatRole;
   content: string;
   action?: ChatAction | null;
   suggestions?: ChatSuggestion[];
+  auction_cards?: ChatAuctionCard[];
 };
 
 export type SupportChatRequest = {
@@ -41,53 +57,54 @@ export type SupportChatResponse = {
   message?: string;
   action?: ChatAction | null;
   suggestions?: ChatSuggestion[];
+  auction_cards?: ChatAuctionCard[];
 };
 
 export const SUPPORT_CHAT_WELCOME =
-  'Hi! I can help explain how BidKori bidding, auctions, products, and notifications work, or help you navigate.';
+  'Hi! I can search live auctions, show current bids and time remaining, browse categories, and help you navigate BidKori. Ask me anything!';
 
 export const SUPPORT_CHAT_SCOPE_DISCLOSURE =
   'BidKori Help can explain platform features and navigate to supported pages. It cannot place bids, access private account data, or perform actions.';
 
 /** Supported BidKori topics only — no Watchlist/refunds/Admin ops. */
 export const SUPPORT_CHAT_STARTERS: readonly string[] = [
+  'Show me live auctions',
+  'What categories are available?',
+  'What auctions are ending soon?',
   'How do I place a bid?',
-  'What happens if I am outbid?',
-  'How do Sellers create an auction?',
   'What does reserve price mean?',
-  'Where can I see auctions I won?',
 ] as const;
 
 export function getRoleBasedStarters(role?: string | null): readonly string[] {
   if (role === 'BUYER') {
     return [
+      'Show me live auctions',
+      'What auctions are ending soon?',
       'Take me to My Bids',
-      'Where are my won auctions?',
       'How do outbid notifications work?',
-      'Where can I edit my profile?',
     ];
   }
   if (role === 'SELLER') {
     return [
+      'Show me live auctions',
       'How do I create a product?',
       'Take me to Create Auction',
       'Open seller sales',
-      'How do Seller notifications work?',
     ];
   }
   if (role === 'ADMIN') {
     return [
+      'How many auctions are live?',
       'Open user management',
       'Open auction moderation',
       'Take me to admin analytics',
-      'Where can I manage products?',
     ];
   }
   return [
+    'Show me live auctions',
+    'What categories are available?',
+    'What auctions are ending soon?',
     'How do I place a bid?',
-    'What does reserve price mean?',
-    'How do I become a seller?',
-    'Take me to auctions',
   ];
 }
 
@@ -114,8 +131,16 @@ export function createChatMessage(
   id: string = createChatMessageId(),
   action?: ChatAction | null,
   suggestions?: ChatSuggestion[],
+  auction_cards?: ChatAuctionCard[],
 ): ChatMessage {
-  return { id, role, content, action: action || null, suggestions: suggestions || [] };
+  return {
+    id,
+    role,
+    content,
+    action: action || null,
+    suggestions: suggestions || [],
+    auction_cards: auction_cards || [],
+  };
 }
 
 export function createWelcomeMessages(): ChatMessage[] {
@@ -170,8 +195,9 @@ export function appendAssistantMessage(
   action?: ChatAction | null,
   suggestions?: ChatSuggestion[],
   id?: string,
+  auction_cards?: ChatAuctionCard[],
 ): ChatMessage[] {
-  return [...messages, createChatMessage('assistant', content, id, action, suggestions)];
+  return [...messages, createChatMessage('assistant', content, id, action, suggestions, auction_cards)];
 }
 
 export function clearSupportChatMessages(): ChatMessage[] {

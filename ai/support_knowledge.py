@@ -38,7 +38,9 @@ assistant provides guidance and navigation.
 - Browse auctions from Marketplace / Auctions.
 - Use the marketplace search box to narrow listings by keyword, category, or status.
 - Open an auction detail page to view live price, countdown timer, images, and the bid form.
-- This assistant cannot search live auctions or return dynamic search results.
+- This assistant can search live auctions by keyword, category, price range, or condition.
+- This assistant can show the current highest bid, time remaining, bid count, and other public details.
+- This assistant can navigate you directly to a specific auction page.
 
 ## Bidding
 - You must be logged in to place a bid on an active auction.
@@ -103,10 +105,18 @@ Typical Seller flow:
 - This is not a full production payment processor. Do not promise real bank settlement, refunds, chargebacks,
   shipping guarantees, payouts, or buyer-protection policies.
 
+## What this assistant can do
+- Search live auctions by keyword, category, price, or condition
+- Show current highest bid and time remaining for any live auction
+- List categories with active auction counts
+- Navigate you to specific auction pages
+- Explain how BidKori features work (bidding, selling, auctions, notifications)
+- Navigate you to any BidKori page (dashboards, settings, etc.)
+
 ## What this assistant cannot do
 - Place bids, create/edit/delete listings, cancel auctions, checkout, or change account settings
 - Read private account data (your bids, wins, payments, email, or other users)
-- Search or browse live auction results
+- Reveal bidder identities, seller contact info, or personal data of other users
 - Verify authenticity, seller trustworthiness, or give financial advice
 - Answer general non-BidKori questions (coding, trivia, jokes, etc.)
 

@@ -14,7 +14,10 @@ import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import {
   ArrowRight,
+  Clock,
+  Gavel,
   SendHorizontal,
+  Tag,
   Trash2,
   X,
 } from 'lucide-react';
@@ -33,8 +36,42 @@ import {
   getRoleBasedStarters,
   getSupportChatErrorMessage,
   normalizeSupportChatMessage,
+  type ChatAuctionCard,
   type ChatMessage,
 } from '@/lib/supportChat';
+
+/* ──────────────────────────────────────────────
+   Helpers
+   ────────────────────────────────────────────── */
+
+function formatTaka(amount: string): string {
+  try {
+    const num = parseFloat(amount);
+    if (Number.isNaN(num)) return `৳${amount}`;
+    if (num === Math.floor(num)) return `৳${Math.floor(num).toLocaleString()}`;
+    return `৳${num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  } catch {
+    return `৳${amount}`;
+  }
+}
+
+function formatTimeRemaining(seconds: number): string {
+  if (seconds <= 0) return 'Ended';
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) {
+    const secs = seconds % 60;
+    return secs > 0 ? `${minutes}m ${secs}s` : `${minutes}m`;
+  }
+  const hours = Math.floor(minutes / 60);
+  const remainingMins = minutes % 60;
+  if (hours < 24) {
+    return remainingMins > 0 ? `${hours}h ${remainingMins}m` : `${hours}h`;
+  }
+  const days = Math.floor(hours / 24);
+  const remainingHours = hours % 24;
+  return remainingHours > 0 ? `${days}d ${remainingHours}h` : `${days}d`;
+}
 
 function formatLineContent(text: string) {
   const bulletMatch = text.match(/^(\s*[-*•]\s+)(.*)$/);
@@ -80,6 +117,113 @@ function formatLineContent(text: string) {
     </span>
   );
 }
+
+/* ──────────────────────────────────────────────
+   AuctionCard — Inline auction card in chat
+   ────────────────────────────────────────────── */
+
+function AuctionCardInline({
+  card,
+  onNavigate,
+}: {
+  card: ChatAuctionCard;
+  onNavigate: (href: string) => void;
+}) {
+  const [timeLeft, setTimeLeft] = useState(card.ends_in_seconds);
+
+  // Live countdown timer
+  useEffect(() => {
+    if (timeLeft <= 0) return;
+    const interval = window.setInterval(() => {
+      setTimeLeft((prev) => Math.max(0, prev - 1));
+    }, 1000);
+    return () => window.clearInterval(interval);
+  }, [timeLeft]);
+
+  const isLive = card.status === 'LIVE' && timeLeft > 0;
+  const bidLabel = formatTaka(card.current_bid);
+  const timeLabel = formatTimeRemaining(timeLeft);
+  const hasBids = card.bid_count > 0;
+
+  return (
+    <button
+      type="button"
+      onClick={() => onNavigate(card.href)}
+      className="group flex w-full gap-3 rounded-xl border border-zinc-200/80 bg-white p-2.5 text-left shadow-xs transition-all duration-200 hover:border-amber-400/60 hover:shadow-md hover:shadow-amber-500/10 active:scale-[0.98] dark:border-zinc-800 dark:bg-zinc-900/80 dark:hover:border-amber-500/40"
+    >
+      {/* Thumbnail */}
+      <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-zinc-100 dark:bg-zinc-800">
+        {card.image_url ? (
+          <Image
+            src={card.image_url}
+            alt={card.title}
+            fill
+            sizes="64px"
+            className="object-cover transition-transform duration-300 group-hover:scale-110"
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center">
+            <Gavel className="h-6 w-6 text-zinc-400" aria-hidden />
+          </div>
+        )}
+        {isLive ? (
+          <span className="absolute left-1 top-1 flex items-center gap-1 rounded-full bg-emerald-500/90 px-1.5 py-0.5 text-[9px] font-bold text-white backdrop-blur-sm">
+            <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
+            LIVE
+          </span>
+        ) : null}
+      </div>
+
+      {/* Info */}
+      <div className="flex min-w-0 flex-1 flex-col justify-between">
+        <div>
+          <h4 className="truncate text-[13px] font-semibold text-zinc-900 group-hover:text-amber-600 dark:text-zinc-100 dark:group-hover:text-amber-400 transition-colors">
+            {card.title}
+          </h4>
+          {card.category_name ? (
+            <div className="mt-0.5 flex items-center gap-1 text-[10px] text-zinc-500 dark:text-zinc-400">
+              <Tag className="h-2.5 w-2.5" aria-hidden />
+              {card.category_name}
+            </div>
+          ) : null}
+        </div>
+
+        <div className="mt-1.5 flex items-center justify-between gap-2">
+          {/* Price */}
+          <div className="flex items-center gap-1">
+            <span className="text-[13px] font-bold text-amber-600 dark:text-amber-400">
+              {bidLabel}
+            </span>
+            <span className="text-[10px] text-zinc-400 dark:text-zinc-500">
+              {hasBids ? `(${card.bid_count} bid${card.bid_count > 1 ? 's' : ''})` : '(no bids)'}
+            </span>
+          </div>
+
+          {/* Time */}
+          {isLive ? (
+            <div className="flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-950/40 dark:text-amber-400">
+              <Clock className="h-2.5 w-2.5" aria-hidden />
+              {timeLabel}
+            </div>
+          ) : (
+            <span className="text-[10px] font-medium text-zinc-400">
+              {card.status}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Arrow */}
+      <div className="flex shrink-0 items-center self-center">
+        <ArrowRight className="h-3.5 w-3.5 text-zinc-400 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:text-amber-500" aria-hidden />
+      </div>
+    </button>
+  );
+}
+
+/* ──────────────────────────────────────────────
+   AnimatedAssistantBubble — existing with auction_cards support
+   ────────────────────────────────────────────── */
 
 function AnimatedAssistantBubble({
   message,
@@ -129,6 +273,7 @@ function AnimatedAssistantBubble({
   };
 
   const visibleLines = lines.slice(0, visibleCount);
+  const auctionCards = message.auction_cards || [];
 
   return (
     <div
@@ -165,6 +310,22 @@ function AnimatedAssistantBubble({
         })}
       </div>
 
+      {/* ── Auction Cards ── */}
+      {isDone && auctionCards.length > 0 ? (
+        <div className="mt-3 space-y-2 animate-chat-line">
+          {auctionCards.map((card) => (
+            <AuctionCardInline
+              key={card.auction_id}
+              card={card}
+              onNavigate={(href) => {
+                onActionClick(href);
+              }}
+            />
+          ))}
+        </div>
+      ) : null}
+
+      {/* ── Action Button ── */}
       {isDone && message.action ? (
         <div className="mt-2.5 pt-2 border-t border-zinc-200/80 dark:border-zinc-800 animate-chat-line">
           <button
@@ -181,6 +342,7 @@ function AnimatedAssistantBubble({
         </div>
       ) : null}
 
+      {/* ── Suggestion Chips ── */}
       {isDone && message.suggestions && message.suggestions.length > 0 ? (
         <div className="mt-2 flex flex-wrap gap-1.5 pt-1 animate-chat-line">
           {message.suggestions.map((sug) => (
@@ -202,8 +364,12 @@ function AnimatedAssistantBubble({
   );
 }
 
+/* ──────────────────────────────────────────────
+   SupportChat — Main floating chat panel (CHAT-X01 + X02)
+   ────────────────────────────────────────────── */
+
 /**
- * Floating BidKori Help button + mobile-safe role-aware chat panel (CHAT-X01).
+ * Floating BidKori Help button + mobile-safe role-aware chat panel (CHAT-X01, CHAT-X02).
  * In-memory session history only — no localStorage / server persistence.
  */
 export default function SupportChat() {
@@ -286,7 +452,7 @@ export default function SupportChat() {
         }
       }
 
-      const { answer, action, suggestions } = await sendSupportChatMessage(
+      const { answer, action, suggestions, auction_cards } = await sendSupportChatMessage(
         normalized,
         pathname,
         clientContext,
@@ -294,7 +460,7 @@ export default function SupportChat() {
       const newId = createChatMessageId();
       setLatestAnimatedId(newId);
       setMessages((prev) =>
-        appendAssistantMessage(prev, answer, action, suggestions, newId),
+        appendAssistantMessage(prev, answer, action, suggestions, newId, auction_cards),
       );
     } catch (error: unknown) {
       const message = getSupportChatErrorMessage(error);
@@ -409,7 +575,7 @@ export default function SupportChat() {
                   </span>
                 </div>
                 <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-                  Ask how bidding, auctions, products, and notifications work.
+                  Search auctions, check bids, and navigate BidKori.
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-1">
@@ -525,7 +691,7 @@ export default function SupportChat() {
               {!pending && messages.length <= 1 ? (
                 <div className="space-y-2 pt-1">
                   <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                    Suggested questions
+                    Try asking
                   </p>
                   <div className="flex flex-wrap gap-2">
                     {starters.map((starter) => (
@@ -561,7 +727,7 @@ export default function SupportChat() {
                   disabled={pending}
                   onChange={(event) => setDraft(event.target.value)}
                   onKeyDown={onKeyDown}
-                  placeholder="Ask about bidding, auctions, products…"
+                  placeholder="Search auctions, ask about bids…"
                   className="min-h-[2.75rem] max-h-28 flex-1 resize-none rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none ring-amber-500/40 placeholder:text-zinc-400 focus:ring-2 disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
                 />
                 <button

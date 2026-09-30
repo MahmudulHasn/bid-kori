@@ -20,6 +20,8 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import useSWR from 'swr';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { stepTransitionVariants } from '@/lib/motion/variants';
 
 import { useAuth } from '@/context/AuthContext';
 import { getApiErrorMessage, getApiStatus } from '@/lib/apiErrors';
@@ -81,6 +83,8 @@ export default function WinnerDetailsPage() {
 
   // Wizard state
   const [currentStep, setCurrentStep] = useState<number>(1);
+  const [stepDirection, setStepDirection] = useState<number>(1);
+  const prefersReduced = useReducedMotion();
   const [savingDraft, setSavingDraft] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
@@ -187,6 +191,7 @@ export default function WinnerDetailsPage() {
           },
           1,
         );
+        setStepDirection(1);
         setCurrentStep(2);
       } catch (err) {
         toast.error(getApiErrorMessage(err, 'Failed to save personal information draft.'));
@@ -218,6 +223,7 @@ export default function WinnerDetailsPage() {
           },
           2,
         );
+        setStepDirection(1);
         setCurrentStep(3);
       } catch (err) {
         toast.error(getApiErrorMessage(err, 'Failed to save address draft.'));
@@ -246,6 +252,7 @@ export default function WinnerDetailsPage() {
           },
           3,
         );
+        setStepDirection(1);
         setCurrentStep(4);
       } catch (err) {
         toast.error(getApiErrorMessage(err, 'Failed to save preferences draft.'));
@@ -258,6 +265,7 @@ export default function WinnerDetailsPage() {
   const handlePrevStep = () => {
     setErrors({});
     if (currentStep > 1) {
+      setStepDirection(-1);
       setCurrentStep((prev) => prev - 1);
     }
   };
@@ -494,9 +502,18 @@ export default function WinnerDetailsPage() {
       )}
 
       {/* Form Card */}
-      <section className="rounded-2xl border border-zinc-200/90 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/60 sm:p-7">
-        {/* STEP 1: Personal Information */}
-        {currentStep === 1 && (
+      <section className="rounded-2xl border border-zinc-200/90 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/60 sm:p-7 overflow-hidden">
+        <AnimatePresence mode="wait" custom={stepDirection}>
+          <motion.div
+            key={currentStep}
+            custom={stepDirection}
+            variants={prefersReduced ? undefined : stepTransitionVariants}
+            initial={prefersReduced ? false : 'enter'}
+            animate="center"
+            exit={prefersReduced ? undefined : 'exit'}
+          >
+            {/* STEP 1: Personal Information */}
+            {currentStep === 1 && (
           <fieldset className="space-y-5">
             <legend className="text-lg font-bold text-zinc-900 dark:text-white">
               Step 1: Personal Information
@@ -836,7 +853,10 @@ export default function WinnerDetailsPage() {
                   {!submitSuccess && (
                     <button
                       type="button"
-                      onClick={() => setCurrentStep(1)}
+                      onClick={() => {
+                        setStepDirection(-1);
+                        setCurrentStep(1);
+                      }}
                       className="text-xs font-semibold text-amber-600 hover:underline dark:text-amber-400"
                     >
                       Edit
@@ -868,7 +888,10 @@ export default function WinnerDetailsPage() {
                   {!submitSuccess && (
                     <button
                       type="button"
-                      onClick={() => setCurrentStep(2)}
+                      onClick={() => {
+                        setStepDirection(-1);
+                        setCurrentStep(2);
+                      }}
                       className="text-xs font-semibold text-amber-600 hover:underline dark:text-amber-400"
                     >
                       Edit
@@ -910,7 +933,10 @@ export default function WinnerDetailsPage() {
                   {!submitSuccess && (
                     <button
                       type="button"
-                      onClick={() => setCurrentStep(3)}
+                      onClick={() => {
+                        setStepDirection(-1);
+                        setCurrentStep(3);
+                      }}
                       className="text-xs font-semibold text-amber-600 hover:underline dark:text-amber-400"
                     >
                       Edit
@@ -937,6 +963,8 @@ export default function WinnerDetailsPage() {
             </div>
           </div>
         )}
+          </motion.div>
+        </AnimatePresence>
 
         {/* Wizard Controls */}
         <div className="mt-8 flex flex-col-reverse gap-3 border-t border-zinc-100 pt-5 dark:border-zinc-800 sm:flex-row sm:items-center sm:justify-between">

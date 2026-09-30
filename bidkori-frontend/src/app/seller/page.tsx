@@ -7,6 +7,9 @@ import { Gavel, Package, Store, Trophy } from 'lucide-react';
 import useSWR from 'swr';
 
 import SellerVerificationStatusCard from '@/components/seller/SellerVerificationStatusCard';
+import FadeUp from '@/components/motion/FadeUp';
+import StaggerList from '@/components/motion/StaggerList';
+import StaggerItem from '@/components/motion/StaggerItem';
 import { useAuth } from '@/context/AuthContext';
 import { getApiErrorMessage } from '@/lib/apiErrors';
 import { formatAuctionMoney, getAuctionTitle } from '@/lib/auctionDisplay';
@@ -312,117 +315,127 @@ export default function SellerHomePage() {
       {!loading && !error && !isEmpty ? (
         <>
           <section aria-label="Seller summary">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              <MetricCard
-                label="My Products"
-                value={metrics.products}
-                hint="Items from your product listings"
-                icon={<Package className="h-4 w-4" />}
-              />
-              <MetricCard
-                label="My Auctions"
-                value={metrics.auctions}
-                hint="Auctions linked to your products"
-                icon={<Store className="h-4 w-4" />}
-              />
-              <MetricCard
-                label="Active Auctions"
-                value={metrics.activeAuctions}
-                hint="Owned auctions with ACTIVE status"
-                icon={<Gavel className="h-4 w-4" />}
-              />
-              <MetricCard
-                label="Closed Auctions"
-                value={metrics.closedAuctions}
-                hint="Owned auctions with CLOSED status"
-                icon={<Trophy className="h-4 w-4" />}
-              />
-            </div>
+            <StaggerList className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <StaggerItem>
+                <MetricCard
+                  label="My Products"
+                  value={metrics.products}
+                  hint="Items from your product listings"
+                  icon={<Package className="h-4 w-4" />}
+                />
+              </StaggerItem>
+              <StaggerItem>
+                <MetricCard
+                  label="My Auctions"
+                  value={metrics.auctions}
+                  hint="Auctions linked to your products"
+                  icon={<Store className="h-4 w-4" />}
+                />
+              </StaggerItem>
+              <StaggerItem>
+                <MetricCard
+                  label="Active Auctions"
+                  value={metrics.activeAuctions}
+                  hint="Owned auctions with ACTIVE status"
+                  icon={<Gavel className="h-4 w-4" />}
+                />
+              </StaggerItem>
+              <StaggerItem>
+                <MetricCard
+                  label="Closed Auctions"
+                  value={metrics.closedAuctions}
+                  hint="Owned auctions with CLOSED status"
+                  icon={<Trophy className="h-4 w-4" />}
+                />
+              </StaggerItem>
+            </StaggerList>
           </section>
 
-          <div className="grid gap-8 lg:grid-cols-2">
-            <section aria-labelledby="recent-products-heading">
-              <div className="flex flex-wrap items-end justify-between gap-3">
-                <div>
-                  <h2
-                    id="recent-products-heading"
-                    className="text-xl font-semibold text-zinc-900 dark:text-white"
-                  >
-                    Recent Products
-                  </h2>
-                  <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-                    Catalog items you own. These are not auctions.
-                  </p>
+          <FadeUp delay={1} className="mt-8">
+            <div className="grid gap-8 lg:grid-cols-2">
+              <section aria-labelledby="recent-products-heading">
+                <div className="flex flex-wrap items-end justify-between gap-3">
+                  <div>
+                    <h2
+                      id="recent-products-heading"
+                      className="text-xl font-semibold text-zinc-900 dark:text-white"
+                    >
+                      Recent Products
+                    </h2>
+                    <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+                      Catalog items you own. These are not auctions.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Link
+                      href={SELLER_PRODUCT_CREATE_PATH}
+                      className="text-sm font-medium text-sky-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:text-sky-300"
+                    >
+                      Create Product
+                    </Link>
+                    <Link
+                      href={SELLER_PRODUCTS_PATH}
+                      className="text-sm font-medium text-sky-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:text-sky-300"
+                    >
+                      View all products
+                    </Link>
+                  </div>
                 </div>
-                <div className="flex flex-wrap items-center gap-3">
-                  <Link
-                    href={SELLER_PRODUCT_CREATE_PATH}
-                    className="text-sm font-medium text-sky-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:text-sky-300"
-                  >
-                    Create Product
-                  </Link>
-                  <Link
-                    href={SELLER_PRODUCTS_PATH}
-                    className="text-sm font-medium text-sky-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:text-sky-300"
-                  >
-                    View all products
-                  </Link>
+                <div className="mt-4 space-y-3">
+                  {recentProducts.length > 0 ? (
+                    recentProducts.map((item) => (
+                      <ProductPreview key={item.id} item={item} />
+                    ))
+                  ) : (
+                    <p className="rounded-xl border border-dashed border-zinc-300 px-4 py-6 text-sm text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
+                      No products in your listings yet.
+                    </p>
+                  )}
                 </div>
-              </div>
-              <div className="mt-4 space-y-3">
-                {recentProducts.length > 0 ? (
-                  recentProducts.map((item) => (
-                    <ProductPreview key={item.id} item={item} />
-                  ))
-                ) : (
-                  <p className="rounded-xl border border-dashed border-zinc-300 px-4 py-6 text-sm text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
-                    No products in your listings yet.
-                  </p>
-                )}
-              </div>
-            </section>
+              </section>
 
-            <section aria-labelledby="recent-auctions-heading">
-              <div className="flex flex-wrap items-end justify-between gap-3">
-                <div>
-                  <h2
-                    id="recent-auctions-heading"
-                    className="text-xl font-semibold text-zinc-900 dark:text-white"
-                  >
-                    Recent Auctions
-                  </h2>
-                  <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-                    Auctions running on products you own.
-                  </p>
+              <section aria-labelledby="recent-auctions-heading">
+                <div className="flex flex-wrap items-end justify-between gap-3">
+                  <div>
+                    <h2
+                      id="recent-auctions-heading"
+                      className="text-xl font-semibold text-zinc-900 dark:text-white"
+                    >
+                      Recent Auctions
+                    </h2>
+                    <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+                      Auctions running on products you own.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Link
+                      href={SELLER_AUCTION_CREATE_PATH}
+                      className="text-sm font-medium text-sky-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:text-sky-300"
+                    >
+                      Create Auction
+                    </Link>
+                    <Link
+                      href={SELLER_AUCTIONS_PATH}
+                      className="text-sm font-medium text-sky-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:text-sky-300"
+                    >
+                      View all auctions
+                    </Link>
+                  </div>
                 </div>
-                <div className="flex flex-wrap items-center gap-3">
-                  <Link
-                    href={SELLER_AUCTION_CREATE_PATH}
-                    className="text-sm font-medium text-sky-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:text-sky-300"
-                  >
-                    Create Auction
-                  </Link>
-                  <Link
-                    href={SELLER_AUCTIONS_PATH}
-                    className="text-sm font-medium text-sky-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:text-sky-300"
-                  >
-                    View all auctions
-                  </Link>
+                <div className="mt-4 space-y-3">
+                  {recentAuctions.length > 0 ? (
+                    recentAuctions.map((item) => (
+                      <AuctionPreview key={item.id} item={item} />
+                    ))
+                  ) : (
+                    <p className="rounded-xl border border-dashed border-zinc-300 px-4 py-6 text-sm text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
+                      No auctions on your products yet.
+                    </p>
+                  )}
                 </div>
-              </div>
-              <div className="mt-4 space-y-3">
-                {recentAuctions.length > 0 ? (
-                  recentAuctions.map((item) => (
-                    <AuctionPreview key={item.id} item={item} />
-                  ))
-                ) : (
-                  <p className="rounded-xl border border-dashed border-zinc-300 px-4 py-6 text-sm text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
-                    No auctions on your products yet.
-                  </p>
-                )}
-              </div>
-            </section>
-          </div>
+              </section>
+            </div>
+          </FadeUp>
         </>
       ) : null}
     </div>

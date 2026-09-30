@@ -7,6 +7,9 @@ import useSWR from 'swr';
 
 import AuctionGrid from '@/components/marketplace/AuctionGrid';
 import { AuctionGridSkeleton } from '@/components/marketplace/MarketplaceStates';
+import FadeUp from '@/components/motion/FadeUp';
+import StaggerList from '@/components/motion/StaggerList';
+import StaggerItem from '@/components/motion/StaggerItem';
 import { useAuth } from '@/context/AuthContext';
 import {
   AUCTIONS_LIST_API_PATH,
@@ -196,86 +199,96 @@ export default function BuyerHomePage() {
       {!loading && !error && !hasNoBids ? (
         <>
           <section aria-label="Buyer summary">
-            <div className="grid gap-4 sm:grid-cols-3">
-              <MetricCard
-                label="Auctions Bid On"
-                value={metrics.auctionsBidOn}
-                hint="Distinct auctions from your bid history"
-                icon={<Gavel className="h-4 w-4" />}
-              />
-              <MetricCard
-                label="Won Auctions"
-                value={metrics.wonAuctions}
-                hint="Closed auctions you won"
-                icon={<Trophy className="h-4 w-4" />}
-              />
-              <MetricCard
-                label="Pending Checkout"
-                value={metrics.pendingCheckout}
-                hint="Won auctions with unpaid checkout status"
-                icon={<Wallet className="h-4 w-4" />}
-              />
-            </div>
+            <StaggerList className="grid gap-4 sm:grid-cols-3">
+              <StaggerItem>
+                <MetricCard
+                  label="Auctions Bid On"
+                  value={metrics.auctionsBidOn}
+                  hint="Distinct auctions from your bid history"
+                  icon={<Gavel className="h-4 w-4" />}
+                />
+              </StaggerItem>
+              <StaggerItem>
+                <MetricCard
+                  label="Won Auctions"
+                  value={metrics.wonAuctions}
+                  hint="Closed auctions you won"
+                  icon={<Trophy className="h-4 w-4" />}
+                />
+              </StaggerItem>
+              <StaggerItem>
+                <MetricCard
+                  label="Pending Checkout"
+                  value={metrics.pendingCheckout}
+                  hint="Won auctions with unpaid checkout status"
+                  icon={<Wallet className="h-4 w-4" />}
+                />
+              </StaggerItem>
+            </StaggerList>
           </section>
 
-          <section aria-labelledby="recent-bids-heading">
-            <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-              <div>
-                <h2
-                  id="recent-bids-heading"
-                  className="text-xl font-semibold text-zinc-900 dark:text-white"
+          <FadeUp delay={1} className="mt-8">
+            <section aria-labelledby="recent-bids-heading">
+              <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+                <div>
+                  <h2
+                    id="recent-bids-heading"
+                    className="text-xl font-semibold text-zinc-900 dark:text-white"
+                  >
+                    Recent bid activity
+                  </h2>
+                  <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+                    Auctions you have participated in, newest first.
+                  </p>
+                </div>
+                <Link
+                  href="/buyer/my-bids"
+                  className="text-sm font-medium text-amber-700 hover:underline dark:text-amber-300"
                 >
-                  Recent bid activity
-                </h2>
-                <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-                  Auctions you have participated in, newest first.
-                </p>
+                  View my bids
+                </Link>
               </div>
-              <Link
-                href="/buyer/my-bids"
-                className="text-sm font-medium text-amber-700 hover:underline dark:text-amber-300"
-              >
-                View my bids
-              </Link>
-            </div>
-            {recentAuctions.length > 0 ? (
-              <AuctionGrid auctions={recentAuctions} />
-            ) : (
-              <p className="rounded-xl border border-dashed border-zinc-300 px-4 py-6 text-sm text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
-                Your bids are recorded, but matching auction listings could not
-                be joined yet.
-              </p>
-            )}
-          </section>
+              {recentAuctions.length > 0 ? (
+                <AuctionGrid auctions={recentAuctions} />
+              ) : (
+                <p className="rounded-xl border border-dashed border-zinc-300 px-4 py-6 text-sm text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
+                  Your bids are recorded, but matching auction listings could not
+                  be joined yet.
+                </p>
+              )}
+            </section>
+          </FadeUp>
 
-          <section aria-labelledby="won-preview-heading">
-            <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-              <div>
-                <h2
-                  id="won-preview-heading"
-                  className="text-xl font-semibold text-zinc-900 dark:text-white"
+          <FadeUp delay={2} className="mt-8">
+            <section aria-labelledby="won-preview-heading">
+              <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+                <div>
+                  <h2
+                    id="won-preview-heading"
+                    className="text-xl font-semibold text-zinc-900 dark:text-white"
+                  >
+                    Won auctions
+                  </h2>
+                  <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+                    Closed listings where you are the winning bidder.
+                  </p>
+                </div>
+                <Link
+                  href={BUYER_WON_PATH}
+                  className="text-sm font-medium text-amber-700 hover:underline dark:text-amber-300"
                 >
-                  Won auctions
-                </h2>
-                <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-                  Closed listings where you are the winning bidder.
-                </p>
+                  View all won auctions
+                </Link>
               </div>
-              <Link
-                href={BUYER_WON_PATH}
-                className="text-sm font-medium text-amber-700 hover:underline dark:text-amber-300"
-              >
-                View all won auctions
-              </Link>
-            </div>
-            {wonPreview.length > 0 ? (
-              <AuctionGrid auctions={wonPreview} />
-            ) : (
-              <p className="rounded-xl border border-dashed border-zinc-300 px-4 py-6 text-sm text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
-                No won auctions yet. Keep bidding on live listings.
-              </p>
-            )}
-          </section>
+              {wonPreview.length > 0 ? (
+                <AuctionGrid auctions={wonPreview} />
+              ) : (
+                <p className="rounded-xl border border-dashed border-zinc-300 px-4 py-6 text-sm text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
+                  No won auctions yet. Keep bidding on live listings.
+                </p>
+              )}
+            </section>
+          </FadeUp>
         </>
       ) : null}
     </div>

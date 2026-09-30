@@ -4,6 +4,7 @@ import {
   buildSupportChatRequest,
   type SupportChatRequest,
   type SupportChatResponse,
+  type ChatAuctionCard,
 } from '@/lib/supportChat';
 
 export {
@@ -39,10 +40,26 @@ export async function sendSupportChatMessage(
   if (!answer) {
     throw new Error('BidKori Help returned an empty answer.');
   }
+
+  // Parse auction cards — validate structure from backend
+  let auctionCards: ChatAuctionCard[] = [];
+  if (Array.isArray(data?.auction_cards)) {
+    auctionCards = data.auction_cards.filter(
+      (card): card is ChatAuctionCard =>
+        typeof card === 'object' &&
+        card !== null &&
+        typeof card.auction_id === 'number' &&
+        typeof card.title === 'string' &&
+        typeof card.href === 'string',
+    );
+  }
+
   return {
     answer,
     message: answer,
     action: data?.action || null,
     suggestions: Array.isArray(data?.suggestions) ? data.suggestions : [],
+    auction_cards: auctionCards,
   };
 }
+

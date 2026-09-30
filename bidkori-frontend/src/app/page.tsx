@@ -5,8 +5,6 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
-import gsap from 'gsap';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import {
   ArrowRight,
   Clock,
@@ -25,7 +23,6 @@ import {
 } from 'lucide-react';
 import useSWR from 'swr';
 
-import AuctionCard from '@/components/AuctionCard';
 import AuctionGrid from '@/components/marketplace/AuctionGrid';
 import {
   AuctionGridSkeleton,
@@ -56,12 +53,9 @@ import {
   sortAuctionsEndingSoon,
 } from '@/lib/marketplace';
 import { resolveMediaUrl } from '@/lib/media';
-import { isReducedMotionPreferred, MOTION_DURATIONS, MOTION_EASINGS } from '@/lib/motionTokens';
+import { MOTION_DURATIONS, MOTION_EASINGS } from '@/lib/motionTokens';
+import { initLandingHero, initLandingScrollTriggers } from '@/lib/motion/gsap';
 import type { Auction, Category } from '@/lib/types';
-
-if (typeof window !== 'undefined') {
-  gsap.registerPlugin(ScrollTrigger);
-}
 
 const PREVIEW_LIMIT = 4;
 
@@ -347,53 +341,16 @@ export default function HomePage() {
     ];
   }, [categories]);
 
-  // GSAP Cinematic Entrance & ScrollTrigger Animation with Cleanup
+  // GSAP Cinematic Entrance & ScrollTrigger Animation with Scoped Context & Cleanup
   useEffect(() => {
-    if (typeof window === 'undefined' || isReducedMotionPreferred()) return;
+    if (!landingContainerRef.current) return;
 
-    const ctx = gsap.context(() => {
-      // Hero entrance sequence with fromTo to guarantee opacity 1
-      const tl = gsap.timeline({ defaults: { ease: 'power3.out', duration: 0.6 } });
-      tl.fromTo('.gsap-hero-badge', { opacity: 0, y: -12 }, { opacity: 1, y: 0, delay: 0.05 })
-        .fromTo('.gsap-hero-title', { opacity: 0, y: 18 }, { opacity: 1, y: 0 }, '-=0.35')
-        .fromTo('.gsap-hero-desc', { opacity: 0, y: 14 }, { opacity: 1, y: 0 }, '-=0.35')
-        .fromTo('.gsap-hero-cta', { opacity: 0, y: 10 }, { opacity: 1, y: 0 }, '-=0.35')
-        .fromTo('.gsap-hero-visual', { opacity: 0, scale: 0.96, y: 16 }, { opacity: 1, scale: 1, y: 0 }, '-=0.4');
-
-      // ScrollTrigger section reveals
-      const scrollSections = [
-        { trigger: '.gsap-categories', y: 20 },
-        { trigger: '.gsap-live-auctions', y: 24 },
-        { trigger: '.gsap-ending-soon', y: 24 },
-        { trigger: '.gsap-why-choose', y: 24 },
-        { trigger: '.gsap-how-works', y: 24 },
-        { trigger: '.gsap-seller-cta', y: 24 },
-      ];
-
-      scrollSections.forEach(({ trigger, y }) => {
-        const el = document.querySelector(trigger);
-        if (el) {
-          gsap.fromTo(
-            el,
-            { opacity: 0, y },
-            {
-              scrollTrigger: {
-                trigger: el,
-                start: 'top 88%',
-                toggleActions: 'play none none none',
-              },
-              opacity: 1,
-              y: 0,
-              duration: 0.6,
-              ease: 'power2.out',
-            }
-          );
-        }
-      });
-    }, landingContainerRef);
+    const hero = initLandingHero(landingContainerRef.current);
+    const cleanupTriggers = initLandingScrollTriggers(landingContainerRef.current);
 
     return () => {
-      ctx.revert();
+      hero.cleanup();
+      cleanupTriggers();
     };
   }, []);
 

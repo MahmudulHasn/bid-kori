@@ -17,9 +17,7 @@ import {
   Shield,
   ShieldAlert,
   ShieldCheck,
-  Sparkles,
   Store,
-  TrendingUp,
   Trophy,
   User,
   UserCheck,
@@ -28,6 +26,9 @@ import {
 } from 'lucide-react';
 import useSWR from 'swr';
 
+import FadeUp from '@/components/motion/FadeUp';
+import StaggerList from '@/components/motion/StaggerList';
+import StaggerItem from '@/components/motion/StaggerItem';
 import { useAuth } from '@/context/AuthContext';
 import {
   ADMIN_PROFILE_PATH,
@@ -383,92 +384,110 @@ export default function AdminHomePage() {
         <h2 id="primary-kpis-heading" className="sr-only">
           Primary Platform KPIs
         </h2>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <MetricCard
-            label="Total Platform Users"
-            value={users?.total}
-            hint={`${users?.buyers ?? 0} buyers, ${users?.sellers ?? 0} sellers`}
-            icon={<Users className="h-5 w-5" />}
-            loading={isLoading}
-          />
-          <MetricCard
-            label="Live Auctions"
-            value={auctions?.live}
-            hint={`${auctions?.upcoming ?? 0} upcoming countdowns`}
-            icon={<Gavel className="h-5 w-5" />}
-            loading={isLoading}
-            badge={
-              <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
-                Active Bidding
-              </span>
-            }
-          />
-          <MetricCard
-            label="Gross Volume (GMV)"
-            value={formatAdminMoney(finance?.gross_paid_volume)}
-            hint="Completed checkout ledger"
-            icon={<DollarSign className="h-5 w-5" />}
-            loading={isLoading}
-          />
-          <MetricCard
-            label="Platform Fee Revenue"
-            value={formatAdminMoney(finance?.platform_revenue)}
-            hint="2.00% standard commission"
-            icon={<Trophy className="h-5 w-5" />}
-            loading={isLoading}
-            badge={
-              <span className="inline-flex items-center rounded-full bg-violet-100 px-2 py-0.5 text-xs font-semibold text-violet-800 dark:bg-violet-950/60 dark:text-violet-300">
-                Revenue
-              </span>
-            }
-          />
-          <MetricCard
-            label="Total Products Listed"
-            value={products?.total}
-            hint="Catalog inventory"
-            icon={<Package className="h-5 w-5" />}
-            loading={isLoading}
-          />
-          <MetricCard
-            label="Total Bids Placed"
-            value={bids?.total}
-            hint="Real-time bidding events"
-            icon={<Activity className="h-5 w-5" />}
-            loading={isLoading}
-          />
-          <MetricCard
-            label="Completed Sales"
-            value={finance?.completed_sales_count}
-            hint="Paid auction settlements"
-            icon={<Store className="h-5 w-5" />}
-            loading={isLoading}
-          />
-          <MetricCard
-            label="Seller Net Earnings"
-            value={formatAdminMoney(finance?.seller_net_total)}
-            hint="Net after commission"
-            icon={<UserCheck className="h-5 w-5" />}
-            loading={isLoading}
-          />
-        </div>
+        <StaggerList className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <StaggerItem>
+            <MetricCard
+              label="Total Platform Users"
+              value={users?.total}
+              hint={`${users?.buyers ?? 0} buyers, ${users?.sellers ?? 0} sellers`}
+              icon={<Users className="h-5 w-5" />}
+              loading={isLoading}
+            />
+          </StaggerItem>
+          <StaggerItem>
+            <MetricCard
+              label="Live Auctions"
+              value={auctions?.live}
+              hint={`${auctions?.upcoming ?? 0} upcoming countdowns`}
+              icon={<Gavel className="h-5 w-5" />}
+              loading={isLoading}
+              badge={
+                <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                  Active Bidding
+                </span>
+              }
+            />
+          </StaggerItem>
+          <StaggerItem>
+            <MetricCard
+              label="Gross Volume (GMV)"
+              value={formatAdminMoney(finance?.gross_paid_volume)}
+              hint="Completed checkout ledger"
+              icon={<DollarSign className="h-5 w-5" />}
+              loading={isLoading}
+            />
+          </StaggerItem>
+          <StaggerItem>
+            <MetricCard
+              label="Platform Fee Revenue"
+              value={formatAdminMoney(finance?.platform_revenue)}
+              hint="2.00% standard commission"
+              icon={<Trophy className="h-5 w-5" />}
+              loading={isLoading}
+              badge={
+                <span className="inline-flex items-center rounded-full bg-violet-100 px-2 py-0.5 text-xs font-semibold text-violet-800 dark:bg-violet-950/60 dark:text-violet-300">
+                  Revenue
+                </span>
+              }
+            />
+          </StaggerItem>
+          <StaggerItem>
+            <MetricCard
+              label="Total Products Listed"
+              value={products?.total}
+              hint="Catalog inventory"
+              icon={<Package className="h-5 w-5" />}
+              loading={isLoading}
+            />
+          </StaggerItem>
+          <StaggerItem>
+            <MetricCard
+              label="Total Bids Placed"
+              value={bids?.total}
+              hint="Real-time bidding events"
+              icon={<Activity className="h-5 w-5" />}
+              loading={isLoading}
+            />
+          </StaggerItem>
+          <StaggerItem>
+            <MetricCard
+              label="Completed Sales"
+              value={finance?.completed_sales_count}
+              hint="Paid auction settlements"
+              icon={<Store className="h-5 w-5" />}
+              loading={isLoading}
+            />
+          </StaggerItem>
+          <StaggerItem>
+            <MetricCard
+              label="Seller Net Earnings"
+              value={formatAdminMoney(finance?.seller_net_total)}
+              hint="Net after commission"
+              icon={<UserCheck className="h-5 w-5" />}
+              loading={isLoading}
+            />
+          </StaggerItem>
+        </StaggerList>
       </section>
 
       {/* REAL-TIME BIDDING TIMELINE CHART */}
-      <SectionCard
-        title="Live Bidding Activity Progression"
-        subtitle="Real-time escalation history from live marketplace auctions"
-        action={
-          <Link
-            href={ADMIN_ANALYTICS_PATH}
-            className="flex items-center gap-1 text-xs font-semibold text-violet-700 hover:underline dark:text-violet-300"
-          >
-            <span>Full Analytics</span>
-            <ArrowUpRight className="h-3.5 w-3.5" />
-          </Link>
-        }
-      >
-        <BiddingTimelineChart points={timelinePoints} height={260} />
-      </SectionCard>
+      <FadeUp delay={1} className="mt-8">
+        <SectionCard
+          title="Live Bidding Activity Progression"
+          subtitle="Real-time escalation history from live marketplace auctions"
+          action={
+            <Link
+              href={ADMIN_ANALYTICS_PATH}
+              className="flex items-center gap-1 text-xs font-semibold text-violet-700 hover:underline dark:text-violet-300"
+            >
+              <span>Full Analytics</span>
+              <ArrowUpRight className="h-3.5 w-3.5" />
+            </Link>
+          }
+        >
+          <BiddingTimelineChart points={timelinePoints} height={260} />
+        </SectionCard>
+      </FadeUp>
 
       {/* SECTION 6 & 7 — AUCTION STATUS & USER BREAKDOWNS WITH REAL CHARTS */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
